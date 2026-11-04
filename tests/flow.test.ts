@@ -297,6 +297,15 @@ describe('meerdere tabbladen', () => {
   })
 })
 
+describe('doorzetten zonder leverancier op het artikel', () => {
+  it('weigert en verwijst naar Beheer', async () => {
+    const s = await loadSnapshot(db)
+    const [line] = linesToPurchase(s)
+    await db.update('products', line.product_id, { supplier_id: null })
+    await expect(convertLinesToPurchaseOrders(db, { lines: [{ sales_order_line_id: line.id }], order_date: TODAY, warehouse_id: s.warehouses[1].id })).rejects.toThrow(/geen leverancier/)
+  })
+})
+
 describe('taal van documenten', () => {
   it('volgt de keuze onder Beheer en anders de klant', () => {
     expect(documentLanguage('klant', 'es')).toBe('es')
@@ -480,7 +489,7 @@ describe('doorzetten naar inkoop', () => {
     expect(suppliersIn.size).toBeGreaterThan(1)
     const transport = s.transports.find((t) => t.status === 'planned')!
     const ids = await convertLinesToPurchaseOrders(db, {
-      lines: queue.map((l) => ({ sales_order_line_id: l.id, supplier_id: s.products.find((p) => p.id === l.product_id)!.supplier_id! })),
+      lines: queue.map((l) => ({ sales_order_line_id: l.id })),
       order_date: TODAY, warehouse_id: s.warehouses[1].id,
     })
     expect(ids).toHaveLength(suppliersIn.size)
@@ -495,7 +504,7 @@ describe('doorzetten naar inkoop', () => {
     const linked = await loadSnapshot(db)
     expect(linked.inbound_shipments.find((x) => x.id === rows[0].id)).toMatchObject({ transport_id: transport.id, expected_date: transport.arrival_date })
     expect(linked.inbound_shipments.find((x) => x.id === rows[1].id)!.transport_id).toBeNull()
-    await expect(convertLinesToPurchaseOrders(db, { lines: [{ sales_order_line_id: queue[0].id, supplier_id: s.suppliers[0].id }], order_date: TODAY, warehouse_id: s.warehouses[1].id })).rejects.toThrow(/al ingekocht/)
+    await expect(convertLinesToPurchaseOrders(db, { lines: [{ sales_order_line_id: queue[0].id }], order_date: TODAY, warehouse_id: s.warehouses[1].id })).rejects.toThrow(/al ingekocht/)
   })
 })
 

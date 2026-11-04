@@ -341,3 +341,14 @@ body.route-dragging, body.route-dragging * { cursor: grabbing !important; user-s
 .sku { display: block; color: var(--muted); font-size: .78rem; font-weight: 400; font-variant-numeric: tabular-nums; letter-spacing: .01em; }
 .sku.inline, .inline-sku .sku { display: inline; margin-left: 6px; }
 .small > .sku { display: inline; }
+
+/* Door te zetten: klik selecteert, driehoek klapt */
+.queue tr.pick { cursor: pointer; }
+.queue tr.pick:hover td { background: var(--sell); }
+.queue tr.pick:focus-visible { outline: 2px solid var(--ochre); outline-offset: -2px; }
+.queue tr.pick.sel td, .queue tr.pick.partly td:first-child { background: var(--sell); color: var(--sell-fg); }
+.queue tr.pick.sel td:first-child { box-shadow: inset 3px 0 0 var(--ochre); }
+.tri { display: grid; place-items: center; width: 32px; height: 32px; padding: 0; border: 0; border-radius: 6px; background: none; color: var(--fg); cursor: pointer; }
+.tri:hover { background: var(--surface); }
+.tri svg { transition: transform .12s; }
+.tri.open svg { transform: rotate(180deg); }

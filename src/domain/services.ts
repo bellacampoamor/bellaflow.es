@@ -86,21 +86,23 @@ export async function setPurchaseLabel(db: Driver, id: string, label: PurchaseLa
 }
 
 export interface ConvertInput {
-  lines: { sales_order_line_id: string; supplier_id: string }[]
+  lines: { sales_order_line_id: string }[]
   order_date: string; warehouse_id: string
 }
 
 /** Zet aangevinkte regels van verkooporders door: per leverancier één inkooporder. */
 export async function convertLinesToPurchaseOrders(db: Driver, input: ConvertInput) {
   if (!input.lines.length) fail(tx("Vink minimaal één regel aan."))
-  if (input.lines.some((l) => !l.supplier_id)) fail(tx("Kies bij elke regel een leverancier."))
   if (!input.warehouse_id) fail(tx("Kies een bestemming."))
   const s = await loadSnapshot(db)
   const open = linesToPurchase(s)
   const rows = input.lines.map((l) => {
     const line = open.find((x) => x.id === l.sales_order_line_id)
     if (!line) fail(tx("Een van de regels is al ingekocht. Ververs het overzicht."))
-    return { line: line!, supplier_id: l.supplier_id }
+    // Een artikel hoort bij één leverancier; die staat op het product.
+    const supplier_id = s.products.find((p) => p.id === line!.product_id)?.supplier_id
+    if (!supplier_id) fail(tx("{0} heeft geen leverancier. Stel die in onder Beheer.", line!.description))
+    return { line: line!, supplier_id: supplier_id! }
   })
   const ids: string[] = []
   for (const supplier_id of new Set(rows.map((r) => r.supplier_id))) {
