@@ -34,6 +34,7 @@ export const en: Record<string, string> = {
   "Afdrukken of PDF": "Print or PDF",
   "Afgedrukt": "Printed",
   "Afgerond": "Completed",
+  "Afmelden als geleverd": "Mark as delivered",
   "{0} is al afgeleverd": "{0} has already been delivered",
   "Terug naar Levering": "Back to Delivery",
   "Afleverbon toch openen": "Open delivery note anyway",

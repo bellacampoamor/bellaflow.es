@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { CalendarClock, Check as CheckIcon, ChevronDown, ChevronUp, ClipboardCheck, FileText, GripVertical, Map as MapIcon, Route, Truck } from 'lucide-react'
+import { CalendarClock, ChevronDown, ChevronUp, ClipboardCheck, FileText, GripVertical, Map as MapIcon, PackageCheck, Route, Truck } from 'lucide-react'
 import { geocodeAddress, travelMatrix, type TravelMatrix } from '../data/geo'
 import type { Delivery, SalesOrder } from '../data/types'
 import { deliveryIsOpen, invoicesOnDelivery, isPartialDelivery, onHandMap, stockKey, todayISO } from '../domain/calc'
@@ -129,7 +129,7 @@ export function Deliveries() {
           {d.status !== 'planned' && needsNote && <a className="btn sm" href={`#levering-${d.id}`}><FileText size={14} />{tx("Afleverbon")}</a>}
           {d.status === 'planned' && needsNote && <button className="btn sm primary" onClick={() => setPrepare(d)}><ClipboardCheck size={14} />{tx("Klaarzetten")}</button>}
           {d.status === 'ready' && needsNote && <button className="btn sm" onClick={() => run((db) => setDeliveryInTransit(db, d.id), tx("{0} is onderweg", d.number))}><Truck size={14} />{tx("Onderweg")}</button>}
-          {(d.status !== 'planned' || !needsNote) && <button className="btn sm primary" onClick={() => setFinish(d)}><CheckIcon size={14} />{tx("Geleverd")}</button>}
+          {(d.status !== 'planned' || !needsNote) && <button className="btn sm primary" onClick={() => setFinish(d)}><PackageCheck size={14} />{tx("Afmelden als geleverd")}</button>}
         </div>
       </div>
     )

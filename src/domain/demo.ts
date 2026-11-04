@@ -5,7 +5,7 @@ import type { Customer, Product, Salesperson, Supplier, Warehouse } from '../dat
 import { addDays, openLinesOnTransport, todayISO } from './calc'
 import {
   closeShipment, createDelivery, createInvoice, createTransport, createOrder, createPurchaseOrder, lineFromProduct, markDelivered, markNotePrinted, markReady, payInvoice,
-  receiveGoods, setTransportStatus, type OrderHeader, type OrderLineInput,
+  receiveGoods, rescheduleOrder, setTransportStatus, type OrderHeader, type OrderLineInput,
 } from './services'
 import { loadSnapshot } from '../data/driver'
 
@@ -190,6 +190,7 @@ export async function seedDemo(db: Driver, today = todayISO()) {
   const dl2 = await createDelivery(db, { sales_order_id: o2, method: 'eigen_team', planned_date: d(-3), carrier: '', notes: '', lines: o2l.map((l) => ({ sales_order_line_id: l.id, qty: Math.ceil(l.qty / 2) })) })
   await markReady(db, dl2, { approved_by: 'Magazijn', date: d(-4) })
   await markDelivered(db, dl2, { date: d(-3), signed_by: 'Receptie Mirador', signed_note_received: true })
+  await rescheduleOrder(db, o2, { new_date: today, reason: 'Tweede deel', customer_notified: true })
   const dl3 = await createDelivery(db, { sales_order_id: o2, method: 'eigen_team', planned_date: today, carrier: '', notes: '', lines: o2l.map((l) => ({ sales_order_line_id: l.id, qty: Math.floor(l.qty / 2) })) })
 
   await markReady(db, dl3, { approved_by: 'Magazijn', date: today })
