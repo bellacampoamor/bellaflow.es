@@ -98,6 +98,11 @@ function DriverStop({ id }: { id: string }) {
           <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`} target="_blank" rel="noreferrer">{address}</a>
           {o.delivery_phone && <div><a className="drv-tel" href={`tel:${o.delivery_phone.replace(/\s/g, '')}`}><Phone size={15} />{o.delivery_phone}</a></div>}
         </div>
+        <div>
+          <div className="muted small">{t.bill}</div>
+          <div className="strong">{c.company || c.name}</div>
+          {c.company && c.name && c.name !== c.company && <div>{c.name}</div>}
+        </div>
         <ul className="drv-lines">{lines.map((l) => (
           <li key={l.id}><b>{l.qty} ×</b><span>{l.sol.description}<Sku code={articleNo(s, l.sol.product_id)} />{l.sol.options && <span className="muted small"><br />{l.sol.options}</span>}</span></li>
         ))}</ul>

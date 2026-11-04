@@ -147,7 +147,7 @@ function Route({ screen, param }: { screen: string; param: string }) {
       if (param === 'nieuw') return <OrderForm />
       if (param.startsWith('wijzig-')) return <OrderForm id={param.slice(7)} />
       return param ? <OrderDetail id={param} /> : <Orders />
-    case 'levering': return param.startsWith('print-') ? <DeliveryNote key={param} id={param.slice(6)} autoPrint /> : param ? <DeliveryNote key={param} id={param} /> : <Deliveries />
+    case 'levering': return param.startsWith('print-') ? <DeliveryNote key={param} id={param.slice(6)} autoPrint /> : param.startsWith('archief-') ? <DeliveryNote key={param} id={param.slice(8)} fromArchive /> : param ? <DeliveryNote key={param} id={param} /> : <Deliveries />
     case 'facturatie': return param.startsWith('print-') ? <InvoiceDetail key={param} id={param.slice(6)} autoPrint /> : param ? <InvoiceDetail key={param} id={param} /> : <Invoices />
     case 'archief': return <ArchiveScreen />
     case 'voorraad': return <Stock />

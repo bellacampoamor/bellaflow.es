@@ -58,6 +58,10 @@ export async function signedNotePdf(s: Snapshot, deliveryId: string) {
   put(t.to, { size: 9, color: MUTED })
   put(o.delivery_name || c.company || c.name, { font: bold })
   put([o.delivery_address, `${o.delivery_postal_code} ${o.delivery_city}`.trim()].filter(Boolean).join(', '))
+  y -= 8
+  put(t.bill, { size: 9, color: MUTED })
+  put(c.company || c.name, { font: bold })
+  if (c.company && c.name && c.name !== c.company) put(c.name)
   y -= 14
   put(`${t.qty}  /  ${t.prod}`, { size: 9, color: MUTED })
   page.drawLine({ start: { x: MARGIN, y }, end: { x: MARGIN + width, y }, thickness: 0.8, color: INK })
