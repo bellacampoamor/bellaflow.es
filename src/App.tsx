@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Moon, Sun, Boxes, ClipboardList, FileText, LayoutDashboard, PackageCheck, Settings2, ShoppingCart, Truck, Warehouse as WarehouseIcon } from 'lucide-react'
+import { Languages, Moon, Sun, Boxes, ClipboardList, FileText, LayoutDashboard, PackageCheck, Settings2, ShoppingCart, Truck, Warehouse as WarehouseIcon } from 'lucide-react'
 import { flowCounts } from './domain/calc'
 import { useApp, useHash } from './ui/app-context'
 import { Logo, Modal } from './ui/kit'
@@ -14,14 +14,15 @@ import { DeliveryNote } from './screens/DeliveryNote'
 import { InvoiceDetail, Invoices } from './screens/Invoices'
 import { Stock } from './screens/Stock'
 import { Admin } from './screens/Admin'
+import { getLanguage, setLanguage, tx } from './i18n'
 
 const STEPS = [
-  { key: 'inkoop', label: '1. Inkoop', sub: (n: number) => `${n} nog in te kopen`, icon: ShoppingCart, tint: '' },
-  { key: 'inkomend', label: '2. Inkomend', sub: (n: number) => (n ? `${n} te laat` : 'deelleveringen'), icon: Truck, tint: '' },
-  { key: 'ontvangst', label: '3. Ontvangst', sub: (n: number) => `${n} binnen 7 dagen`, icon: PackageCheck, tint: 'sell' },
-  { key: 'orders', label: '4. Orders', sub: (n: number) => `${n} te plannen`, icon: ClipboardList, tint: 'sell' },
-  { key: 'levering', label: '5. Levering', sub: (n: number) => `${n} vandaag`, icon: Truck, tint: 'ship' },
-  { key: 'facturatie', label: '6. Facturatie', sub: (n: number) => `${n} te factureren`, icon: FileText, tint: 'bill' },
+  { key: 'inkoop', label: '1. Inkoop', sub: (n: number) => tx("{0} nog in te kopen", n), icon: ShoppingCart, tint: '' },
+  { key: 'inkomend', label: '2. Inkomend', sub: (n: number) => (n ? tx("{0} te laat", n) : tx("deelleveringen")), icon: Truck, tint: '' },
+  { key: 'ontvangst', label: '3. Ontvangst', sub: (n: number) => tx("{0} binnen 7 dagen", n), icon: PackageCheck, tint: 'sell' },
+  { key: 'orders', label: '4. Orders', sub: (n: number) => tx("{0} te plannen", n), icon: ClipboardList, tint: 'sell' },
+  { key: 'levering', label: '5. Levering', sub: (n: number) => tx("{0} vandaag", n), icon: Truck, tint: 'ship' },
+  { key: 'facturatie', label: '6. Facturatie', sub: (n: number) => tx("{0} te factureren", n), icon: FileText, tint: 'bill' },
 ] as const
 
 const THEME_KEY = 'bella-flow-theme'
@@ -43,6 +44,13 @@ function useTheme() {
 export function App({ onResetDemo, onSignOut }: { onResetDemo?: () => Promise<void>; onSignOut?: () => void }) {
   const { s } = useApp()
   const [theme, toggleTheme] = useTheme()
+  const [language, setUiLanguage] = useState(getLanguage)
+  const switchLanguage = () => {
+    const next = language === 'nl' ? 'en' : 'nl'
+    setLanguage(next)
+    setUiLanguage(next)
+  }
+  useEffect(() => { document.documentElement.lang = language }, [language])
   const hash = useHash()
   const [confirmReset, setConfirmReset] = useState(false)
   const dash = hash.indexOf('-')
@@ -55,31 +63,32 @@ export function App({ onResetDemo, onSignOut }: { onResetDemo?: () => Promise<vo
       {onResetDemo && (
         <div className="demo-bar wrap">
           <div className="inner">
-            <span>Dit zijn verzonnen voorbeeldgegevens. Wijzigingen blijven alleen in deze browser.</span>
-            <button className="linklike" onClick={() => setConfirmReset(true)}>Voorbeeldgegevens herstellen</button>
+            <span>{tx("Dit zijn verzonnen voorbeeldgegevens. Wijzigingen blijven alleen in deze browser.")}</span>
+            <button className="linklike" onClick={() => setConfirmReset(true)}>{tx("Voorbeeldgegevens herstellen")}</button>
           </div>
         </div>
       )}
       <header className="top wrap">
         <div className="inner top-row">
-          <a className="brand" href="#overzicht" aria-label="Bella Flow, naar overzicht"><Logo /></a>
-          <nav className="util" aria-label="Algemeen">
-            <a href="#overzicht" className={screen === 'overzicht' ? 'on' : ''}><LayoutDashboard size={16} />Overzicht</a>
-            <a href="#voorraad" className={screen === 'voorraad' ? 'on' : ''}><Boxes size={16} />Voorraad</a>
-            <a href="#beheer" className={screen === 'beheer' ? 'on' : ''}><Settings2 size={16} />Beheer</a>
-            <button className="btn-toggle" onClick={toggleTheme}>{theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}{theme === 'dark' ? 'Dagstand' : 'Nachtstand'}</button>
-            {onSignOut && <a href="#overzicht" onClick={onSignOut}>Uitloggen</a>}
+          <a className="brand" href="#overzicht" aria-label={tx("Bella Flow, naar overzicht")}><Logo /></a>
+          <nav className="util" aria-label={tx("Algemeen")}>
+            <a href="#overzicht" className={screen === 'overzicht' ? 'on' : ''}><LayoutDashboard size={16} />{tx("Overzicht")}</a>
+            <a href="#voorraad" className={screen === 'voorraad' ? 'on' : ''}><Boxes size={16} />{tx("Voorraad")}</a>
+            <a href="#beheer" className={screen === 'beheer' ? 'on' : ''}><Settings2 size={16} />{tx("Beheer")}</a>
+            <button className="btn-toggle" onClick={switchLanguage}><Languages size={16} />{language === 'nl' ? 'English' : 'Nederlands'}</button>
+            <button className="btn-toggle" onClick={toggleTheme}>{theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}{theme === 'dark' ? tx("Dagstand") : tx("Nachtstand")}</button>
+            {onSignOut && <a href="#overzicht" onClick={onSignOut}>{tx("Uitloggen")}</a>}
           </nav>
         </div>
       </header>
       <div className="ribbon-wrap wrap">
-        <nav className="inner ribbon" aria-label="Processtappen">
+        <nav className="inner ribbon" aria-label={tx("Processtappen")}>
           {STEPS.map((st) => {
             const Icon = st.icon
             return (
               <a key={st.key} href={`#${st.key}`} className={`step ${st.tint} ${screen === st.key ? 'on' : ''}`} aria-current={screen === st.key ? 'page' : undefined}>
                 <span className="ico"><Icon size={16} /></span>
-                <span className="t">{st.label}<small>{st.sub(counts[st.key])}</small></span>
+                <span className="t">{tx(st.label)}<small>{st.sub(counts[st.key])}</small></span>
               </a>
             )
           })}
@@ -91,11 +100,11 @@ export function App({ onResetDemo, onSignOut }: { onResetDemo?: () => Promise<vo
         </div>
       </main>
       {confirmReset && onResetDemo && (
-        <Modal title="Voorbeeldgegevens herstellen?" onClose={() => setConfirmReset(false)} footer={<>
-          <button className="btn" onClick={() => setConfirmReset(false)}>Annuleren</button>
-          <button className="btn primary" onClick={() => { location.hash = 'overzicht'; void onResetDemo() }}>Herstellen</button>
+        <Modal title={tx("Voorbeeldgegevens herstellen?")} onClose={() => setConfirmReset(false)} footer={<>
+          <button className="btn" onClick={() => setConfirmReset(false)}>{tx("Annuleren")}</button>
+          <button className="btn primary" onClick={() => { location.hash = 'overzicht'; void onResetDemo() }}>{tx("Herstellen")}</button>
         </>}>
-          <p style={{ margin: 0 }}>Alles wat je hebt ingevoerd verdwijnt en de voorbeeldsituatie komt terug.</p>
+          <p style={{ margin: 0 }}>{tx("Alles wat je hebt ingevoerd verdwijnt en de voorbeeldsituatie komt terug.")}</p>
         </Modal>
       )}
     </>
@@ -119,7 +128,7 @@ function Route({ screen, param }: { screen: string; param: string }) {
     default: return (
       <div className="panel">
         <WarehouseIcon size={20} />
-        <p>Deze pagina bestaat niet. <a href="#overzicht">Ga naar het overzicht</a>.</p>
+        <p>{tx("Deze pagina bestaat niet.")} <a href="#overzicht">{tx("Ga naar het overzicht")}</a>.</p>
       </div>
     )
   }

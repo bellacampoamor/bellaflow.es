@@ -4,6 +4,7 @@ import { deliveryValue, depositAvailable, invoiceBalance, invoiceState, todayISO
 import { createInvoice, payInvoice } from '../domain/services'
 import { go, useApp } from '../ui/app-context'
 import { Check, Empty, eur, fmtDate, Head, Modal, NumberField, Pill, SelectField, Tabs, TextField } from '../ui/kit'
+import { tx } from '../i18n'
 
 const STATE = { betaald: ['Betaald', 'good'], open: ['Open', 'bill'], te_laat: ['Te laat', 'bad'] } as const
 
@@ -16,13 +17,13 @@ export function Invoices() {
   const mode = s.settings[0]?.invoice_mode ?? 'manual'
   return (
     <>
-      <Head title="Facturatie" sub="Deelleveringen worden bij afmelden direct gefactureerd. Vooruitbetalingen worden verrekend.">
-        <SelectField label="Hele leveringen factureren" value={mode} onChange={(v) => run((db) => db.update('settings', 'default', { invoice_mode: v }), v === 'auto' ? 'Hele leveringen worden nu automatisch gefactureerd' : 'Hele leveringen factureer je nu zelf')} options={[{ value: 'manual', label: 'Handmatig' }, { value: 'auto', label: 'Automatisch bij levering' }]} />
+      <Head title={tx("Facturatie")} sub={tx("Deelleveringen worden bij afmelden direct gefactureerd. Vooruitbetalingen worden verrekend.")}>
+        <SelectField label={tx("Hele leveringen factureren")} value={mode} onChange={(v) => run((db) => db.update('settings', 'default', { invoice_mode: v }), v === 'auto' ? tx("Hele leveringen worden nu automatisch gefactureerd") : tx("Hele leveringen factureer je nu zelf"))} options={[{ value: 'manual', label: tx("Handmatig") }, { value: 'auto', label: tx("Automatisch bij levering") }]} />
       </Head>
       <div className="stack">
         <section className="panel">
-          <h2>Geleverd, nog te factureren</h2>
-          {pending.length === 0 && <Empty>Alle leveringen zijn gefactureerd.</Empty>}
+          <h2>{tx("Geleverd, nog te factureren")}</h2>
+          {pending.length === 0 && <Empty>{tx("Alle leveringen zijn gefactureerd.")}</Empty>}
           {pending.map((o) => {
             const ds = uninvoicedDeliveries(s, o.id)
             const c = s.customers.find((x) => x.id === o.customer_id)!
@@ -31,30 +32,30 @@ export function Invoices() {
               <div className="task" key={o.id} style={{ flexWrap: 'wrap' }}>
                 <div style={{ flex: '1 1 300px' }}>
                   <div className="task-t"><a className="rowlink" href={`#orders-${o.id}`}>{o.number}</a>, {c.company || c.name}</div>
-                  {ds.map((d) => <div className="small" key={d.id}>{d.number}, geleverd {fmtDate(d.delivered_at)}: <span className="num">{eur(deliveryValue(s, d.id))}</span></div>)}
-                  {dep > 0 && <div className="muted small">{eur(dep)} vooruitbetaald, nog te verrekenen</div>}
+                  {ds.map((d) => <div className="small" key={d.id}>{d.number}{tx(", geleverd")} {fmtDate(d.delivered_at)}: <span className="num">{eur(deliveryValue(s, d.id))}</span></div>)}
+                  {dep > 0 && <div className="muted small">{eur(dep)} {tx("vooruitbetaald, nog te verrekenen")}</div>}
                 </div>
                 <div className="actions">
-                  {ds.length > 1 && ds.map((d) => <button className="btn sm" key={d.id} onClick={() => setMake({ order: o, ids: [d.id] })}>Alleen {d.number}</button>)}
-                  <button className="btn sm primary" onClick={() => setMake({ order: o, ids: ds.map((d) => d.id) })}>Factuur maken</button>
+                  {ds.length > 1 && ds.map((d) => <button className="btn sm" key={d.id} onClick={() => setMake({ order: o, ids: [d.id] })}>{tx("Alleen")} {d.number}</button>)}
+                  <button className="btn sm primary" onClick={() => setMake({ order: o, ids: ds.map((d) => d.id) })}>{tx("Factuur maken")}</button>
                 </div>
               </div>
             )
           })}
         </section>
         <section className="panel">
-          <Tabs value={tab} onChange={setTab} tabs={[{ value: 'open', label: 'Openstaand', n: s.invoices.filter((i) => invoiceBalance(s, i) > 0).length }, { value: 'all', label: 'Alle facturen', n: s.invoices.length }]} />
-          {rows.length === 0 && <Empty>{tab === 'open' ? 'Geen openstaande facturen.' : 'Nog geen facturen.'}</Empty>}
+          <Tabs value={tab} onChange={setTab} tabs={[{ value: 'open', label: tx("Openstaand"), n: s.invoices.filter((i) => invoiceBalance(s, i) > 0).length }, { value: 'all', label: tx("Alle facturen"), n: s.invoices.length }]} />
+          {rows.length === 0 && <Empty>{tab === 'open' ? tx("Geen openstaande facturen.") : tx("Nog geen facturen.")}</Empty>}
           {rows.length > 0 && <div className="table-wrap"><table>
-            <thead><tr><th>Factuur</th><th>Datum</th><th>Klant</th><th>Soort</th><th className="num">Totaal</th><th className="num">Verrekend</th><th className="num">Open</th><th>Vervalt</th><th>Status</th></tr></thead>
+            <thead><tr><th>{tx("Factuur")}</th><th>{tx("Datum")}</th><th>{tx("Klant")}</th><th>{tx("Soort")}</th><th className="num">{tx("Totaal")}</th><th className="num">{tx("Verrekend")}</th><th className="num">{tx("Open")}</th><th>{tx("Vervalt")}</th><th>{tx("Status")}</th></tr></thead>
             <tbody>{rows.map((i) => {
               const c = s.customers.find((x) => x.id === i.customer_id)!
               const [label, tone] = STATE[invoiceState(s, i)]
               return (
                 <tr key={i.id} className="click" onClick={() => go(`facturatie-${i.id}`)}>
                   <td><a className="rowlink" href={`#facturatie-${i.id}`}>{i.number}</a></td><td>{fmtDate(i.invoice_date)}</td><td>{c.company || c.name}</td>
-                  <td>{i.kind[0].toUpperCase() + i.kind.slice(1)}</td><td className="num">{eur(i.total)}</td><td className="num">{i.deposit_settled ? eur(i.deposit_settled) : <span className="zero">–</span>}</td>
-                  <td className="num">{eur(invoiceBalance(s, i))}</td><td>{fmtDate(i.due_date)}</td><td><Pill tone={tone}>{label}</Pill></td>
+                  <td>{tx(i.kind[0].toUpperCase() + i.kind.slice(1))}</td><td className="num">{eur(i.total)}</td><td className="num">{i.deposit_settled ? eur(i.deposit_settled) : <span className="zero">–</span>}</td>
+                  <td className="num">{eur(invoiceBalance(s, i))}</td><td>{fmtDate(i.due_date)}</td><td><Pill tone={tone}>{tx(label)}</Pill></td>
                 </tr>
               )
             })}</tbody>
@@ -76,22 +77,22 @@ function MakeInvoiceModal({ order, ids, onClose }: { order: SalesOrder; ids: str
   const settled = settle ? Math.min(available, value) : 0
   const create = async () => {
     let id = ''
-    const ok = await run(async (db) => { id = await createInvoice(db, { sales_order_id: order.id, delivery_ids: ids, invoice_date: date, settle_deposit: settle }) }, 'Factuur gemaakt')
+    const ok = await run(async (db) => { id = await createInvoice(db, { sales_order_id: order.id, delivery_ids: ids, invoice_date: date, settle_deposit: settle }) }, tx("Factuur gemaakt"))
     if (ok) { onClose(); go(`facturatie-${id}`) }
   }
   return (
-    <Modal title="Factuur maken" onClose={onClose} footer={<>
-      <button className="btn" onClick={onClose}>Annuleren</button>
-      <button className="btn primary" onClick={create}>Factuur maken</button>
+    <Modal title={tx("Factuur maken")} onClose={onClose} footer={<>
+      <button className="btn" onClick={onClose}>{tx("Annuleren")}</button>
+      <button className="btn primary" onClick={create}>{tx("Factuur maken")}</button>
     </>}>
-      <TextField label="Factuurdatum" type="date" value={date} onChange={setDate} hint={last ? `Mag niet voor ${fmtDate(last)} liggen, de datum van de laatste factuur.` : undefined} />
-      {available > 0 && <Check label={`Vooruitbetaling verrekenen (${eur(available)} beschikbaar)`} checked={settle} onChange={setSettle} />}
+      <TextField label={tx("Factuurdatum")} type="date" value={date} onChange={setDate} hint={last ? tx("Mag niet voor {0} liggen, de datum van de laatste factuur.", fmtDate(last)) : undefined} />
+      {available > 0 && <Check label={tx("Vooruitbetaling verrekenen ({0} beschikbaar)", eur(available))} checked={settle} onChange={setSettle} />}
       <div className="totals" style={{ maxWidth: 'none' }}>
-        <div><span>Factuurbedrag incl. IVA</span><span>{eur(value)}</span></div>
-        {settled > 0 && <div><span>Verrekend</span><span>−{eur(settled)}</span></div>}
-        <div className="grand"><span>Te betalen</span><span>{eur(value - settled)}</span></div>
+        <div><span>{tx("Factuurbedrag incl. IVA")}</span><span>{eur(value)}</span></div>
+        {settled > 0 && <div><span>{tx("Verrekend")}</span><span>−{eur(settled)}</span></div>}
+        <div className="grand"><span>{tx("Te betalen")}</span><span>{eur(value - settled)}</span></div>
       </div>
-      <p className="small muted" style={{ margin: 0 }}>Na het maken staat de factuur vast en kan hij niet meer worden gewijzigd.</p>
+      <p className="small muted" style={{ margin: 0 }}>{tx("Na het maken staat de factuur vast en kan hij niet meer worden gewijzigd.")}</p>
     </Modal>
   )
 }
@@ -110,7 +111,7 @@ export function InvoiceDetail({ id }: { id: string }) {
   const [method, setMethod] = useState<Payment['method']>('overboeking')
   const [date, setDate] = useState(todayISO())
   const [ref, setRef] = useState('')
-  if (!inv) return <div className="panel">Factuur niet gevonden. <a href="#facturatie">Terug naar facturatie</a>.</div>
+  if (!inv) return <div className="panel">{tx("Factuur niet gevonden.")} <a href="#facturatie">{tx("Terug naar facturatie")}</a>.</div>
   const c = s.customers.find((x) => x.id === inv.customer_id)!
   const o = s.sales_orders.find((x) => x.id === inv.sales_order_id)!
   const lines = s.invoice_lines.filter((l) => l.invoice_id === id)
@@ -123,10 +124,10 @@ export function InvoiceDetail({ id }: { id: string }) {
   const canPrint = !import.meta.env.VITE_PREVIEW
   return (
     <>
-      <Head title={inv.number} sub={<>{c.company || c.name} <Pill tone={tone}>{label}</Pill></>} back={{ href: '#facturatie', label: 'Facturatie' }}>
-        <a className="btn" href={`#orders-${o.id}`}>Naar {o.number}</a>
-        {canPrint && <button className="btn" onClick={() => window.print()}>Afdrukken of PDF</button>}
-        {balance > 0 && <button className="btn primary" onClick={() => { setAmount(balance); setPay(true) }}>Betaling registreren</button>}
+      <Head title={inv.number} sub={<>{c.company || c.name} <Pill tone={tone}>{tx(label)}</Pill></>} back={{ href: '#facturatie', label: tx("Facturatie") }}>
+        <a className="btn" href={`#orders-${o.id}`}>{tx("Naar")} {o.number}</a>
+        {canPrint && <button className="btn" onClick={() => window.print()}>{tx("Afdrukken of PDF")}</button>}
+        {balance > 0 && <button className="btn primary" onClick={() => { setAmount(balance); setPay(true) }}>{tx("Betaling registreren")}</button>}
       </Head>
       <div className="paper">
         <div className="paper-top">
@@ -160,15 +161,15 @@ export function InvoiceDetail({ id }: { id: string }) {
         <p className="small muted" style={{ marginTop: 26, marginBottom: 0 }}>{t.pay}: {co.iban}{co.invoice_footer ? <><br />{co.invoice_footer}</> : ''}</p>
       </div>
       {pay && (
-        <Modal title="Betaling registreren" onClose={() => setPay(false)} footer={<>
-          <button className="btn" onClick={() => setPay(false)}>Annuleren</button>
-          <button className="btn primary" onClick={async () => { if (await run((db) => payInvoice(db, { invoice_id: id, amount, method, paid_at: date, reference: ref }), 'Betaling geregistreerd')) setPay(false) }}>Betaling registreren</button>
+        <Modal title={tx("Betaling registreren")} onClose={() => setPay(false)} footer={<>
+          <button className="btn" onClick={() => setPay(false)}>{tx("Annuleren")}</button>
+          <button className="btn primary" onClick={async () => { if (await run((db) => payInvoice(db, { invoice_id: id, amount, method, paid_at: date, reference: ref }), tx("Betaling geregistreerd"))) setPay(false) }}>{tx("Betaling registreren")}</button>
         </>}>
           <div className="form-grid">
-            <NumberField label="Bedrag" value={amount} step="0.01" min={0} onChange={setAmount} hint={`Open: ${eur(balance)}`} />
-            <SelectField label="Betaalwijze" value={method} onChange={setMethod} options={[{ value: 'overboeking', label: 'Overboeking' }, { value: 'pin', label: 'Pin' }, { value: 'contant', label: 'Contant' }, { value: 'online', label: 'Online' }]} />
-            <TextField label="Datum" type="date" value={date} onChange={setDate} />
-            <TextField label="Referentie" value={ref} onChange={setRef} />
+            <NumberField label={tx("Bedrag")} value={amount} step="0.01" min={0} onChange={setAmount} hint={tx("Open: {0}", eur(balance))} />
+            <SelectField label={tx("Betaalwijze")} value={method} onChange={setMethod} options={[{ value: 'overboeking', label: tx("Overboeking") }, { value: 'pin', label: tx("Pin") }, { value: 'contant', label: tx("Contant") }, { value: 'online', label: tx("Online") }]} />
+            <TextField label={tx("Datum")} type="date" value={date} onChange={setDate} />
+            <TextField label={tx("Referentie")} value={ref} onChange={setRef} />
           </div>
         </Modal>
       )}

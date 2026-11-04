@@ -1,8 +1,9 @@
 // Gedeelde bouwstenen voor alle schermen.
 import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react'
 import { X } from 'lucide-react'
+import { locale, tx } from '../i18n'
 
-const brandFile = (name: string) => `${import.meta.env.BASE_URL}assets/brand/${name}`
+const brandFile = (name: string) => `${import.meta.env.BASE_URL}assets/brand/${name}`/** Op smalle schermen het compacte logo. */
 
 /** Op smalle schermen het compacte logo. */
 export const Logo = () => (
@@ -13,13 +14,13 @@ export const Logo = () => (
 )
 export const LogoFull = () => <img className="logo-full" src={brandFile('bellaflow-logo-full-tagline.png')} width={2400} height={502} alt="Bella Flow" />
 
-export const eur = (n: number) => new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' }).format(n || 0)
+export const eur = (n: number) => new Intl.NumberFormat(locale(), { style: 'currency', currency: 'EUR' }).format(n || 0)
 export const fmtDate = (iso?: string | null) => {
   if (!iso) return '–'
   const [y, m, d] = iso.slice(0, 10).split('-')
   return `${d}-${m}-${y}`
 }
-export const fmtShort = (iso: string) => new Date(`${iso.slice(0, 10)}T12:00:00`).toLocaleDateString('nl-NL', { weekday: 'short', day: 'numeric', month: 'short' })
+export const fmtShort = (iso: string) => new Date(`${iso.slice(0, 10)}T12:00:00`).toLocaleDateString(locale(), { weekday: 'short', day: 'numeric', month: 'short' })
 
 export type Tone = 'good' | 'warn' | 'bad' | 'info' | 'sell' | 'bill' | ''
 export const Pill = ({ tone = '', children }: { tone?: Tone; children: ReactNode }) => <span className={`pill ${tone}`}>{children}</span>
@@ -72,7 +73,7 @@ export const Check = ({ label, checked, onChange }: { label: string; checked: bo
   <label className="check"><input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} />{label}</label>
 )
 
-export interface ComboOption { value: string; label: string; sub?: string; search?: string }
+export interface ComboOption { value: string; label: string; sub?: string; search?: string }/** Doorzoekbare keuzelijst voor klanten en producten. */
 /** Doorzoekbare keuzelijst voor klanten en producten. */
 export function Combo({ id, value, options, onChange, placeholder, footer }: { id?: string; value: string | null; options: ComboOption[]; onChange: (v: string) => void; placeholder?: string; footer?: ReactNode }) {
   const [open, setOpen] = useState(false)
@@ -123,7 +124,7 @@ export function Combo({ id, value, options, onChange, placeholder, footer }: { i
               {o.label}{o.sub && <small>{o.sub}</small>}
             </button>
           ))}
-          {!list.length && <div className="empty" style={{ padding: '8px 11px' }}>Niets gevonden voor "{q}"</div>}
+          {!list.length && <div className="empty" style={{ padding: '8px 11px' }}>{tx("Niets gevonden voor \"")}{q}"</div>}
           {footer}
         </div>
       )}
@@ -142,7 +143,7 @@ export function Modal({ title, wide, onClose, children, footer }: { title: strin
       <div className={`modal ${wide ? 'wide' : ''}`} role="dialog" aria-modal="true" aria-label={title}>
         <div className="panel-head" style={{ marginBottom: 0 }}>
           <h2>{title}</h2>
-          <button className="btn icon" type="button" aria-label="Sluiten" onClick={onClose}><X size={18} /></button>
+          <button className="btn icon" type="button" aria-label={tx("Sluiten")} onClick={onClose}><X size={18} /></button>
         </div>
         {children}
         {footer && <div className="modal-foot">{footer}</div>}

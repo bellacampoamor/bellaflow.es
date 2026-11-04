@@ -2,11 +2,12 @@ import { createContext, useCallback, useContext, useEffect, useState, type React
 import { loadSnapshot, type Driver } from '../data/driver'
 import type { Snapshot } from '../data/types'
 import { FlowError } from '../domain/services'
+import { tx } from '../i18n'
 
 interface Ctx {
   db: Driver
   s: Snapshot
-  refresh: () => Promise<void>
+  refresh: () => Promise<void>/** Voert een handeling uit, ververst de gegevens en toont het resultaat. Geeft true bij succes. */
   /** Voert een handeling uit, ververst de gegevens en toont het resultaat. Geeft true bij succes. */
   run: (fn: (db: Driver) => Promise<unknown>, success?: string) => Promise<boolean>
   toast: (msg: string, err?: boolean) => void
@@ -36,12 +37,12 @@ export function AppProvider({ db, children, fallback }: { db: Driver; children: 
       return true
     } catch (e) {
       await refresh().catch(() => {})
-      toast(e instanceof FlowError || e instanceof Error ? e.message : 'De handeling is niet gelukt. Probeer het opnieuw.', true)
+      toast(e instanceof FlowError || e instanceof Error ? e.message : tx("De handeling is niet gelukt. Probeer het opnieuw."), true)
       return false
     }
   }, [db, refresh, toast])
 
-  if (loadError) return <div className="wrap" style={{ paddingBlock: 40 }}><div className="note bad">De gegevens konden niet worden geladen: {loadError}</div></div>
+  if (loadError) return <div className="wrap" style={{ paddingBlock: 40 }}><div className="note bad">{tx("De gegevens konden niet worden geladen:")} {loadError}</div></div>
   if (!s) return <>{fallback}</>
   return (
     <AppCtx.Provider value={{ db, s, refresh, run, toast }}>
@@ -49,7 +50,7 @@ export function AppProvider({ db, children, fallback }: { db: Driver; children: 
       {msg && (
         <div className={`toast ${msg.err ? 'err' : ''}`} role="status">
           <span>{msg.text}</span>
-          {msg.err && <button className="linklike" onClick={() => setMsg(null)}>Sluiten</button>}
+          {msg.err && <button className="linklike" onClick={() => setMsg(null)}>{tx("Sluiten")}</button>}
         </div>
       )}
     </AppCtx.Provider>

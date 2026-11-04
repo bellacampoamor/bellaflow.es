@@ -50,6 +50,7 @@ Schermen praten alleen met `services` en `calc`, nooit rechtstreeks met de opsla
 - **Deelleveringen** worden bij afmelden direct gefactureerd. Hele leveringen volgen de instelling onder Facturatie.
 - **Afleverbon**: een bezorging moet eerst klaargezet en akkoord bevonden worden. Daarna volgt de bon, en bij afmelden de naam van wie tekende.
 - **Route**: per dag voor het eigen team, heen en terug vanaf het magazijn dat onder Beheer als vertrekpunt staat. Tot 9 stops de gegarandeerd kortste rit.
+- **Taal**: het scherm is Nederlands of Engels (`src/i18n.en.ts`). Afleverbon, factuur en klantberichten volgen de taal van de klant. Eerder opgeslagen geschiedenisregels blijven in hun oorspronkelijke taal.
 - **Facturen** zijn onwijzigbaar en kunnen niet worden teruggedateerd. De database dwingt dat ook zelf af.
 - **Nummers** komen in Supabase uit `next_number()`, zodat twee gebruikers nooit hetzelfde nummer krijgen.
 

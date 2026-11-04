@@ -11,6 +11,7 @@ import {
 } from '../src/domain/services'
 import { estimateMatrix, parseRouterTable } from '../src/data/geo'
 import { googleMapsRouteUrl, optimizeRoute, tourCost } from '../src/domain/route'
+import { en } from '../src/i18n.en'
 import { toSeedSql } from '../scripts/seed-sql'
 
 const TODAY = '2026-11-04'
@@ -215,6 +216,14 @@ describe('route', () => {
   it('zet alle stops en de terugweg in de kaartlink', () => {
     const url = decodeURIComponent(googleMapsRouteUrl({ latitude: 1, longitude: 2 }, [{ latitude: 3, longitude: 4 }, { latitude: 5, longitude: 6 }]).replace(/\+/g, ' '))
     expect(url).toContain('origin=1,2'); expect(url).toContain('destination=1,2'); expect(url).toContain('waypoints=3,4|5,6')
+  })
+})
+
+describe('vertalingen', () => {
+  it('heeft een Engelse tekst voor elke schermtekst', () => {
+    const files = ['App.tsx', 'main.tsx', 'ui/kit.tsx', 'ui/app-context.tsx', 'domain/services.ts', ...readdirSync('src/screens').map((f) => `screens/${f}`)]
+    const missing = files.flatMap((f) => [...readFileSync(`src/${f}`, 'utf8').matchAll(/\btx\(("(?:[^"\\\\]|\\\\.)*")/g)].map((m) => JSON.parse(m[1]) as string)).filter((k) => !(k in en))
+    expect(missing).toEqual([])
   })
 })
 

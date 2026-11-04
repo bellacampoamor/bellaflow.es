@@ -1,3 +1,4 @@
+import { tx } from '../i18n'
 // Alle handelingen in het proces. Elke functie controleert eerst en schrijft daarna,
 // zodat een geweigerde actie niets half achterlaat.
 import { loadSnapshot, newId, type Driver } from '../data/driver'
@@ -24,7 +25,7 @@ export interface PurchaseInput {
   supplier_id: string; order_date: string; supplier_reference: string; notes: string
   lines: { product_id: string; qty: number; unit_cost: number; sales_order_line_id: string | null }[]
   shipments: { expected_date: string; warehouse_id: string; carrier: string; pct: number }[]
-}
+}/** Verdeelt elke regel over de zendingen volgens percentage; afronding telt altijd op tot het totaal. */
 
 /** Verdeelt elke regel over de zendingen volgens percentage; afronding telt altijd op tot het totaal. */
 export function splitQty(qty: number, pcts: number[]) {
@@ -40,11 +41,11 @@ export function splitQty(qty: number, pcts: number[]) {
 }
 
 export async function createPurchaseOrder(db: Driver, input: PurchaseInput) {
-  if (!input.supplier_id) fail('Kies een leverancier.')
-  if (!input.lines.length || input.lines.some((l) => !l.product_id || l.qty <= 0)) fail('Voeg minimaal één regel toe met product en aantal.')
-  if (!input.shipments.length) fail('Plan minimaal één zending.')
-  if (input.shipments.some((x) => !x.expected_date || !x.warehouse_id)) fail('Vul per zending een datum en een magazijn in.')
-  if (Math.round(input.shipments.reduce((n, x) => n + x.pct, 0)) !== 100) fail('De percentages van de zendingen moeten samen 100% zijn.')
+  if (!input.supplier_id) fail(tx("Kies een leverancier."))
+  if (!input.lines.length || input.lines.some((l) => !l.product_id || l.qty <= 0)) fail(tx("Voeg minimaal één regel toe met product en aantal."))
+  if (!input.shipments.length) fail(tx("Plan minimaal één zending."))
+  if (input.shipments.some((x) => !x.expected_date || !x.warehouse_id)) fail(tx("Vul per zending een datum en een magazijn in."))
+  if (Math.round(input.shipments.reduce((n, x) => n + x.pct, 0)) !== 100) fail(tx("De percentages van de zendingen moeten samen 100% zijn."))
 
   const id = newId()
   const number = await db.nextNumber('IO', yearOf(input.order_date))
@@ -68,9 +69,9 @@ export async function createPurchaseOrder(db: Driver, input: PurchaseInput) {
 }
 
 export async function rescheduleShipment(db: Driver, shipmentId: string, newDate: string, reason: string) {
-  if (!newDate) fail('Vul de nieuwe datum in.')
+  if (!newDate) fail(tx("Vul de nieuwe datum in."))
   const s = await loadSnapshot(db)
-  const x = s.inbound_shipments.find((r) => r.id === shipmentId) ?? fail('Zending niet gevonden.')
+  const x = s.inbound_shipments.find((r) => r.id === shipmentId) ?? fail(tx("Zending niet gevonden."))
   await db.update('inbound_shipments', shipmentId, { expected_date: newDate, notes: reason || (x as InboundShipment).notes })
 }
 
@@ -81,7 +82,7 @@ export async function closeShipment(db: Driver, shipmentId: string, reason: stri
 export async function cancelPurchaseOrder(db: Driver, id: string) {
   const s = await loadSnapshot(db)
   const shipments = s.inbound_shipments.filter((x) => x.purchase_order_id === id)
-  if (s.goods_receipts.some((r) => shipments.some((x) => x.id === r.shipment_id))) fail('Deze inkooporder heeft al ontvangsten. Sluit de openstaande zendingen af.')
+  if (s.goods_receipts.some((r) => shipments.some((x) => x.id === r.shipment_id))) fail(tx("Deze inkooporder heeft al ontvangsten. Sluit de openstaande zendingen af."))
   await db.update('purchase_orders', id, { status: 'cancelled' })
   for (const x of shipments) await db.update('inbound_shipments', x.id, { status: 'closed' })
 }
@@ -94,13 +95,13 @@ export interface ReceiptInput { shipment_id: string; received_date: string; deli
 export async function receiveGoods(db: Driver, input: ReceiptInput) {
   const s = await loadSnapshot(db)
   const rows = input.rows.filter((r) => r.qty_received > 0 || r.qty_damaged > 0)
-  if (!rows.length) fail('Vul bij minimaal één regel een ontvangen aantal in.')
-  if (rows.some((r) => !r.warehouse_id)) fail('Kies per regel het magazijn waar de goederen binnenkomen.')
+  if (!rows.length) fail(tx("Vul bij minimaal één regel een ontvangen aantal in."))
+  if (rows.some((r) => !r.warehouse_id)) fail(tx("Kies per regel het magazijn waar de goederen binnenkomen."))
   const perLine = new Map<string, number>()
   for (const r of rows) perLine.set(r.shipment_line_id, (perLine.get(r.shipment_line_id) ?? 0) + r.qty_received)
   for (const [lineId, n] of perLine) {
     const open = shipmentLineOpen(s, lineId)
-    if (n > open) fail(`Er staat nog ${open} open op deze regel, maar er is ${n} ingevuld. Corrigeer het aantal of verdeel de rest over een andere zending.`)
+    if (n > open) fail(tx("Er staat nog {0} open op deze regel, maar er is {1} ingevuld. Corrigeer het aantal of verdeel de rest over een andere zending.", open, n))
   }
   const polOf = (slId: string) => {
     const sl = s.inbound_shipment_lines.find((l) => l.id === slId)!
@@ -138,11 +139,11 @@ export async function receiveGoods(db: Driver, input: ReceiptInput) {
 // Voorraad ---------------------------------------------------------------------
 
 export async function transferStock(db: Driver, input: { product_id: string; from_id: string; to_id: string; qty: number; note: string; date: string }) {
-  if (input.from_id === input.to_id) fail('Kies twee verschillende magazijnen.')
-  if (input.qty <= 0) fail('Vul een aantal in.')
+  if (input.from_id === input.to_id) fail(tx("Kies twee verschillende magazijnen."))
+  if (input.qty <= 0) fail(tx("Vul een aantal in."))
   const s = await loadSnapshot(db)
   const have = onHandMap(s).get(stockKey(input.product_id, input.from_id)) ?? 0
-  if (input.qty > have) fail(`Er liggen maar ${have} stuks in het gekozen magazijn.`)
+  if (input.qty > have) fail(tx("Er liggen maar {0} stuks in het gekozen magazijn.", have))
   const common = { product_id: input.product_id, kind: 'overboeking' as const, ref_id: '', note: input.note, moved_at: input.date }
   await db.insert('stock_movements', [
     { id: newId(), warehouse_id: input.from_id, qty: -input.qty, ...common },
@@ -151,8 +152,8 @@ export async function transferStock(db: Driver, input: { product_id: string; fro
 }
 
 export async function correctStock(db: Driver, input: { product_id: string; warehouse_id: string; qty: number; note: string; date: string }) {
-  if (!input.qty) fail('Vul een afwijking in, bijvoorbeeld -1 of 2.')
-  if (!input.note.trim()) fail('Noteer de reden van de correctie.')
+  if (!input.qty) fail(tx("Vul een afwijking in, bijvoorbeeld -1 of 2."))
+  if (!input.note.trim()) fail(tx("Noteer de reden van de correctie."))
   await db.insert('stock_movements', [{ id: newId(), product_id: input.product_id, warehouse_id: input.warehouse_id, qty: input.qty, kind: 'correctie', ref_id: '', note: input.note, moved_at: input.date }])
 }
 
@@ -167,17 +168,17 @@ export interface OrderInput {
 
 function validateOrder(s: Snapshot, input: OrderInput) {
   const h = input.header
-  if (!h.customer_id) fail('Kies of maak een klant.')
-  if (!input.lines.length) fail('Voeg minimaal één product toe.')
+  if (!h.customer_id) fail(tx("Kies of maak een klant."))
+  if (!input.lines.length) fail(tx("Voeg minimaal één product toe."))
   for (const l of input.lines) {
-    if (!l.product_id || l.qty <= 0) fail('Elke regel heeft een product en een aantal nodig.')
-    if (l.source === 'voorraad' && !l.warehouse_id) fail(`Kies bij ${l.description} uit welk magazijn het komt.`)
+    if (!l.product_id || l.qty <= 0) fail(tx("Elke regel heeft een product en een aantal nodig."))
+    if (l.source === 'voorraad' && !l.warehouse_id) fail(tx("Kies bij {0} uit welk magazijn het komt.", l.description))
   }
-  if (h.order_type === 'direct' && input.lines.some((l) => l.source === 'bestelling')) fail('Directe levering kan alleen uit voorraad. Kies "Bestelling" voor producten die nog binnen moeten komen.')
-  if (h.fulfilment !== 'meenemen' && !h.delivery_address.trim()) fail('Vul het afleveradres in.')
-  if (input.deposit && input.deposit.amount < 0) fail('Een vooruitbetaling kan niet negatief zijn.')
+  if (h.order_type === 'direct' && input.lines.some((l) => l.source === 'bestelling')) fail(tx("Directe levering kan alleen uit voorraad. Kies \"Bestelling\" voor producten die nog binnen moeten komen."))
+  if (h.fulfilment !== 'meenemen' && !h.delivery_address.trim()) fail(tx("Vul het afleveradres in."))
+  if (input.deposit && input.deposit.amount < 0) fail(tx("Een vooruitbetaling kan niet negatief zijn."))
   const total = round2(input.lines.reduce((n, l) => n + lineTotal(l), 0))
-  if (input.deposit && input.deposit.amount > total) fail('De vooruitbetaling is hoger dan het ordertotaal.')
+  if (input.deposit && input.deposit.amount > total) fail(tx("De vooruitbetaling is hoger dan het ordertotaal."))
   if (h.order_type === 'direct') {
     const need = new Map<string, number>()
     for (const l of input.lines) {
@@ -189,7 +190,7 @@ function validateOrder(s: Snapshot, input: OrderInput) {
       const have = stock.get(k) ?? 0
       if (n > have) {
         const p = s.products.find((x) => x.id === k.split('|')[0])
-        fail(`${p?.name}: ${n} nodig, ${have} aanwezig in dit magazijn. Kies een ander magazijn of maak er een bestelling van.`)
+        fail(tx("{0}: {1} nodig, {2} aanwezig in dit magazijn. Kies een ander magazijn of maak er een bestelling van.", p?.name, n, have))
       }
     }
   }
@@ -219,19 +220,19 @@ export async function createOrder(db: Driver, input: OrderInput, opts: { autoDel
 export async function updateOrder(db: Driver, id: string, input: OrderInput) {
   const s = await loadSnapshot(db)
   validateOrder({ ...s, sales_order_lines: s.sales_order_lines.filter((l) => l.sales_order_id !== id) }, { ...input, header: { ...input.header, order_type: 'bestelling' } })
-  const order = s.sales_orders.find((o) => o.id === id) ?? fail('Order niet gevonden.')
+  const order = s.sales_orders.find((o) => o.id === id) ?? fail(tx("Order niet gevonden."))
   const existing = orderLines(s, id)
   const kept = new Set(input.lines.map((l) => l.id).filter(Boolean))
   for (const old of existing) {
     const planned = plannedQty(s, old.id)
-    if (!kept.has(old.id) && planned > 0) fail(`${old.description} staat al op een levering en kan niet worden verwijderd.`)
+    if (!kept.has(old.id) && planned > 0) fail(tx("{0} staat al op een levering en kan niet worden verwijderd.", old.description))
     const next = input.lines.find((l) => l.id === old.id)
-    if (next && next.qty < planned) fail(`${old.description}: er staan al ${planned} stuks op een levering. Annuleer die levering eerst.`)
+    if (next && next.qty < planned) fail(tx("{0}: er staan al {1} stuks op een levering. Annuleer die levering eerst.", old.description, planned))
   }
   const changes: string[] = []
   for (const old of existing) {
     if (!kept.has(old.id)) {
-      if (s.purchase_order_lines.some((l) => l.sales_order_line_id === old.id)) fail(`${old.description} is al ingekocht voor deze order en kan niet worden verwijderd.`)
+      if (s.purchase_order_lines.some((l) => l.sales_order_line_id === old.id)) fail(tx("{0} is al ingekocht voor deze order en kan niet worden verwijderd.", old.description))
       await db.remove('sales_order_lines', old.id); changes.push(`${old.description} verwijderd`)
     }
   }
@@ -253,9 +254,9 @@ export async function updateOrder(db: Driver, id: string, input: OrderInput) {
 }
 
 export async function rescheduleOrder(db: Driver, orderId: string, input: { new_date: string; reason: string; customer_notified: boolean }) {
-  if (!input.new_date) fail('Vul de nieuwe leverdatum in.')
+  if (!input.new_date) fail(tx("Vul de nieuwe leverdatum in."))
   const s = await loadSnapshot(db)
-  const order = s.sales_orders.find((o) => o.id === orderId) ?? fail('Order niet gevonden.')
+  const order = s.sales_orders.find((o) => o.id === orderId) ?? fail(tx("Order niet gevonden."))
   const old = (order as SalesOrder).promised_date
   await db.update('sales_orders', orderId, { promised_date: input.new_date })
   await db.insert('order_events', [event(orderId, 'leverdatum', input.reason ? `Leverdatum verschoven: ${input.reason}` : 'Leverdatum verschoven.', { old_date: old, new_date: input.new_date, customer_notified: input.customer_notified })])
@@ -267,7 +268,7 @@ export async function rescheduleOrder(db: Driver, orderId: string, input: { new_
 
 export async function cancelOrder(db: Driver, id: string, reason: string) {
   const s = await loadSnapshot(db)
-  if (orderLines(s, id).some((l) => shippedQty(s, l.id) > 0)) fail('Er is al geleverd op deze order. Annuleren kan niet meer.')
+  if (orderLines(s, id).some((l) => shippedQty(s, l.id) > 0)) fail(tx("Er is al geleverd op deze order. Annuleren kan niet meer."))
   for (const d of s.deliveries.filter((x) => x.sales_order_id === id && x.status !== 'cancelled')) await db.update('deliveries', d.id, { status: 'cancelled' })
   await db.update('sales_orders', id, { status: 'cancelled' })
   await db.insert('order_events', [event(id, 'geannuleerd', reason ? `Order geannuleerd: ${reason}` : 'Order geannuleerd.')])
@@ -275,12 +276,12 @@ export async function cancelOrder(db: Driver, id: string, reason: string) {
 
 export async function setLineWarehouse(db: Driver, lineId: string, warehouseId: string) {
   const s = await loadSnapshot(db)
-  if (plannedQty(s, lineId) > 0) fail('Deze regel staat al op een levering. Annuleer die eerst om het magazijn te wijzigen.')
+  if (plannedQty(s, lineId) > 0) fail(tx("Deze regel staat al op een levering. Annuleer die eerst om het magazijn te wijzigen."))
   await db.update('sales_order_lines', lineId, { warehouse_id: warehouseId })
 }
 
 export async function addOrderPayment(db: Driver, input: { sales_order_id: string; amount: number; method: Payment['method']; paid_at: string; reference: string }) {
-  if (input.amount <= 0) fail('Vul een bedrag in.')
+  if (input.amount <= 0) fail(tx("Vul een bedrag in."))
   await db.insert('payments', [{ id: newId(), invoice_id: null, kind: 'vooruitbetaling', ...input }])
 }
 
@@ -294,13 +295,13 @@ export interface DeliveryInput {
 export async function createDelivery(db: Driver, input: DeliveryInput) {
   const s = await loadSnapshot(db)
   const rows = input.lines.filter((l) => l.qty > 0)
-  if (!rows.length) fail('Vul bij minimaal één regel een aantal in.')
-  if (!input.planned_date) fail('Kies een leverdatum.')
+  if (!rows.length) fail(tx("Vul bij minimaal één regel een aantal in."))
+  if (!input.planned_date) fail(tx("Kies een leverdatum."))
   const lines = rows.map((r) => {
     const line = s.sales_order_lines.find((l) => l.id === r.sales_order_line_id)!
-    if (!line.warehouse_id) fail(`${line.description} is nog niet binnen en kan nog niet worden gepland.`)
+    if (!line.warehouse_id) fail(tx("{0} is nog niet binnen en kan nog niet worden gepland.", line.description))
     const open = line.qty - plannedQty(s, line.id)
-    if (r.qty > open) fail(`${line.description}: er staat nog ${open} open om te plannen.`)
+    if (r.qty > open) fail(tx("{0}: er staat nog {1} open om te plannen.", line.description, open))
     return { id: newId(), sales_order_line_id: line.id, warehouse_id: line.warehouse_id as string, qty: r.qty }
   })
   const id = newId()
@@ -323,17 +324,17 @@ function assertStockForDelivery(s: Snapshot, deliveryId: string) {
     const have = stock.get(k) ?? 0
     if (n > have) {
       const [pid, wid] = k.split('|')
-      fail(`${s.products.find((p) => p.id === pid)?.name}: ${n} nodig, ${have} aanwezig op ${s.warehouses.find((w) => w.id === wid)?.name}. Boek eerst voorraad over of ontvang de goederen.`)
+      fail(tx("{0}: {1} nodig, {2} aanwezig op {3}. Boek eerst voorraad over of ontvang de goederen.", s.products.find((p) => p.id === pid)?.name, n, have, s.warehouses.find((w) => w.id === wid)?.name))
     }
   }
-}
+}/** Order staat klaar en is akkoord bevonden; vanaf nu kan de afleverbon de deur uit. */
 
 /** Order staat klaar en is akkoord bevonden; vanaf nu kan de afleverbon de deur uit. */
 export async function markReady(db: Driver, id: string, input: { approved_by: string; date: string }) {
-  if (!input.approved_by.trim()) fail('Noteer wie de levering akkoord heeft bevonden.')
+  if (!input.approved_by.trim()) fail(tx("Noteer wie de levering akkoord heeft bevonden."))
   const s = await loadSnapshot(db)
-  const d = s.deliveries.find((x) => x.id === id) ?? (fail('Levering niet gevonden.') as never)
-  if (d.status !== 'planned') fail('Deze levering is al klaargezet.')
+  const d = s.deliveries.find((x) => x.id === id) ?? (fail(tx("Levering niet gevonden.")) as never)
+  if (d.status !== 'planned') fail(tx("Deze levering is al klaargezet."))
   assertStockForDelivery(s, id)
   await db.update('deliveries', id, { status: 'ready', ready_at: input.date, approved_by: input.approved_by })
   await db.insert('order_events', [event(d.sales_order_id, 'levering', `${d.number} klaargezet en akkoord bevonden door ${input.approved_by}.`)])
@@ -348,18 +349,18 @@ export async function saveRouteOrder(db: Driver, deliveryIds: string[]) {
 }
 
 export async function setOrderCoordinates(db: Driver, orderId: string, latitude: number, longitude: number) {
-  if (!Number.isFinite(latitude) || !Number.isFinite(longitude) || Math.abs(latitude) > 90 || Math.abs(longitude) > 180) fail('Vul de locatie in als breedte, lengte, bijvoorbeeld 37.9113, -0.7436.')
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude) || Math.abs(latitude) > 90 || Math.abs(longitude) > 180) fail(tx("Vul de locatie in als breedte, lengte, bijvoorbeeld 37.9113, -0.7436."))
   await db.update('sales_orders', orderId, { delivery_latitude: latitude, delivery_longitude: longitude })
 }
 
 export async function setDeliveryInTransit(db: Driver, id: string) {
   const s = await loadSnapshot(db)
-  if (s.deliveries.find((x) => x.id === id)?.status !== 'ready') fail('Zet de levering eerst klaar en druk de afleverbon af.')
+  if (s.deliveries.find((x) => x.id === id)?.status !== 'ready') fail(tx("Zet de levering eerst klaar en druk de afleverbon af."))
   await db.update('deliveries', id, { status: 'in_transit' })
 }
 
 export async function rescheduleDelivery(db: Driver, id: string, input: { new_date: string; reason: string; customer_notified: boolean }) {
-  if (!input.new_date) fail('Vul de nieuwe datum in.')
+  if (!input.new_date) fail(tx("Vul de nieuwe datum in."))
   const s = await loadSnapshot(db)
   const d = s.deliveries.find((x) => x.id === id)!
   await db.update('deliveries', id, { planned_date: input.new_date, route_position: null })
@@ -369,18 +370,18 @@ export async function rescheduleDelivery(db: Driver, id: string, input: { new_da
 export async function cancelDelivery(db: Driver, id: string) {
   const s = await loadSnapshot(db)
   const d = s.deliveries.find((x) => x.id === id)!
-  if (d.status === 'delivered') fail('Een afgeronde levering kan niet worden geannuleerd.')
+  if (d.status === 'delivered') fail(tx("Een afgeronde levering kan niet worden geannuleerd."))
   await db.update('deliveries', id, { status: 'cancelled' })
   await db.insert('order_events', [event(d.sales_order_id, 'levering', `${d.number} geannuleerd. De artikelen kunnen opnieuw worden gepland.`)])
 }
 
 export async function markDelivered(db: Driver, id: string, input: { date: string; signed_by: string; signed_note_received?: boolean }) {
   const s = await loadSnapshot(db)
-  const d = s.deliveries.find((x) => x.id === id) ?? (fail('Levering niet gevonden.') as never)
-  if (d.status === 'delivered') fail('Deze levering is al afgerond.')
+  const d = s.deliveries.find((x) => x.id === id) ?? (fail(tx("Levering niet gevonden.")) as never)
+  if (d.status === 'delivered') fail(tx("Deze levering is al afgerond."))
   if (d.method !== 'meenemen') {
-    if (d.status === 'planned') fail('Zet de levering eerst klaar en druk de afleverbon af.')
-    if (!input.signed_by.trim()) fail('Noteer wie de afleverbon heeft ondertekend.')
+    if (d.status === 'planned') fail(tx("Zet de levering eerst klaar en druk de afleverbon af."))
+    if (!input.signed_by.trim()) fail(tx("Noteer wie de afleverbon heeft ondertekend."))
   }
   const lines = s.delivery_lines.filter((l) => l.delivery_id === id)
   const productOf = (lineId: string) => s.sales_order_lines.find((l) => l.id === lineId)!
@@ -403,14 +404,14 @@ const laterOf = (a: string, b: string) => (a > b ? a : b)
 
 export async function createInvoice(db: Driver, input: { sales_order_id: string; delivery_ids: string[]; invoice_date: string; settle_deposit: boolean }) {
   const s = await loadSnapshot(db)
-  if (!input.delivery_ids.length) fail('Kies minimaal één levering om te factureren.')
+  if (!input.delivery_ids.length) fail(tx("Kies minimaal één levering om te factureren."))
   const last = latestInvoiceDate(s)
-  if (last && input.invoice_date < last) fail(`De factuurdatum mag niet voor de laatste factuur liggen (${last.split('-').reverse().join('-')}).`)
-  const order = s.sales_orders.find((o) => o.id === input.sales_order_id) ?? (fail('Order niet gevonden.') as never)
+  if (last && input.invoice_date < last) fail(tx("De factuurdatum mag niet voor de laatste factuur liggen ({0}).", last.split('-').reverse().join('-')))
+  const order = s.sales_orders.find((o) => o.id === input.sales_order_id) ?? (fail(tx("Order niet gevonden.")) as never)
   const customer = s.customers.find((c) => c.id === order.customer_id)!
   const billed = invoicedDeliveryLineIds(s)
   const dls = s.delivery_lines.filter((l) => input.delivery_ids.includes(l.delivery_id) && !billed.has(l.id))
-  if (!dls.length) fail('Deze leveringen zijn al gefactureerd.')
+  if (!dls.length) fail(tx("Deze leveringen zijn al gefactureerd."))
 
   const id = newId()
   const lines: InvoiceLine[] = dls.map((dl) => {
@@ -445,7 +446,7 @@ export async function createInvoice(db: Driver, input: { sales_order_id: string;
 }
 
 export async function payInvoice(db: Driver, input: { invoice_id: string; amount: number; method: Payment['method']; paid_at: string; reference: string }) {
-  if (input.amount <= 0) fail('Vul een bedrag in.')
+  if (input.amount <= 0) fail(tx("Vul een bedrag in."))
   const s = await loadSnapshot(db)
   const inv = s.invoices.find((i) => i.id === input.invoice_id)!
   await db.insert('payments', [{ id: newId(), sales_order_id: inv.sales_order_id, kind: 'betaling', ...input }])

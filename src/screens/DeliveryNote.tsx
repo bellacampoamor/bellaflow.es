@@ -3,6 +3,7 @@ import type { Language } from '../data/types'
 import { markNotePrinted } from '../domain/services'
 import { useApp } from '../ui/app-context'
 import { fmtDate, Head, Pill } from '../ui/kit'
+import { tx } from '../i18n'
 
 const T: Record<Language, Record<string, string>> = {
   es: { title: 'Albarán de entrega', date: 'Fecha de entrega', slot: 'Franja horaria', order: 'Pedido', ref: 'Su referencia', to: 'Entregar a', bill: 'Cliente', tel: 'Tel.', part: 'Entrega parcial', of: 'de', code: 'Referencia', prod: 'Producto', opts: 'Acabado', pkg: 'Bultos', qty: 'Cant.', from: 'Almacén', notes: 'Observaciones', floor: 'Planta', lift: 'Ascensor', assembly: 'Montaje', remove: 'Retirar muebles antiguos', yes: 'sí', no: 'no', confirm: 'El cliente declara haber recibido los productos indicados en buen estado.', remarks: 'Observaciones en la recepción', name: 'Nombre', sign: 'Firma del cliente', when: 'Fecha y hora', stop: 'Parada' },
@@ -13,7 +14,7 @@ const T: Record<Language, Record<string, string>> = {
 export function DeliveryNote({ id }: { id: string }) {
   const { s, run } = useApp()
   const d = s.deliveries.find((x) => x.id === id)
-  if (!d) return <div className="panel">Levering niet gevonden. <a href="#levering">Terug naar de planning</a>.</div>
+  if (!d) return <div className="panel">{tx("Levering niet gevonden.")} <a href="#levering">{tx("Terug naar de planning")}</a>.</div>
   const o = s.sales_orders.find((x) => x.id === d.sales_order_id)!
   const c = s.customers.find((x) => x.id === o.customer_id)!
   const co = s.settings[0]
@@ -32,14 +33,14 @@ export function DeliveryNote({ id }: { id: string }) {
   }
   return (
     <>
-      <Head title={`Afleverbon ${d.number}`} back={{ href: '#levering', label: 'Levering aan klant' }} sub={<>
-        {ready ? <Pill tone="good">Akkoord door {d.approved_by || 'onbekend'}</Pill> : <Pill tone="warn">Nog niet klaargezet</Pill>}{' '}
-        {d.note_printed_at ? <Pill tone="info">Afgedrukt</Pill> : <Pill>Nog niet afgedrukt</Pill>}
+      <Head title={tx("Afleverbon {0}", d.number)} back={{ href: '#levering', label: tx("Levering aan klant") }} sub={<>
+        {ready ? <Pill tone="good">{tx("Akkoord door")} {d.approved_by || 'onbekend'}</Pill> : <Pill tone="warn">{tx("Nog niet klaargezet")}</Pill>}{' '}
+        {d.note_printed_at ? <Pill tone="info">{tx("Afgedrukt")}</Pill> : <Pill>{tx("Nog niet afgedrukt")}</Pill>}
       </>}>
-        <a className="btn" href={`#orders-${o.id}`}>Naar {o.number}</a>
+        <a className="btn" href={`#orders-${o.id}`}>{tx("Naar")} {o.number}</a>
         {canPrint
-          ? <button className="btn primary" disabled={!ready} onClick={print}><Printer size={16} />Afleverbon afdrukken</button>
-          : <span className="small muted">Afdrukken kan in de eigen app, niet in deze preview.</span>}
+          ? <button className="btn primary" disabled={!ready} onClick={print}><Printer size={16} />{tx("Afleverbon afdrukken")}</button>
+          : <span className="small muted">{tx("Afdrukken kan in de eigen app, niet in deze preview.")}</span>}
       </Head>
       <div className="paper">
         <div className="paper-top">

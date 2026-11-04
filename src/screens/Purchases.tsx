@@ -4,6 +4,7 @@ import { addDays, linesToPurchase, round2, shipmentLineOpen, todayISO } from '..
 import { cancelPurchaseOrder, createPurchaseOrder, splitQty } from '../domain/services'
 import { go, useApp } from '../ui/app-context'
 import { Combo, Empty, eur, fmtDate, Head, Modal, NumberField, Pill, SelectField, TextField, AreaField, type Tone } from '../ui/kit'
+import { tx } from '../i18n'
 
 export function poProgress(s: ReturnType<typeof useApp>['s'], poId: string) {
   const shipments = s.inbound_shipments.filter((x) => x.purchase_order_id === poId)
@@ -19,15 +20,15 @@ export function Purchases() {
   const rows = [...s.purchase_orders].sort((a, b) => b.order_date.localeCompare(a.order_date) || b.number.localeCompare(a.number))
   return (
     <>
-      <Head title="Inkoop" sub="Bestellingen bij je leveranciers, met de zendingen waarin ze binnenkomen.">
-        <a className="btn primary" href="#inkoop-nieuw"><Plus size={16} />Nieuwe inkooporder</a>
+      <Head title={tx("Inkoop")} sub={tx("Bestellingen bij je leveranciers, met de zendingen waarin ze binnenkomen.")}>
+        <a className="btn primary" href="#inkoop-nieuw"><Plus size={16} />{tx("Nieuwe inkooporder")}</a>
       </Head>
       <div className="stack">
         {waiting.length > 0 && (
           <section className="panel">
-            <div className="panel-head"><h2>Nog in te kopen voor klantorders</h2><a className="btn sm" href="#inkoop-nieuw">Neem over in inkooporder</a></div>
+            <div className="panel-head"><h2>{tx("Nog in te kopen voor klantorders")}</h2><a className="btn sm" href="#inkoop-nieuw">{tx("Neem over in inkooporder")}</a></div>
             <div className="table-wrap"><table>
-              <thead><tr><th>Order</th><th>Klant</th><th>Product</th><th>Uitvoering</th><th className="num">Aantal</th></tr></thead>
+              <thead><tr><th>{tx("Order")}</th><th>{tx("Klant")}</th><th>{tx("Product")}</th><th>{tx("Uitvoering")}</th><th className="num">{tx("Aantal")}</th></tr></thead>
               <tbody>{waiting.map((l) => {
                 const o = s.sales_orders.find((x) => x.id === l.sales_order_id)!
                 return <tr key={l.id}><td><a className="rowlink" href={`#orders-${o.id}`}>{o.number}</a></td><td>{s.customers.find((c) => c.id === o.customer_id)?.name}</td><td>{l.description}</td><td className="muted">{l.options || '–'}</td><td className="num">{l.qty}</td></tr>
@@ -36,15 +37,15 @@ export function Purchases() {
           </section>
         )}
         <section className="panel">
-          <h2>Inkooporders</h2>
-          {rows.length === 0 && <Empty>Nog geen inkooporders. Maak de eerste met de knop rechtsboven.</Empty>}
+          <h2>{tx("Inkooporders")}</h2>
+          {rows.length === 0 && <Empty>{tx("Nog geen inkooporders. Maak de eerste met de knop rechtsboven.")}</Empty>}
           <div className="table-wrap"><table>
-            <thead><tr><th>Nummer</th><th>Leverancier</th><th>Besteld</th><th>Referentie</th><th>Zendingen</th><th className="num">Ontvangen</th><th className="num">Waarde</th><th>Status</th></tr></thead>
+            <thead><tr><th>{tx("Nummer")}</th><th>{tx("Leverancier")}</th><th>{tx("Besteld")}</th><th>{tx("Referentie")}</th><th>{tx("Zendingen")}</th><th className="num">{tx("Ontvangen")}</th><th className="num">{tx("Waarde")}</th><th>{tx("Status")}</th></tr></thead>
             <tbody>{rows.map((po) => {
               const { ordered, received, shipments } = poProgress(s, po.id)
               const value = round2(s.purchase_order_lines.filter((l) => l.purchase_order_id === po.id).reduce((n, l) => n + l.qty * l.unit_cost, 0))
               const closed = shipments.every((x) => x.status === 'received' || x.status === 'closed')
-              const [label, tone]: [string, Tone] = po.status === 'cancelled' ? ['Geannuleerd', ''] : closed ? ['Afgerond', 'good'] : received > 0 ? ['Deels ontvangen', 'warn'] : ['Besteld', 'info']
+              const [label, tone]: [string, Tone] = po.status === 'cancelled' ? [tx("Geannuleerd"), ''] : closed ? [tx("Afgerond"), 'good'] : received > 0 ? [tx("Deels ontvangen"), 'warn'] : [tx("Besteld"), 'info']
               return (
                 <tr key={po.id} className="click" onClick={() => go(`inkoop-${po.id}`)}>
                   <td><a className="rowlink" href={`#inkoop-${po.id}`}>{po.number}</a></td>
@@ -66,7 +67,7 @@ export function PurchaseDetail({ id }: { id: string }) {
   const { s, run } = useApp()
   const [confirm, setConfirm] = useState(false)
   const po = s.purchase_orders.find((p) => p.id === id)
-  if (!po) return <div className="panel">Inkooporder niet gevonden. <a href="#inkoop">Terug naar inkoop</a>.</div>
+  if (!po) return <div className="panel">{tx("Inkooporder niet gevonden.")} <a href="#inkoop">{tx("Terug naar inkoop")}</a>.</div>
   const lines = s.purchase_order_lines.filter((l) => l.purchase_order_id === id)
   const shipments = s.inbound_shipments.filter((x) => x.purchase_order_id === id).sort((a, b) => a.sequence - b.sequence)
   const pname = (pid: string) => s.products.find((p) => p.id === pid)?.name
@@ -74,58 +75,58 @@ export function PurchaseDetail({ id }: { id: string }) {
   const hasReceipts = s.goods_receipts.some((r) => shipments.some((x) => x.id === r.shipment_id))
   return (
     <>
-      <Head title={po.number} sub={`${supplier?.name}, besteld op ${fmtDate(po.order_date)}${po.supplier_reference ? `, referentie ${po.supplier_reference}` : ''}`} back={{ href: '#inkoop', label: 'Inkoop' }}>
-        {po.status === 'open' && !hasReceipts && <button className="btn danger" onClick={() => setConfirm(true)}>Inkooporder annuleren</button>}
+      <Head title={po.number} sub={tx("{0}, besteld op {1}{2}", supplier?.name, fmtDate(po.order_date), po.supplier_reference ? tx(", referentie {0}", po.supplier_reference) : '')} back={{ href: '#inkoop', label: tx("Inkoop") }}>
+        {po.status === 'open' && !hasReceipts && <button className="btn danger" onClick={() => setConfirm(true)}>{tx("Inkooporder annuleren")}</button>}
       </Head>
       <div className="stack">
         <section className="panel">
-          <h2>Bestelde producten</h2>
+          <h2>{tx("Bestelde producten")}</h2>
           <div className="table-wrap"><table>
-            <thead><tr><th>Product</th><th>Voor order</th><th className="num">Aantal</th><th className="num">Inkoopprijs</th><th className="num">Totaal</th></tr></thead>
+            <thead><tr><th>{tx("Product")}</th><th>{tx("Voor order")}</th><th className="num">{tx("Aantal")}</th><th className="num">{tx("Inkoopprijs")}</th><th className="num">{tx("Totaal")}</th></tr></thead>
             <tbody>{lines.map((l) => {
               const sol = s.sales_order_lines.find((x) => x.id === l.sales_order_line_id)
               const so = sol && s.sales_orders.find((o) => o.id === sol.sales_order_id)
-              return <tr key={l.id}><td>{pname(l.product_id)}</td><td>{so ? <a className="rowlink" href={`#orders-${so.id}`}>{so.number}</a> : <span className="muted">Voorraad</span>}</td><td className="num">{l.qty}</td><td className="num">{eur(l.unit_cost)}</td><td className="num">{eur(l.qty * l.unit_cost)}</td></tr>
+              return <tr key={l.id}><td>{pname(l.product_id)}</td><td>{so ? <a className="rowlink" href={`#orders-${so.id}`}>{so.number}</a> : <span className="muted">{tx("Voorraad")}</span>}</td><td className="num">{l.qty}</td><td className="num">{eur(l.unit_cost)}</td><td className="num">{eur(l.qty * l.unit_cost)}</td></tr>
             })}</tbody>
           </table></div>
         </section>
         <section className="panel">
-          <h2>Zendingen</h2>
+          <h2>{tx("Zendingen")}</h2>
           <div className="table-wrap"><table>
-            <thead><tr><th>Zending</th><th>Verwacht</th><th>Losplek</th><th>Inhoud</th><th>Status</th><th></th></tr></thead>
+            <thead><tr><th>{tx("Zending")}</th><th>{tx("Verwacht")}</th><th>{tx("Losplek")}</th><th>{tx("Inhoud")}</th><th>{tx("Status")}</th><th></th></tr></thead>
             <tbody>{shipments.map((x) => {
               const ls = s.inbound_shipment_lines.filter((l) => l.shipment_id === x.id)
               const open = x.status === 'expected' || x.status === 'partial'
               return (
                 <tr key={x.id}>
-                  <td>Zending {x.sequence}</td>
-                  <td>{fmtDate(x.expected_date)}{x.expected_date !== x.original_date && <div className="muted small">was {fmtDate(x.original_date)}</div>}</td>
+                  <td>{tx("Zending")} {x.sequence}</td>
+                  <td>{fmtDate(x.expected_date)}{x.expected_date !== x.original_date && <div className="muted small">{tx("was")} {fmtDate(x.original_date)}</div>}</td>
                   <td>{s.warehouses.find((w) => w.id === x.warehouse_id)?.name}</td>
                   <td className="small">{ls.map((l) => {
                     const pol = lines.find((p) => p.id === l.purchase_order_line_id)!
-                    return <div key={l.id}>{l.qty} × {pname(pol.product_id)}{shipmentLineOpen(s, l.id) < l.qty && <span className="muted"> ({l.qty - shipmentLineOpen(s, l.id)} binnen)</span>}</div>
+                    return <div key={l.id}>{l.qty} {tx("×")} {pname(pol.product_id)}{shipmentLineOpen(s, l.id) < l.qty && <span className="muted"> ({l.qty - shipmentLineOpen(s, l.id)} {tx("binnen)")}</span>}</div>
                   })}</td>
                   <td><ShipmentPill status={x.status} /></td>
-                  <td className="num">{open && <a className="btn sm" href={`#ontvangst-${x.id}`}>Ontvangen</a>}</td>
+                  <td className="num">{open && <a className="btn sm" href={`#ontvangst-${x.id}`}>{tx("Ontvangen")}</a>}</td>
                 </tr>
               )
             })}</tbody>
           </table></div>
         </section>
-        {po.notes && <section className="panel"><h2>Notitie</h2><p style={{ margin: 0 }}>{po.notes}</p></section>}
+        {po.notes && <section className="panel"><h2>{tx("Notitie")}</h2><p style={{ margin: 0 }}>{po.notes}</p></section>}
       </div>
       {confirm && (
-        <Modal title={`${po.number} annuleren?`} onClose={() => setConfirm(false)} footer={<>
-          <button className="btn" onClick={() => setConfirm(false)}>Terug</button>
-          <button className="btn danger" onClick={async () => { await run((db) => cancelPurchaseOrder(db, id), 'Inkooporder geannuleerd'); setConfirm(false) }}>Inkooporder annuleren</button>
-        </>}><p style={{ margin: 0 }}>De zendingen vervallen. Klantorders die hierop wachten, verschijnen weer bij "Nog in te kopen".</p></Modal>
+        <Modal title={tx("{0} annuleren?", po.number)} onClose={() => setConfirm(false)} footer={<>
+          <button className="btn" onClick={() => setConfirm(false)}>{tx("Terug")}</button>
+          <button className="btn danger" onClick={async () => { await run((db) => cancelPurchaseOrder(db, id), tx("Inkooporder geannuleerd")); setConfirm(false) }}>{tx("Inkooporder annuleren")}</button>
+        </>}><p style={{ margin: 0 }}>{tx("De zendingen vervallen. Klantorders die hierop wachten, verschijnen weer bij \"Nog in te kopen\".")}</p></Modal>
       )}
     </>
   )
 }
 
 export function ShipmentPill({ status }: { status: string }) {
-  const map: Record<string, [string, Tone]> = { expected: ['Verwacht', 'info'], partial: ['Deels ontvangen', 'warn'], received: ['Ontvangen', 'good'], closed: ['Afgesloten', ''] }
+  const map: Record<string, [string, Tone]> = { expected: [tx("Verwacht"), 'info'], partial: [tx("Deels ontvangen"), 'warn'], received: [tx("Ontvangen"), 'good'], closed: [tx("Afgesloten"), ''] }
   const [l, t] = map[status]
   return <Pill tone={t}>{l}</Pill>
 }
@@ -148,7 +149,7 @@ export function PurchaseForm() {
   const [ships, setShips] = useState<PoShip[]>([{ key: k++, expected_date: addDays(today, 21), warehouse_id: receivers[0]?.id ?? '', carrier: '', pct: 100 }])
 
   const waiting = linesToPurchase(s).filter((l) => !lines.some((x) => x.sales_order_line_id === l.id))
-  const products = useMemo(() => s.products.filter((p) => p.is_active && (!supplier || p.supplier_id === supplier || !p.supplier_id)).map((p) => ({ value: p.id, label: p.name, sub: `${p.sku}, inkoop ${eur(p.purchase_price)}`, search: p.sku })), [s.products, supplier])
+  const products = useMemo(() => s.products.filter((p) => p.is_active && (!supplier || p.supplier_id === supplier || !p.supplier_id)).map((p) => ({ value: p.id, label: p.name, sub: tx("{0}, inkoop {1}", p.sku, eur(p.purchase_price)), search: p.sku })), [s.products, supplier])
 
   const addWaiting = (lineId: string) => {
     const l = s.sales_order_lines.find((x) => x.id === lineId)!
@@ -170,87 +171,87 @@ export function PurchaseForm() {
     let id = ''
     const ok = await run(async (db) => {
       id = await createPurchaseOrder(db, { supplier_id: supplier, order_date: orderDate, supplier_reference: reference, notes, lines: lines.map(({ key: _k, ...l }) => l), shipments: ships.map(({ key: _k, ...x }) => x) })
-    }, 'Inkooporder aangemaakt')
+    }, tx("Inkooporder aangemaakt"))
     if (ok) go(`inkoop-${id}`)
   }
 
   return (
     <>
-      <Head title="Nieuwe inkooporder" back={{ href: '#inkoop', label: 'Inkoop' }} />
+      <Head title={tx("Nieuwe inkooporder")} back={{ href: '#inkoop', label: tx("Inkoop") }} />
       <div className="stack">
         <section className="panel">
-          <h2>Bestelling</h2>
+          <h2>{tx("Bestelling")}</h2>
           <div className="form-grid">
-            <SelectField className="span-2" label="Leverancier" value={supplier} onChange={setSupplier} placeholder="Kies een leverancier" options={suppliers.map((x) => ({ value: x.id, label: `${x.name} (${x.country})` }))} />
-            <TextField label="Besteldatum" type="date" value={orderDate} onChange={setOrderDate} />
-            <TextField label="Referentie leverancier" value={reference} onChange={setReference} placeholder="Ordernummer bij leverancier" />
+            <SelectField className="span-2" label={tx("Leverancier")} value={supplier} onChange={setSupplier} placeholder={tx("Kies een leverancier")} options={suppliers.map((x) => ({ value: x.id, label: `${x.name} (${x.country})` }))} />
+            <TextField label={tx("Besteldatum")} type="date" value={orderDate} onChange={setOrderDate} />
+            <TextField label={tx("Referentie leverancier")} value={reference} onChange={setReference} placeholder={tx("Ordernummer bij leverancier")} />
           </div>
         </section>
 
         {waiting.length > 0 && (
           <section className="panel">
-            <h2>Nog in te kopen voor klantorders</h2>
+            <h2>{tx("Nog in te kopen voor klantorders")}</h2>
             <div className="actions">{waiting.map((l) => (
               <button key={l.id} className="btn sm" onClick={() => addWaiting(l.id)}>
-                <Plus size={14} />{l.qty} × {l.description} ({s.sales_orders.find((o) => o.id === l.sales_order_id)?.number})
+                <Plus size={14} />{l.qty} {tx("×")} {l.description} ({s.sales_orders.find((o) => o.id === l.sales_order_id)?.number})
               </button>
             ))}</div>
           </section>
         )}
 
         <section className="panel">
-          <div className="panel-head"><h2>Producten</h2><button className="btn sm" onClick={() => setLines((v) => [...v, { key: k++, product_id: '', qty: 1, unit_cost: 0, sales_order_line_id: null }])}><Plus size={14} />Regel toevoegen</button></div>
-          {lines.length === 0 && <Empty>Voeg het eerste product toe.</Empty>}
+          <div className="panel-head"><h2>{tx("Producten")}</h2><button className="btn sm" onClick={() => setLines((v) => [...v, { key: k++, product_id: '', qty: 1, unit_cost: 0, sales_order_line_id: null }])}><Plus size={14} />{tx("Regel toevoegen")}</button></div>
+          {lines.length === 0 && <Empty>{tx("Voeg het eerste product toe.")}</Empty>}
           {lines.length > 0 && (
             <div className="table-wrap" style={{ minHeight: 120 }}><table>
-              <thead><tr><th style={{ minWidth: 260 }}>Product</th><th>Voor order</th><th className="num">Aantal</th><th className="num">Inkoopprijs</th><th className="num">Totaal</th><th></th></tr></thead>
+              <thead><tr><th style={{ minWidth: 260 }}>{tx("Product")}</th><th>{tx("Voor order")}</th><th className="num">{tx("Aantal")}</th><th className="num">{tx("Inkoopprijs")}</th><th className="num">{tx("Totaal")}</th><th></th></tr></thead>
               <tbody>{lines.map((l) => {
                 const so = l.sales_order_line_id && s.sales_orders.find((o) => o.id === s.sales_order_lines.find((x) => x.id === l.sales_order_line_id)?.sales_order_id)
                 return (
                   <tr key={l.key}>
-                    <td><Combo value={l.product_id} options={products} placeholder="Zoek op naam of artikelnummer" onChange={(v) => patchLine(l.key, { product_id: v, unit_cost: s.products.find((p) => p.id === v)?.purchase_price ?? 0 })} /></td>
-                    <td className="muted">{so ? so.number : 'Voorraad'}</td>
-                    <td className="num"><input className="qty" aria-label="Aantal" type="number" min={1} value={l.qty} onChange={(e) => patchLine(l.key, { qty: Number(e.target.value) })} /></td>
-                    <td className="num"><input className="price" aria-label="Inkoopprijs" type="number" step="0.01" min={0} value={l.unit_cost} onChange={(e) => patchLine(l.key, { unit_cost: Number(e.target.value) })} /></td>
+                    <td><Combo value={l.product_id} options={products} placeholder={tx("Zoek op naam of artikelnummer")} onChange={(v) => patchLine(l.key, { product_id: v, unit_cost: s.products.find((p) => p.id === v)?.purchase_price ?? 0 })} /></td>
+                    <td className="muted">{so ? so.number : tx("Voorraad")}</td>
+                    <td className="num"><input className="qty" aria-label={tx("Aantal")} type="number" min={1} value={l.qty} onChange={(e) => patchLine(l.key, { qty: Number(e.target.value) })} /></td>
+                    <td className="num"><input className="price" aria-label={tx("Inkoopprijs")} type="number" step="0.01" min={0} value={l.unit_cost} onChange={(e) => patchLine(l.key, { unit_cost: Number(e.target.value) })} /></td>
                     <td className="num">{eur(l.qty * l.unit_cost)}</td>
-                    <td><button className="btn icon" aria-label="Regel verwijderen" onClick={() => setLines((v) => v.filter((x) => x.key !== l.key))}><Trash2 size={16} /></button></td>
+                    <td><button className="btn icon" aria-label={tx("Regel verwijderen")} onClick={() => setLines((v) => v.filter((x) => x.key !== l.key))}><Trash2 size={16} /></button></td>
                   </tr>
                 )
               })}</tbody>
-              <tfoot><tr><td colSpan={4}>Totaal exclusief IVA</td><td className="num">{eur(total)}</td><td></td></tr></tfoot>
+              <tfoot><tr><td colSpan={4}>{tx("Totaal exclusief IVA")}</td><td className="num">{eur(total)}</td><td></td></tr></tfoot>
             </table></div>
           )}
         </section>
 
         <section className="panel">
           <div className="panel-head">
-            <h2>Zendingen</h2>
+            <h2>{tx("Zendingen")}</h2>
             <div className="actions">
-              <button className="btn sm" onClick={() => applyPreset(1)}>Alles ineens</button>
+              <button className="btn sm" onClick={() => applyPreset(1)}>{tx("Alles ineens")}</button>
               <button className="btn sm" onClick={() => applyPreset(2)}>50 / 50</button>
-              <button className="btn sm" onClick={() => applyPreset(3)}>In 3 delen</button>
-              <button className="btn sm" onClick={() => setShips((v) => [...v, { key: k++, expected_date: addDays(orderDate, lead), warehouse_id: receivers[0]?.id ?? '', carrier: '', pct: 0 }])}><Plus size={14} />Zending</button>
+              <button className="btn sm" onClick={() => applyPreset(3)}>{tx("In 3 delen")}</button>
+              <button className="btn sm" onClick={() => setShips((v) => [...v, { key: k++, expected_date: addDays(orderDate, lead), warehouse_id: receivers[0]?.id ?? '', carrier: '', pct: 0 }])}><Plus size={14} />{tx("Zending")}</button>
             </div>
           </div>
           <div className="stack">
             {ships.map((x, i) => (
               <div key={x.key} className="form-grid" style={{ alignItems: 'end' }}>
-                <TextField label={`Zending ${i + 1}: verwacht op`} type="date" value={x.expected_date} onChange={(v) => patchShip(x.key, { expected_date: v })} />
-                <SelectField label="Komt binnen op" value={x.warehouse_id} onChange={(v) => patchShip(x.key, { warehouse_id: v })} options={receivers.map((w) => ({ value: w.id, label: w.name }))} />
-                <TextField label="Vervoerder" value={x.carrier} onChange={(v) => patchShip(x.key, { carrier: v })} />
-                <NumberField label="Deel van de bestelling (%)" value={x.pct} min={0} onChange={(v) => patchShip(x.key, { pct: v })} />
-                {lines.length > 0 && <div className="small muted span-2">{lines.filter((l) => l.product_id).map((l) => `${splitQty(l.qty, ships.map((y) => y.pct || 0.0001))[i]} × ${s.products.find((p) => p.id === l.product_id)?.name}`).join(', ')}</div>}
-                {ships.length > 1 && <button className="btn sm" style={{ justifySelf: 'start' }} onClick={() => setShips((v) => v.filter((y) => y.key !== x.key))}>Zending verwijderen</button>}
+                <TextField label={tx("Zending {0}: verwacht op", i + 1)} type="date" value={x.expected_date} onChange={(v) => patchShip(x.key, { expected_date: v })} />
+                <SelectField label={tx("Komt binnen op")} value={x.warehouse_id} onChange={(v) => patchShip(x.key, { warehouse_id: v })} options={receivers.map((w) => ({ value: w.id, label: w.name }))} />
+                <TextField label={tx("Vervoerder")} value={x.carrier} onChange={(v) => patchShip(x.key, { carrier: v })} />
+                <NumberField label={tx("Deel van de bestelling (%)")} value={x.pct} min={0} onChange={(v) => patchShip(x.key, { pct: v })} />
+                {lines.length > 0 && <div className="small muted span-2">{lines.filter((l) => l.product_id).map((l) => tx("{0} × {1}", splitQty(l.qty, ships.map((y) => y.pct || 0.0001))[i], s.products.find((p) => p.id === l.product_id)?.name)).join(', ')}</div>}
+                {ships.length > 1 && <button className="btn sm" style={{ justifySelf: 'start' }} onClick={() => setShips((v) => v.filter((y) => y.key !== x.key))}>{tx("Zending verwijderen")}</button>}
               </div>
             ))}
-            {Math.round(pctSum) !== 100 && <div className="note warn">De delen tellen op tot {pctSum}%. Dat moet 100% zijn.</div>}
+            {Math.round(pctSum) !== 100 && <div className="note warn">{tx("De delen tellen op tot")} {pctSum}{tx("%. Dat moet 100% zijn.")}</div>}
           </div>
         </section>
 
-        <section className="panel"><AreaField label="Notitie" value={notes} onChange={setNotes} /></section>
+        <section className="panel"><AreaField label={tx("Notitie")} value={notes} onChange={setNotes} /></section>
         <div className="sticky-save">
-          <a className="btn" href="#inkoop">Annuleren</a>
-          <button className="btn primary" onClick={save}>Inkooporder aanmaken</button>
+          <a className="btn" href="#inkoop">{tx("Annuleren")}</a>
+          <button className="btn primary" onClick={save}>{tx("Inkooporder aanmaken")}</button>
         </div>
       </div>
     </>

@@ -8,8 +8,9 @@ import { seedDemo } from './domain/demo'
 import { AppProvider } from './ui/app-context'
 import { LogoFull } from './ui/kit'
 import './styles.css'
+import { tx } from './i18n'
 
-const Loading = () => <div className="wrap" style={{ paddingBlock: 40 }}>Gegevens laden…</div>
+const Loading = () => <div className="wrap" style={{ paddingBlock: 40 }}>{tx("Gegevens laden…")}</div>
 
 // Eén driver per paginabezoek, ook als React een effect dubbel uitvoert.
 let localBoot: Promise<LocalDriver> | null = null
@@ -45,16 +46,16 @@ function SupabaseRoot({ sb }: { sb: SupabaseClient }) {
     const login = async (e: FormEvent) => {
       e.preventDefault(); setError('')
       const { error: err } = await sb.auth.signInWithPassword({ email, password })
-      if (err) setError('Inloggen is niet gelukt. Controleer je e-mailadres en wachtwoord.')
+      if (err) setError(tx("Inloggen is niet gelukt. Controleer je e-mailadres en wachtwoord."))
     }
     return (
       <div className="wrap login">
         <form className="panel" onSubmit={login}>
           <div className="brand"><LogoFull /></div>
-          <div className="field"><label htmlFor="login-email">E-mailadres</label><input id="login-email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} /></div>
-          <div className="field"><label htmlFor="login-pass">Wachtwoord</label><input id="login-pass" type="password" required value={password} onChange={(e) => setPassword(e.target.value)} /></div>
+          <div className="field"><label htmlFor="login-email">{tx("E-mailadres")}</label><input id="login-email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} /></div>
+          <div className="field"><label htmlFor="login-pass">{tx("Wachtwoord")}</label><input id="login-pass" type="password" required value={password} onChange={(e) => setPassword(e.target.value)} /></div>
           {error && <div className="note bad">{error}</div>}
-          <button className="btn primary">Inloggen</button>
+          <button className="btn primary">{tx("Inloggen")}</button>
         </form>
       </div>
     )
