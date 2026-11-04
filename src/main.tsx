@@ -4,7 +4,7 @@ import type { Session, SupabaseClient } from '@supabase/supabase-js'
 import { App } from './App'
 import { LocalDriver } from './data/localDriver'
 import { createSupabase, SupabaseDriver } from './data/supabaseDriver'
-import { seedDemo } from './domain/demo'
+import { renameOldSuppliers, restoreSuppliers, seedDemo } from './domain/demo'
 import { AppProvider } from './ui/app-context'
 import { LogoFull } from './ui/kit'
 import './styles.css'
@@ -17,6 +17,7 @@ let localBoot: Promise<LocalDriver> | null = null
 const bootLocal = () => (localBoot ??= (async () => {
   const d = new LocalDriver()
   if (d.isEmpty) await seedDemo(d)
+  await renameOldSuppliers(d)
   return d
 })())
 
@@ -27,7 +28,13 @@ function LocalRoot() {
     bootLocal().then(setDriver)
   }, [])
   if (!driver) return <Loading />
-  const reset = async () => { driver.clear(); await seedDemo(driver); setVersion((v) => v + 1) }
+  const reset = async () => {
+    const suppliers = await driver.list('suppliers')
+    driver.clear()
+    await seedDemo(driver)
+    await restoreSuppliers(driver, suppliers)
+    setVersion((v) => v + 1)
+  }
   return <AppProvider key={version} db={driver} fallback={<Loading />}><App onResetDemo={reset} /></AppProvider>
 }
 

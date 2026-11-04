@@ -15,6 +15,29 @@ const COORDS: Record<string, [number, number]> = {
   Rojales: [38.0887, -0.7233], 'Pilar de la Horadada': [37.8654, -0.7923],
 }
 
+const RENAMED_SUPPLIERS: Record<string, string> = {
+  'Eikenhoeve Meubelmakers': 'Coöperatieve Inkoopvereniging Ha-Co U.A.',
+  'Noorderzon Outdoor': 'Life Outdoor Living International B.V.',
+}
+
+/** Zet de oude voorbeeldleveranciers in een bestaande browser om naar de standaardleveranciers. */
+export async function renameOldSuppliers(db: Driver) {
+  for (const x of await db.list('suppliers')) {
+    const name = RENAMED_SUPPLIERS[x.name]
+    if (name) await db.update('suppliers', x.id, { name, city: '' })
+  }
+}
+
+/** Herstellen van de voorbeeldgegevens laat ingevoerde leveranciersgegevens staan. */
+export async function restoreSuppliers(db: Driver, previous: Supplier[]) {
+  const current = await db.list('suppliers')
+  for (const { id: _id, ...old } of previous) {
+    const match = current.find((x) => x.name === old.name)
+    if (match) await db.update('suppliers', match.id, old)
+    else await db.insert('suppliers', [{ ...old, id: newId() }])
+  }
+}
+
 export async function seedDemo(db: Driver, today = todayISO()) {
   const d = (n: number) => addDays(today, n)
 
@@ -38,8 +61,8 @@ export async function seedDemo(db: Driver, today = todayISO()) {
     id: newId(), name, vat_number: '', contact_name: '', email: '', phone: '', address: '', postal_code: '', city, country: 'Nederland',
     lead_time_days: lead, payment_terms: '30 dagen', notes: '', is_active: true,
   })
-  const oak = sup('Eikenhoeve Meubelmakers', 'Apeldoorn', 28)
-  const lounge = sup('Noorderzon Outdoor', 'Zwolle', 21)
+  const oak = sup('Coöperatieve Inkoopvereniging Ha-Co U.A.', '', 28)
+  const lounge = sup('Life Outdoor Living International B.V.', '', 21)
   await db.insert('suppliers', [oak, lounge])
 
   const prod = (sku: string, name: string, collection: string, category: string, material: string, color: string, dim: string, kg: number, colli: number, buy: number, sell: number, s: Supplier, min: number): Product => ({

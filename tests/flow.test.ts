@@ -5,7 +5,7 @@ import { loadSnapshot } from '../src/data/driver'
 import { LocalDriver } from '../src/data/localDriver'
 import { TABLES } from '../src/data/types'
 import { openLinesOnTransport, linePurchaseStatus, linesToPurchase, flowCounts, freeAt, transportLoad, invoiceBalance, onHandMap, orderStage, reservedMap, stockKey, vatBreakdown } from '../src/domain/calc'
-import { seedDemo } from '../src/domain/demo'
+import { renameOldSuppliers, restoreSuppliers, seedDemo } from '../src/domain/demo'
 import {
   createDelivery, createInvoice, createOrder, createPurchaseOrder, lineFromProduct, markDelivered, assignShipmentsToTransport, cancelTransport, convertLinesToPurchaseOrders, createTransport, markReady, receiveGoods, rescheduleDelivery, saveRouteOrder, saveSettings, setPurchaseLabel, splitLinesForStock, setDeliveryInTransit, setShipmentWarehouse, setTransportStatus, updateTransport, transferStock,
 } from '../src/domain/services'
@@ -349,6 +349,23 @@ describe('verkoper', () => {
     const s = await loadSnapshot(db)
     const product = s.products.find((p) => p.sku === 'LIG-AL-WT')!
     await expect(createOrder(db, { header: header(s.customers[0].id, { salesperson_id: '' }), lines: [lineFromProduct(product, { qty: 1, warehouse_id: s.warehouses[1].id })] })).rejects.toThrow(/verkoper/)
+  })
+})
+
+describe('leveranciers', () => {
+  it('blijven bewaard bij herstellen en oude namen worden omgezet', async () => {
+    const before = await loadSnapshot(db)
+    expect(before.suppliers.map((x) => x.name)).toContain('Life Outdoor Living International B.V.')
+    const edited = before.suppliers.map((x) => ({ ...x, email: 'inkoop@voorbeeld.test' }))
+    const extra = { ...edited[0], id: 'x', name: 'Derde leverancier' }
+    db.clear(); await seedDemo(db, TODAY)
+    await restoreSuppliers(db, [...edited, extra])
+    const after = await loadSnapshot(db)
+    expect(after.suppliers).toHaveLength(3)
+    expect(after.suppliers.every((x) => x.email === 'inkoop@voorbeeld.test')).toBe(true)
+    await db.update('suppliers', after.suppliers[0].id, { name: 'Noorderzon Outdoor', city: 'Zwolle' })
+    await renameOldSuppliers(db)
+    expect((await loadSnapshot(db)).suppliers[0]).toMatchObject({ name: 'Life Outdoor Living International B.V.', city: '' })
   })
 })
 

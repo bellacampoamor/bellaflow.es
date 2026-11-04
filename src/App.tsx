@@ -125,7 +125,7 @@ export function App({ onResetDemo, onSignOut }: { onResetDemo?: () => Promise<vo
           <button className="btn" onClick={() => setConfirmReset(false)}>{tx("Annuleren")}</button>
           <button className="btn primary" onClick={() => { location.hash = 'overzicht'; void onResetDemo() }}>{tx("Herstellen")}</button>
         </>}>
-          <p style={{ margin: 0 }}>{tx("Alles wat je hebt ingevoerd verdwijnt en de voorbeeldsituatie komt terug.")}</p>
+          <p style={{ margin: 0 }}>{tx("Wat je hebt ingevoerd verdwijnt en de voorbeeldsituatie komt terug. Leveranciers blijven bewaard.")}</p>
         </Modal>
       )}
     </>
