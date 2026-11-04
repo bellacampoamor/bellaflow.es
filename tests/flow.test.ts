@@ -2,7 +2,7 @@ import { readdirSync, readFileSync } from 'node:fs'
 import { PGlite } from '@electric-sql/pglite'
 import { PDFDocument } from 'pdf-lib'
 import type { EmailAttachment } from '../src/data/types'
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { loadSnapshot } from '../src/data/driver'
 import { LocalDriver } from '../src/data/localDriver'
 import { TABLES } from '../src/data/types'
@@ -276,6 +276,24 @@ describe('herstellen van voorbeeldgegevens', () => {
     await seedDemo(fresh, TODAY)
     await restoreSettings(fresh, saved)
     expect((await fresh.list('settings'))[0]).toMatchObject({ address: 'Calle Echt 1', tax_id: 'B12345678', delivery_note_mode: 'digitaal' })
+  })
+})
+
+describe('meerdere tabbladen', () => {
+  it('overschrijft een getekende levering niet met een oude stand', async () => {
+    const store = new Map<string, string>()
+    vi.stubGlobal('localStorage', { getItem: (k: string) => store.get(k) ?? null, setItem: (k: string, v: string) => store.set(k, v) })
+    try {
+      const a = new LocalDriver()
+      await seedDemo(a, TODAY)
+      const b = new LocalDriver()
+      const [d] = await a.list('deliveries')
+      await a.update('deliveries', d.id, { signature_data: 'getekend' })
+      await b.update('settings', 'default', { address: 'Ander tabblad' })
+      const fresh = new LocalDriver()
+      expect((await fresh.list('deliveries')).find((x) => x.id === d.id)!.signature_data).toBe('getekend')
+      expect((await fresh.list('settings'))[0].address).toBe('Ander tabblad')
+    } finally { vi.unstubAllGlobals() }
   })
 })
 

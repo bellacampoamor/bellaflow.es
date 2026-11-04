@@ -28,6 +28,12 @@ export function AppProvider({ db, children, fallback }: { db: Driver; children: 
     return () => clearTimeout(t)
   }, [msg])
 
+  // Wijzigingen uit een ander tabblad meteen tonen, zodat niemand op een oude stand verder werkt.
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => { if (e.key === 'bella-flow-v1') void refresh() }
+    window.addEventListener('storage', onStorage)
+    return () => window.removeEventListener('storage', onStorage)
+  }, [refresh])
   const toast = useCallback((text: string, err = false) => setMsg({ text, err }), [])
   const run = useCallback<Ctx['run']>(async (fn, success) => {
     try {
