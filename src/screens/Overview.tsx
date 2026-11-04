@@ -1,4 +1,4 @@
-import { addDays, depositAvailable, deliveryValue, invoiceBalance, invoiceState, linesToPurchase, onHandMap, orderStage, reservedMap, shipmentIsOpen, shipmentOpenQty, STAGE_LABEL, stockKey, todayISO, uninvoicedDeliveries } from '../domain/calc'
+import { addDays, deliveryIsOpen, depositAvailable, deliveryValue, invoiceBalance, invoiceState, linesToPurchase, onHandMap, orderStage, reservedMap, shipmentIsOpen, shipmentOpenQty, STAGE_LABEL, stockKey, todayISO, uninvoicedDeliveries } from '../domain/calc'
 import { useApp } from '../ui/app-context'
 import { Empty, eur, fmtDate, fmtShort, Head, Pill } from '../ui/kit'
 import { Plus } from 'lucide-react'
@@ -10,7 +10,7 @@ export function Overview() {
   const custOf = (orderId: string) => name(s.customers, s.sales_orders.find((o) => o.id === orderId)?.customer_id ?? null)
 
   const inbound = s.inbound_shipments.filter(shipmentIsOpen).filter((x) => x.expected_date <= addDays(today, 14)).sort((a, b) => a.expected_date.localeCompare(b.expected_date))
-  const deliveries = s.deliveries.filter((d) => d.status === 'planned' || d.status === 'in_transit').sort((a, b) => a.planned_date.localeCompare(b.planned_date)).slice(0, 6)
+  const deliveries = s.deliveries.filter(deliveryIsOpen).sort((a, b) => a.planned_date.localeCompare(b.planned_date)).slice(0, 6)
   const orders = s.sales_orders.filter((o) => ['te_plannen', 'wacht_op_goederen'].includes(orderStage(s, o)))
   const toBill = s.sales_orders.flatMap((o) => o.status === 'open' ? uninvoicedDeliveries(s, o.id) : [])
   const openInvoices = s.invoices.filter((i) => invoiceBalance(s, i) > 0)

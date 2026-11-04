@@ -48,6 +48,8 @@ Schermen praten alleen met `services` en `calc`, nooit rechtstreeks met de opsla
 - **Op bestelling**: de orderregel heeft geen magazijn tot de goederen binnen zijn. De ontvangst koppelt dat automatisch.
 - **Prijzen** van verkoop zijn inclusief IVA, inkoopprijzen exclusief.
 - **Deelleveringen** worden bij afmelden direct gefactureerd. Hele leveringen volgen de instelling onder Facturatie.
+- **Afleverbon**: een bezorging moet eerst klaargezet en akkoord bevonden worden. Daarna volgt de bon, en bij afmelden de naam van wie tekende.
+- **Route**: per dag voor het eigen team, heen en terug vanaf het magazijn dat onder Beheer als vertrekpunt staat. Tot 9 stops de gegarandeerd kortste rit.
 - **Facturen** zijn onwijzigbaar en kunnen niet worden teruggedateerd. De database dwingt dat ook zelf af.
 - **Nummers** komen in Supabase uit `next_number()`, zodat twee gebruikers nooit hetzelfde nummer krijgen.
 
@@ -56,4 +58,5 @@ Schermen praten alleen met `services` en `calc`, nooit rechtstreeks met de opsla
 - Een handeling bestaat uit meerdere losse schrijfacties. Controles lopen vooraf, maar er is nog geen databasetransactie.
   Bij meerdere gelijktijdige gebruikers is de volgende stap: `receiveGoods`, `markDelivered` en `createInvoice` als Postgres-functies.
 - De app laadt alle tabellen in één keer. Dat past bij een winkel, maar vraagt om filters zodra er jaren aan data staan.
+- Adressen en rijtijden lopen nu via openbare diensten (Nominatim, OSRM) die niet voor productie bedoeld zijn. Vervang `src/data/geo.ts` door bijvoorbeeld Google Maps Platform voor live gebruik.
 - Creditfacturen, retouren en aanbetalingsfacturen ontbreken nog.

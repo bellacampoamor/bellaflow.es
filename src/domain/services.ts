@@ -246,7 +246,9 @@ export async function updateOrder(db: Driver, id: string, input: OrderInput) {
       changes.push(`${l.description} toegevoegd`)
     }
   }
-  await db.update('sales_orders', id, input.header)
+  const prev = order as SalesOrder
+  const moved = prev.delivery_address !== input.header.delivery_address || prev.delivery_postal_code !== input.header.delivery_postal_code || prev.delivery_city !== input.header.delivery_city
+  await db.update('sales_orders', id, moved ? { ...input.header, delivery_latitude: null, delivery_longitude: null } : input.header)
   await db.insert('order_events', [event((order as SalesOrder).id, 'gewijzigd', changes.length ? `Order gewijzigd: ${changes.join(', ')}.` : 'Ordergegevens gewijzigd.')])
 }
 
@@ -258,8 +260,8 @@ export async function rescheduleOrder(db: Driver, orderId: string, input: { new_
   await db.update('sales_orders', orderId, { promised_date: input.new_date })
   await db.insert('order_events', [event(orderId, 'leverdatum', input.reason ? `Leverdatum verschoven: ${input.reason}` : 'Leverdatum verschoven.', { old_date: old, new_date: input.new_date, customer_notified: input.customer_notified })])
   // Geplande leveringen schuiven mee; onderweg of geleverd blijft staan.
-  for (const d of s.deliveries.filter((x) => x.sales_order_id === orderId && x.status === 'planned')) {
-    await db.update('deliveries', d.id, { planned_date: input.new_date })
+  for (const d of s.deliveries.filter((x) => x.sales_order_id === orderId && (x.status === 'planned' || x.status === 'ready'))) {
+    await db.update('deliveries', d.id, { planned_date: input.new_date, route_position: null })
   }
 }
 
@@ -304,12 +306,55 @@ export async function createDelivery(db: Driver, input: DeliveryInput) {
   const id = newId()
   const sequence = s.deliveries.filter((d) => d.sales_order_id === input.sales_order_id).length + 1
   const number = await db.nextNumber('LV', yearOf(input.planned_date))
-  await db.insert('deliveries', [{ id, number, sales_order_id: input.sales_order_id, sequence, method: input.method, planned_date: input.planned_date, time_slot: input.time_slot, carrier: input.carrier, status: 'planned', delivered_at: null, signed_by: '', notes: input.notes }])
+  await db.insert('deliveries', [{ id, number, sales_order_id: input.sales_order_id, sequence, method: input.method, planned_date: input.planned_date, time_slot: input.time_slot, carrier: input.carrier, status: 'planned', delivered_at: null, signed_by: '', notes: input.notes, ready_at: null, approved_by: '', note_printed_at: null, signed_note_received: false, route_position: null }])
   await db.insert('delivery_lines', lines.map((l) => ({ ...l, delivery_id: id })))
   return id
 }
 
+function assertStockForDelivery(s: Snapshot, deliveryId: string) {
+  const stock = onHandMap(s)
+  const need = new Map<string, number>()
+  for (const l of s.delivery_lines.filter((x) => x.delivery_id === deliveryId)) {
+    const product = s.sales_order_lines.find((x) => x.id === l.sales_order_line_id)!.product_id
+    const k = stockKey(product, l.warehouse_id)
+    need.set(k, (need.get(k) ?? 0) + l.qty)
+  }
+  for (const [k, n] of need) {
+    const have = stock.get(k) ?? 0
+    if (n > have) {
+      const [pid, wid] = k.split('|')
+      fail(`${s.products.find((p) => p.id === pid)?.name}: ${n} nodig, ${have} aanwezig op ${s.warehouses.find((w) => w.id === wid)?.name}. Boek eerst voorraad over of ontvang de goederen.`)
+    }
+  }
+}
+
+/** Order staat klaar en is akkoord bevonden; vanaf nu kan de afleverbon de deur uit. */
+export async function markReady(db: Driver, id: string, input: { approved_by: string; date: string }) {
+  if (!input.approved_by.trim()) fail('Noteer wie de levering akkoord heeft bevonden.')
+  const s = await loadSnapshot(db)
+  const d = s.deliveries.find((x) => x.id === id) ?? (fail('Levering niet gevonden.') as never)
+  if (d.status !== 'planned') fail('Deze levering is al klaargezet.')
+  assertStockForDelivery(s, id)
+  await db.update('deliveries', id, { status: 'ready', ready_at: input.date, approved_by: input.approved_by })
+  await db.insert('order_events', [event(d.sales_order_id, 'levering', `${d.number} klaargezet en akkoord bevonden door ${input.approved_by}.`)])
+}
+
+export async function markNotePrinted(db: Driver, id: string) {
+  await db.update('deliveries', id, { note_printed_at: new Date().toISOString() })
+}
+
+export async function saveRouteOrder(db: Driver, deliveryIds: string[]) {
+  for (let i = 0; i < deliveryIds.length; i++) await db.update('deliveries', deliveryIds[i], { route_position: i + 1 })
+}
+
+export async function setOrderCoordinates(db: Driver, orderId: string, latitude: number, longitude: number) {
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude) || Math.abs(latitude) > 90 || Math.abs(longitude) > 180) fail('Vul de locatie in als breedte, lengte, bijvoorbeeld 37.9113, -0.7436.')
+  await db.update('sales_orders', orderId, { delivery_latitude: latitude, delivery_longitude: longitude })
+}
+
 export async function setDeliveryInTransit(db: Driver, id: string) {
+  const s = await loadSnapshot(db)
+  if (s.deliveries.find((x) => x.id === id)?.status !== 'ready') fail('Zet de levering eerst klaar en druk de afleverbon af.')
   await db.update('deliveries', id, { status: 'in_transit' })
 }
 
@@ -317,7 +362,7 @@ export async function rescheduleDelivery(db: Driver, id: string, input: { new_da
   if (!input.new_date) fail('Vul de nieuwe datum in.')
   const s = await loadSnapshot(db)
   const d = s.deliveries.find((x) => x.id === id)!
-  await db.update('deliveries', id, { planned_date: input.new_date })
+  await db.update('deliveries', id, { planned_date: input.new_date, route_position: null })
   await db.insert('order_events', [event(d.sales_order_id, 'leverdatum', `${d.number} verschoven${input.reason ? `: ${input.reason}` : '.'}`, { old_date: d.planned_date, new_date: input.new_date, customer_notified: input.customer_notified })])
 }
 
@@ -329,30 +374,22 @@ export async function cancelDelivery(db: Driver, id: string) {
   await db.insert('order_events', [event(d.sales_order_id, 'levering', `${d.number} geannuleerd. De artikelen kunnen opnieuw worden gepland.`)])
 }
 
-export async function markDelivered(db: Driver, id: string, input: { date: string; signed_by: string }) {
+export async function markDelivered(db: Driver, id: string, input: { date: string; signed_by: string; signed_note_received?: boolean }) {
   const s = await loadSnapshot(db)
   const d = s.deliveries.find((x) => x.id === id) ?? (fail('Levering niet gevonden.') as never)
   if (d.status === 'delivered') fail('Deze levering is al afgerond.')
+  if (d.method !== 'meenemen') {
+    if (d.status === 'planned') fail('Zet de levering eerst klaar en druk de afleverbon af.')
+    if (!input.signed_by.trim()) fail('Noteer wie de afleverbon heeft ondertekend.')
+  }
   const lines = s.delivery_lines.filter((l) => l.delivery_id === id)
-  const stock = onHandMap(s)
-  const need = new Map<string, number>()
   const productOf = (lineId: string) => s.sales_order_lines.find((l) => l.id === lineId)!
-  for (const l of lines) {
-    const k = stockKey(productOf(l.sales_order_line_id).product_id, l.warehouse_id)
-    need.set(k, (need.get(k) ?? 0) + l.qty)
-  }
-  for (const [k, n] of need) {
-    const have = stock.get(k) ?? 0
-    if (n > have) {
-      const [pid, wid] = k.split('|')
-      fail(`${s.products.find((p) => p.id === pid)?.name}: ${n} nodig, ${have} aanwezig op ${s.warehouses.find((w) => w.id === wid)?.name}. Boek eerst voorraad over of ontvang de goederen.`)
-    }
-  }
+  assertStockForDelivery(s, id)
   await db.insert('stock_movements', lines.map((l) => ({
     id: newId(), product_id: productOf(l.sales_order_line_id).product_id, warehouse_id: l.warehouse_id, qty: -l.qty,
     kind: 'levering' as const, ref_id: d.number, note: '', moved_at: input.date,
   })))
-  await db.update('deliveries', id, { status: 'delivered', delivered_at: input.date, signed_by: input.signed_by })
+  await db.update('deliveries', id, { status: 'delivered', delivered_at: input.date, signed_by: input.signed_by, signed_note_received: input.signed_note_received ?? false })
   await db.insert('order_events', [event(d.sales_order_id, 'levering', `${d.number} geleverd.`)])
   if (invoicesOnDelivery(s, d)) {
     await createInvoice(db, { sales_order_id: d.sales_order_id, delivery_ids: [id], invoice_date: laterOf(input.date, latestInvoiceDate(s)), settle_deposit: true })

@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { readdirSync, readFileSync } from 'node:fs'
 import { PGlite } from '@electric-sql/pglite'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { loadSnapshot } from '../src/data/driver'
@@ -7,8 +7,10 @@ import { TABLES } from '../src/data/types'
 import { flowCounts, invoiceBalance, onHandMap, orderStage, reservedMap, stockKey, vatBreakdown } from '../src/domain/calc'
 import { seedDemo } from '../src/domain/demo'
 import {
-  createDelivery, createInvoice, createOrder, createPurchaseOrder, lineFromProduct, markDelivered, receiveGoods, splitQty, transferStock,
+  createDelivery, createInvoice, createOrder, createPurchaseOrder, lineFromProduct, markDelivered, markReady, receiveGoods, rescheduleDelivery, saveRouteOrder, setDeliveryInTransit, splitQty, transferStock,
 } from '../src/domain/services'
+import { estimateMatrix, parseRouterTable } from '../src/data/geo'
+import { googleMapsRouteUrl, optimizeRoute, tourCost } from '../src/domain/route'
 import { toSeedSql } from '../scripts/seed-sql'
 
 const TODAY = '2026-11-04'
@@ -18,8 +20,13 @@ beforeEach(async () => { db = new LocalDriver(false); await seedDemo(db, TODAY) 
 const header = (customer_id: string, over = {}) => ({
   customer_id, order_date: TODAY, channel: 'winkel' as const, salesperson: '', customer_reference: '', order_type: 'bestelling' as const,
   fulfilment: 'bezorgen' as const, requested_date: null, promised_date: null, delivery_name: 'X', delivery_phone: '', delivery_address: 'Calle 1',
-  delivery_postal_code: '', delivery_city: '', floor: '', has_elevator: false, needs_assembly: false, remove_old_furniture: false, delivery_notes: '', notes: '', ...over,
+  delivery_postal_code: '', delivery_city: '', delivery_latitude: null, delivery_longitude: null, floor: '', has_elevator: false, needs_assembly: false, remove_old_furniture: false, delivery_notes: '', notes: '', ...over,
 })
+
+const deliver = async (id: string) => {
+  await markReady(db, id, { approved_by: 'Magazijn', date: TODAY })
+  await markDelivered(db, id, { date: TODAY, signed_by: 'Klant', signed_note_received: true })
+}
 
 describe('rekenen', () => {
   it('verdeelt aantallen zonder verlies', () => {
@@ -85,7 +92,7 @@ describe('van inkoop tot factuur', () => {
 
     // Deellevering 1: 3 stuks, wordt 363 op de factuur, deposit dekt alles.
     const d1 = await createDelivery(db, { sales_order_id: orderId, method: 'eigen_team', planned_date: TODAY, time_slot: '', carrier: '', notes: '', lines: [{ sales_order_line_id: line.id, qty: 3 }] })
-    await markDelivered(db, d1, { date: TODAY, signed_by: 'X' })
+    await deliver(d1)
     expect(await stockAt(north.id)).toBe(beforeNorth)
     s = await loadSnapshot(db)
     const inv1 = s.invoices.find((i) => i.sales_order_id === orderId)!
@@ -107,7 +114,7 @@ describe('van inkoop tot factuur', () => {
     await receiveGoods(db, { shipment_id: shipments[1].id, received_date: TODAY, delivery_note: 'PB2', received_by: '', notes: '', rows: [{ shipment_line_id: sl2.id, warehouse_id: north.id, qty_received: 5, qty_damaged: 0, location_bin: '' }] })
     await transferStock(db, { product_id: product.id, from_id: south.id, to_id: north.id, qty: 1, note: '', date: TODAY })
     const d2 = await createDelivery(db, { sales_order_id: orderId, method: 'eigen_team', planned_date: TODAY, time_slot: '', carrier: '', notes: '', lines: [{ sales_order_line_id: line.id, qty: 7 }] })
-    await markDelivered(db, d2, { date: TODAY, signed_by: 'X' })
+    await deliver(d2)
     s = await loadSnapshot(db)
     const inv2 = s.invoices.filter((i) => i.sales_order_id === orderId).find((i) => i.id !== inv1.id)!
     expect(inv2).toMatchObject({ kind: 'eindfactuur', total: 847, deposit_settled: 137 })
@@ -124,7 +131,7 @@ describe('van inkoop tot factuur', () => {
     const after = await loadSnapshot(db)
     const line = after.sales_order_lines.find((l) => l.sales_order_id === id)!
     const d = await createDelivery(db, { sales_order_id: id, method: 'eigen_team', planned_date: TODAY, time_slot: '', carrier: '', notes: '', lines: [{ sales_order_line_id: line.id, qty: 1 }] })
-    await expect(markDelivered(db, d, { date: TODAY, signed_by: '' })).rejects.toThrow(/Boek eerst voorraad/)
+    await expect(deliver(d)).rejects.toThrow(/Boek eerst voorraad/)
   })
 
   it('factureert een hele levering niet vanzelf bij handmatige instelling', async () => {
@@ -133,7 +140,7 @@ describe('van inkoop tot factuur', () => {
     const id = await createOrder(db, { header: header(s.customers[0].id), lines: [lineFromProduct(product, { qty: 2, warehouse_id: s.warehouses[1].id })] })
     const line = (await loadSnapshot(db)).sales_order_lines.find((l) => l.sales_order_id === id)!
     const d = await createDelivery(db, { sales_order_id: id, method: 'eigen_team', planned_date: TODAY, time_slot: '', carrier: '', notes: '', lines: [{ sales_order_line_id: line.id, qty: 2 }] })
-    await markDelivered(db, d, { date: TODAY, signed_by: '' })
+    await deliver(d)
     expect((await loadSnapshot(db)).invoices.filter((i) => i.sales_order_id === id)).toHaveLength(0)
   })
 
@@ -154,11 +161,68 @@ describe('van inkoop tot factuur', () => {
   })
 })
 
+describe('afleverbon', () => {
+  const plannedDelivery = async () => {
+    const s = await loadSnapshot(db)
+    const product = s.products.find((p) => p.sku === 'LIG-AL-WT')!
+    const id = await createOrder(db, { header: header(s.customers[0].id), lines: [lineFromProduct(product, { qty: 1, warehouse_id: s.warehouses[1].id })] })
+    const line = (await loadSnapshot(db)).sales_order_lines.find((l) => l.sales_order_id === id)!
+    return createDelivery(db, { sales_order_id: id, method: 'eigen_team', planned_date: TODAY, time_slot: '', carrier: '', notes: '', lines: [{ sales_order_line_id: line.id, qty: 1 }] })
+  }
+  it('vraagt om klaarzetten, akkoord en handtekening', async () => {
+    const d = await plannedDelivery()
+    await expect(markDelivered(db, d, { date: TODAY, signed_by: 'X' })).rejects.toThrow(/eerst klaar/)
+    await expect(setDeliveryInTransit(db, d)).rejects.toThrow(/eerst klaar/)
+    await expect(markReady(db, d, { approved_by: ' ', date: TODAY })).rejects.toThrow(/akkoord/)
+    await markReady(db, d, { approved_by: 'Jan', date: TODAY })
+    await setDeliveryInTransit(db, d)
+    await expect(markDelivered(db, d, { date: TODAY, signed_by: '' })).rejects.toThrow(/ondertekend/)
+    await markDelivered(db, d, { date: TODAY, signed_by: 'Klant', signed_note_received: true })
+    const row = (await loadSnapshot(db)).deliveries.find((x) => x.id === d)!
+    expect(row).toMatchObject({ status: 'delivered', approved_by: 'Jan', signed_by: 'Klant', signed_note_received: true })
+  })
+  it('verschuiven haalt de levering uit de rijvolgorde', async () => {
+    const d = await plannedDelivery()
+    await saveRouteOrder(db, [d])
+    await rescheduleDelivery(db, d, { new_date: '2026-12-01', reason: '', customer_notified: false })
+    expect((await loadSnapshot(db)).deliveries.find((x) => x.id === d)!.route_position).toBeNull()
+  })
+})
+
+describe('route', () => {
+  it('vindt de kortste ronde', () => {
+    const line = [0, 3, 1, 2].map((x) => [0, 3, 1, 2].map((y) => Math.abs(x - y)))
+    const order = optimizeRoute(line)
+    expect(tourCost(line, order)).toBe(6)
+    expect([...order].sort()).toEqual([1, 2, 3])
+  })
+  it('heuristiek bij veel stops levert elke stop één keer en is niet slechter dan de invoervolgorde', () => {
+    const pts = Array.from({ length: 13 }, (_, i) => ({ latitude: 37.8 + ((i * 7) % 13) / 50, longitude: -0.8 + ((i * 5) % 13) / 50 }))
+    const m = estimateMatrix(pts).km
+    const order = optimizeRoute(m)
+    expect([...order].sort((a, b) => a - b)).toEqual(Array.from({ length: 12 }, (_, i) => i + 1))
+    expect(tourCost(m, order)).toBeLessThan(tourCost(m, Array.from({ length: 12 }, (_, i) => i + 1)))
+  })
+  it('asymmetrische rijtijden tellen in de goede richting', () => {
+    const m = [[0, 1, 9], [9, 0, 1], [1, 9, 0]]
+    expect(optimizeRoute(m)).toEqual([1, 2])
+  })
+  it('leest de routeservice en weigert onbereikbare punten', () => {
+    expect(parseRouterTable({ code: 'Ok', durations: [[0, 120]], distances: [[0, 2000]] })).toMatchObject({ source: 'weg', minutes: [[0, 2]], km: [[0, 2]] })
+    expect(parseRouterTable({ code: 'Ok', durations: [[0, null]], distances: [[0, 1]] })).toBeNull()
+    expect(parseRouterTable({ code: 'NoRoute' })).toBeNull()
+  })
+  it('zet alle stops en de terugweg in de kaartlink', () => {
+    const url = decodeURIComponent(googleMapsRouteUrl({ latitude: 1, longitude: 2 }, [{ latitude: 3, longitude: 4 }, { latitude: 5, longitude: 6 }]).replace(/\+/g, ' '))
+    expect(url).toContain('origin=1,2'); expect(url).toContain('destination=1,2'); expect(url).toContain('waypoints=3,4|5,6')
+  })
+})
+
 describe('database', () => {
   it('migratie en voorbeeldgegevens passen op Postgres, en de regels gelden daar ook', async () => {
     const pg = new PGlite()
     await pg.exec('create role authenticated;')
-    await pg.exec(readFileSync('supabase/migrations/20261104120000_bella_flow_schema.sql', 'utf8'))
+    await pg.exec(readdirSync('supabase/migrations').sort().map((f) => readFileSync(`supabase/migrations/${f}`, 'utf8')).join('\n'))
     await pg.exec(toSeedSql(await loadSnapshot(db)))
 
     const snap = await loadSnapshot(db)

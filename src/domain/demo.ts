@@ -4,10 +4,16 @@ import { newId, type Driver } from '../data/driver'
 import type { Customer, Product, Supplier, Warehouse } from '../data/types'
 import { addDays, todayISO } from './calc'
 import {
-  createDelivery, createInvoice, createOrder, createPurchaseOrder, lineFromProduct, markDelivered, payInvoice,
+  createDelivery, createInvoice, createOrder, createPurchaseOrder, lineFromProduct, markDelivered, markNotePrinted, markReady, payInvoice,
   receiveGoods, type OrderHeader, type OrderLineInput,
 } from './services'
 import { loadSnapshot } from '../data/driver'
+
+// Plaatsen bij de verzonnen adressen, zodat de routeplanning meteen iets laat zien.
+const COORDS: Record<string, [number, number]> = {
+  'Orihuela Costa': [37.9341, -0.7395], Torrevieja: [37.9787, -0.6822], Campoamor: [37.8992, -0.7522],
+  Rojales: [38.0887, -0.7233], 'Pilar de la Horadada': [37.8654, -0.7923],
+}
 
 export async function seedDemo(db: Driver, today = todayISO()) {
   const d = (n: number) => addDays(today, n)
@@ -19,11 +25,12 @@ export async function seedDemo(db: Driver, today = todayISO()) {
   }])
 
   const wh = (code: string, name: string, kind: Warehouse['kind'], city: string, receives = true): Warehouse => ({
-    id: newId(), code, name, kind, address: '', postal_code: '', city, phone: '', contact_name: '', receives_goods: receives, ships_goods: true, is_active: true,
+    id: newId(), code, name, kind, address: '', postal_code: '', city, phone: '', contact_name: '', receives_goods: receives, ships_goods: true, is_active: true, latitude: null, longitude: null, is_route_origin: false,
   })
   const shop = wh('SHR-CAM', 'Showroom Campoamor', 'winkel', 'Campoamor')
   const north = wh('MAG-CAM', 'Magazijn Campoamor', 'magazijn', 'Campoamor')
   const south = wh('MAG-ALM', 'Magazijn Almoradí', 'magazijn', 'Almoradí')
+  north.latitude = 37.911372; north.longitude = -0.74365; north.is_route_origin = true
   await db.insert('warehouses', [shop, north, south])
 
   const sup = (name: string, city: string, lead: number): Supplier => ({
@@ -119,7 +126,7 @@ export async function seedDemo(db: Driver, today = todayISO()) {
   const header = (c: Customer, date: string, type: OrderHeader['order_type'], fulfilment: OrderHeader['fulfilment'], over: Partial<OrderHeader> = {}): OrderHeader => ({
     customer_id: c.id, order_date: date, channel: 'winkel', salesperson: 'Winkelteam', customer_reference: '', order_type: type, fulfilment,
     requested_date: null, promised_date: null, delivery_name: c.name, delivery_phone: c.phone, delivery_address: fulfilment === 'meenemen' ? '' : c.address,
-    delivery_postal_code: fulfilment === 'meenemen' ? '' : c.postal_code, delivery_city: fulfilment === 'meenemen' ? '' : c.city, floor: '', has_elevator: false,
+    delivery_postal_code: fulfilment === 'meenemen' ? '' : c.postal_code, delivery_city: fulfilment === 'meenemen' ? '' : c.city, delivery_latitude: fulfilment === 'meenemen' ? null : COORDS[c.city]?.[0] ?? null, delivery_longitude: fulfilment === 'meenemen' ? null : COORDS[c.city]?.[1] ?? null, floor: '', has_elevator: false,
     needs_assembly: false, remove_old_furniture: false, delivery_notes: '', notes: '', ...over,
   })
   const line = (p: Product, qty: number, w: Warehouse | null, over: Partial<OrderLineInput> = {}) =>
@@ -133,7 +140,8 @@ export async function seedDemo(db: Driver, today = todayISO()) {
     deposit: { amount: 1000, method: 'pin', reference: '' },
   })
   const dl1 = await createDelivery(db, { sales_order_id: o1, method: 'eigen_team', planned_date: d(-14), time_slot: '09:00-12:00', carrier: 'Eigen team', notes: '', lines: (await oLines(o1)).map((l) => ({ sales_order_line_id: l.id, qty: l.qty })) })
-  await markDelivered(db, dl1, { date: d(-14), signed_by: 'M. de Vries' })
+  await markReady(db, dl1, { approved_by: 'Magazijn', date: d(-15) })
+  await markDelivered(db, dl1, { date: d(-14), signed_by: 'M. de Vries', signed_note_received: true })
   const inv1 = await createInvoice(db, { sales_order_id: o1, delivery_ids: [dl1], invoice_date: d(-14), settle_deposit: true })
   const invoice1 = (await loadSnapshot(db)).invoices.find((i) => i.id === inv1)!
   await payInvoice(db, { invoice_id: inv1, amount: invoice1.total - invoice1.deposit_settled, method: 'overboeking', paid_at: d(-11), reference: '' })
@@ -153,8 +161,18 @@ export async function seedDemo(db: Driver, today = todayISO()) {
   })
   const o2l = await oLines(o2)
   const dl2 = await createDelivery(db, { sales_order_id: o2, method: 'eigen_team', planned_date: d(-3), time_slot: '08:00-11:00', carrier: 'Eigen team', notes: '', lines: o2l.map((l) => ({ sales_order_line_id: l.id, qty: Math.ceil(l.qty / 2) })) })
-  await markDelivered(db, dl2, { date: d(-3), signed_by: 'Receptie Mirador' })
-  await createDelivery(db, { sales_order_id: o2, method: 'eigen_team', planned_date: today, time_slot: '13:00-16:00', carrier: 'Eigen team', notes: '', lines: o2l.map((l) => ({ sales_order_line_id: l.id, qty: Math.floor(l.qty / 2) })) })
+  await markReady(db, dl2, { approved_by: 'Magazijn', date: d(-4) })
+  await markDelivered(db, dl2, { date: d(-3), signed_by: 'Receptie Mirador', signed_note_received: true })
+  const dl3 = await createDelivery(db, { sales_order_id: o2, method: 'eigen_team', planned_date: today, time_slot: '13:00-16:00', carrier: 'Eigen team', notes: '', lines: o2l.map((l) => ({ sales_order_line_id: l.id, qty: Math.floor(l.qty / 2) })) })
+
+  await markReady(db, dl3, { approved_by: 'Magazijn', date: today })
+  await markNotePrinted(db, dl3)
+
+  // Vier bezorgingen voor morgen, nog niet op rijvolgorde gezet.
+  for (const [c, p, qty] of [[c5, coffee, 1], [c1, chair, 2], [c6, chair, 2], [c3, coffee, 1]] as const) {
+    const id = await createOrder(db, { header: header(c, d(-1), 'bestelling', 'bezorgen', { promised_date: d(1) }), lines: [line(p, qty, north)] })
+    await createDelivery(db, { sales_order_id: id, method: 'eigen_team', planned_date: d(1), time_slot: '', carrier: 'Eigen team', notes: '', lines: (await oLines(id)).map((l) => ({ sales_order_line_id: l.id, qty: l.qty })) })
+  }
 
   // Te plannen uit voorraad, op twee locaties.
   await createOrder(db, {

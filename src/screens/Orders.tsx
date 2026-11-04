@@ -131,7 +131,7 @@ export function OrderDetail({ id }: { id: string }) {
             <div className="panel-head"><h2>Leveringen</h2>{open && plannable.length > 0 && <button className="btn sm" onClick={() => setModal('plan')}><Plus size={14} />Deellevering plannen</button>}</div>
             {deliveries.length === 0 && <Empty>{plannable.length ? 'Nog niets gepland. Plan alles ineens of in delen.' : 'Plannen kan zodra de goederen binnen zijn.'}</Empty>}
             {deliveries.map((d) => (
-              <a key={d.id} href="#levering" className="task">
+              <a key={d.id} href={d.status === 'planned' || d.status === 'cancelled' || d.method === 'meenemen' ? '#levering' : `#levering-${d.id}`} className="task">
                 <div><div className="task-t">{d.number}{d.sequence > 1 || deliveries.length > 1 ? `, deellevering ${d.sequence}` : ''}</div>
                   <div className="muted small">{s.delivery_lines.filter((l) => l.delivery_id === d.id).map((l) => `${l.qty} × ${lines.find((x) => x.id === l.sales_order_line_id)?.description}`).join(', ')}</div></div>
                 <DeliveryPill d={d} />
@@ -203,6 +203,7 @@ export function DeliveryPill({ d }: { d: Delivery }) {
   const today = todayISO()
   if (d.status === 'delivered') return <Pill tone="good">Geleverd {fmtDate(d.delivered_at)}</Pill>
   if (d.status === 'cancelled') return <Pill>Geannuleerd</Pill>
+  if (d.status === 'ready') return <Pill tone="good">Klaargezet, {fmtDate(d.planned_date)}</Pill>
   if (d.status === 'in_transit') return <Pill tone="info">Onderweg</Pill>
   return <Pill tone={d.planned_date < today ? 'bad' : d.planned_date === today ? 'warn' : ''}>{fmtDate(d.planned_date)}</Pill>
 }
@@ -219,7 +220,7 @@ export function RescheduleModal({ order, onClose }: { order: SalesOrder; onClose
   const [reason, setReason] = useState('')
   const [notified, setNotified] = useState(false)
   const c = s.customers.find((x) => x.id === order.customer_id)!
-  const planned = s.deliveries.filter((d) => d.sales_order_id === order.id && d.status === 'planned')
+  const planned = s.deliveries.filter((d) => d.sales_order_id === order.id && (d.status === 'planned' || d.status === 'ready'))
   const message = date ? DATE_MSG[c.language](c.name, order.number, fmtDate(date), reason) : ''
   const copy = async () => {
     try { await navigator.clipboard.writeText(message); toast('Bericht gekopieerd') } catch { toast('Kopiëren lukte niet. Selecteer de tekst handmatig.', true) }

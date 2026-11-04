@@ -9,7 +9,7 @@ import { CustomerFields } from './OrderForm'
 type Tab = 'magazijnen' | 'producten' | 'leveranciers' | 'klanten' | 'bedrijf'
 
 const NEW = {
-  warehouse: { code: '', name: '', kind: 'magazijn', address: '', postal_code: '', city: '', phone: '', contact_name: '', receives_goods: true, ships_goods: true, is_active: true } as Omit<Warehouse, 'id'>,
+  warehouse: { code: '', name: '', kind: 'magazijn', address: '', postal_code: '', city: '', phone: '', contact_name: '', receives_goods: true, ships_goods: true, is_active: true, latitude: null, longitude: null, is_route_origin: false } as Omit<Warehouse, 'id'>,
   product: { sku: '', name: '', collection: '', category: '', material: '', color: '', dimensions: '', weight_kg: 0, colli: 1, purchase_price: 0, sale_price: 0, vat_rate: 21, supplier_id: null, min_stock: 0, is_active: true } as Omit<Product, 'id'>,
   supplier: { name: '', vat_number: '', contact_name: '', email: '', phone: '', address: '', city: '', country: 'Nederland', lead_time_days: 21, payment_terms: '', notes: '', is_active: true } as Omit<Supplier, 'id'>,
   customer: { kind: 'particulier', name: '', company: '', tax_id: '', email: '', phone: '', language: 'es', address: '', postal_code: '', city: '', province: 'Alicante', country: 'España', notes: '' } as Omit<Customer, 'id'>,
@@ -92,10 +92,13 @@ export function Admin() {
           <TextField label="Plaats" value={wh.city} onChange={(v) => setWh({ ...wh, city: v })} />
           <TextField label="Contactpersoon" value={wh.contact_name} onChange={(v) => setWh({ ...wh, contact_name: v })} />
           <TextField label="Telefoon" value={wh.phone} onChange={(v) => setWh({ ...wh, phone: v })} />
+          <NumberField label="Breedtegraad" value={wh.latitude ?? 0} onChange={(v) => setWh({ ...wh, latitude: v })} />
+          <NumberField label="Lengtegraad" value={wh.longitude ?? 0} onChange={(v) => setWh({ ...wh, longitude: v })} />
         </div>
         <div className="actions" style={{ gap: '4px 22px' }}>
           <Check label="Ontvangt goederen" checked={wh.receives_goods} onChange={(v) => setWh({ ...wh, receives_goods: v })} />
           <Check label="Levert uit aan klanten" checked={wh.ships_goods} onChange={(v) => setWh({ ...wh, ships_goods: v })} />
+          <Check label="Vertrekpunt bezorgroute" checked={wh.is_route_origin} onChange={(v) => setWh({ ...wh, is_route_origin: v })} />
           <Check label="Actief" checked={wh.is_active} onChange={(v) => setWh({ ...wh, is_active: v })} />
         </div>
       </Modal>}

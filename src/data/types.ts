@@ -9,6 +9,7 @@ export interface Warehouse {
   id: string; code: string; name: string; kind: 'winkel' | 'magazijn' | 'extern'
   address: string; postal_code: string; city: string; phone: string; contact_name: string
   receives_goods: boolean; ships_goods: boolean; is_active: boolean
+  latitude: number | null; longitude: number | null; is_route_origin: boolean
 }
 export interface Supplier {
   id: string; name: string; vat_number: string; contact_name: string; email: string; phone: string
@@ -33,7 +34,7 @@ export interface SalesOrder {
   channel: 'winkel' | 'online' | 'telefoon' | 'beurs'; salesperson: string; customer_reference: string
   order_type: OrderType; fulfilment: Fulfilment; requested_date: string | null; promised_date: string | null
   delivery_name: string; delivery_phone: string; delivery_address: string; delivery_postal_code: string
-  delivery_city: string; floor: string; has_elevator: boolean; needs_assembly: boolean
+  delivery_city: string; delivery_latitude: number | null; delivery_longitude: number | null; floor: string; has_elevator: boolean; needs_assembly: boolean
   remove_old_furniture: boolean; delivery_notes: string; notes: string; status: 'open' | 'cancelled'
 }
 export interface SalesOrderLine {
@@ -73,8 +74,9 @@ export interface StockMovement {
 export interface Delivery {
   id: string; number: string; sales_order_id: string; sequence: number
   method: 'meenemen' | 'vervoerder' | 'eigen_team'; planned_date: string; time_slot: string; carrier: string
-  status: 'planned' | 'in_transit' | 'delivered' | 'cancelled'; delivered_at: string | null
-  signed_by: string; notes: string
+  status: 'planned' | 'ready' | 'in_transit' | 'delivered' | 'cancelled'; delivered_at: string | null
+  signed_by: string; notes: string; ready_at: string | null; approved_by: string; note_printed_at: string | null
+  signed_note_received: boolean; route_position: number | null
 }
 export interface DeliveryLine {
   id: string; delivery_id: string; sales_order_line_id: string; warehouse_id: string; qty: number

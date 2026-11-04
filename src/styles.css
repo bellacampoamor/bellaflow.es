@@ -1,10 +1,10 @@
-/* Bella Flow. Kleuren uit de procesillustratie: petrolblauw, oker en een eigen tint per processtap.
+/* Bella Flow. Kleuren uit het logo: petrolblauw en roestrood, met een eigen tint per processtap.
    Lay-out: procesbalk als hoofdnavigatie bovenaan, werkvlak eronder. */
 :root {
   --petrol: #123f55;
   --petrol-soft: #2c6079;
-  --ochre: #b97f42;
-  --ochre-strong: #94612a;
+  --ochre: #ab5236;
+  --ochre-strong: #8f4329;
   --bg: #f6f7f5;
   --surface: #ffffff;
   --surface-2: #eff2f0;
@@ -15,9 +15,9 @@
   --on-primary: #ffffff;
   --primary: #123f55;
   --primary-hover: #0c2f40;
-  --accent: #94612a;
+  --accent: #8f4329;
   --buy: #dcebf3;      --buy-fg: #1a506b;
-  --sell: #f6e6d3;     --sell-fg: #875419;
+  --sell: #f7e4db;     --sell-fg: #8a4026;
   --ship: #e1efdf;     --ship-fg: #2f6b34;
   --bill: #eae4f6;     --bill-fg: #5b4296;
   --good: #24743a;     --good-bg: #e0f1e3;
@@ -32,18 +32,18 @@
   --body: 'Figtree', 'Segoe UI', system-ui, sans-serif;
 }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
-  --petrol: #cfe6f1; --petrol-soft: #8fbdd2; --ochre: #d9a468; --ochre-strong: #e3b580;
+  --petrol: #cfe6f1; --petrol-soft: #8fbdd2; --ochre: #e0937a; --ochre-strong: #eaa992;
   --bg: #0f1d24; --surface: #16272f; --surface-2: #1d323b; --fg: #e4edf0; --muted: #94a9b3;
-  --line: #2a424d; --line-strong: #41606d; --on-primary: #0f1d24; --primary: #d9a468; --primary-hover: #e6b985; --accent: #e3b580;
-  --buy: #1d3b4b; --buy-fg: #a7d3e8; --sell: #41301c; --sell-fg: #eec48f; --ship: #21392a; --ship-fg: #a8d8ad; --bill: #322a4b; --bill-fg: #c9baf0;
+  --line: #2a424d; --line-strong: #41606d; --on-primary: #0f1d24; --primary: #e0937a; --primary-hover: #eaa992; --accent: #eaa992;
+  --buy: #1d3b4b; --buy-fg: #a7d3e8; --sell: #44261b; --sell-fg: #f1bda8; --ship: #21392a; --ship-fg: #a8d8ad; --bill: #322a4b; --bill-fg: #c9baf0;
   --good: #8fd89f; --good-bg: #1c3a26; --warn: #eec26b; --warn-bg: #413212; --bad: #f4a79f; --bad-bg: #4a211d; --info: #a7d3e8; --info-bg: #1d3b4b;
   --neutral-bg: #26393f; --shadow: 0 12px 40px rgba(0, 0, 0, .5); --logo-plate: #f6f7f5; --logo-pad: 5px 10px; color-scheme: dark;
 } }
 :root[data-theme="dark"] {
-  --petrol: #cfe6f1; --petrol-soft: #8fbdd2; --ochre: #d9a468; --ochre-strong: #e3b580;
+  --petrol: #cfe6f1; --petrol-soft: #8fbdd2; --ochre: #e0937a; --ochre-strong: #eaa992;
   --bg: #0f1d24; --surface: #16272f; --surface-2: #1d323b; --fg: #e4edf0; --muted: #94a9b3;
-  --line: #2a424d; --line-strong: #41606d; --on-primary: #0f1d24; --primary: #d9a468; --primary-hover: #e6b985; --accent: #e3b580;
-  --buy: #1d3b4b; --buy-fg: #a7d3e8; --sell: #41301c; --sell-fg: #eec48f; --ship: #21392a; --ship-fg: #a8d8ad; --bill: #322a4b; --bill-fg: #c9baf0;
+  --line: #2a424d; --line-strong: #41606d; --on-primary: #0f1d24; --primary: #e0937a; --primary-hover: #eaa992; --accent: #eaa992;
+  --buy: #1d3b4b; --buy-fg: #a7d3e8; --sell: #44261b; --sell-fg: #f1bda8; --ship: #21392a; --ship-fg: #a8d8ad; --bill: #322a4b; --bill-fg: #c9baf0;
   --good: #8fd89f; --good-bg: #1c3a26; --warn: #eec26b; --warn-bg: #413212; --bad: #f4a79f; --bad-bg: #4a211d; --info: #a7d3e8; --info-bg: #1d3b4b;
   --neutral-bg: #26393f; --shadow: 0 12px 40px rgba(0, 0, 0, .5); --logo-plate: #f6f7f5; --logo-pad: 5px 10px; color-scheme: dark;
 }
@@ -246,3 +246,27 @@ td input.price { width: 104px; }
 
 .login { min-height: 80vh; display: grid; place-items: center; }
 .login form { width: min(380px, 100%); display: grid; gap: 12px; }
+
+/* Routeplanning */
+.route-bar { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; justify-content: space-between; background: var(--surface-2); border-radius: 8px; padding: 9px 12px; margin-bottom: 8px; font-size: .9rem; }
+.stop { display: grid; grid-template-columns: 32px minmax(0, 1fr); gap: 10px; align-items: start; border-bottom: 1px solid var(--line); padding: 10px 0; }
+.stop:last-child { border-bottom: 0; }
+.stop .task { border: 0; padding: 0; }
+.stop-nr { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.stop-nr b { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; background: var(--ship); color: var(--ship-fg); font: 700 .9rem var(--display); }
+.stop-nr .btn.icon { min-height: 22px; padding: 0 3px; }
+.stop-nr .btn.icon:hover { color: var(--fg); }
+.btn-row { display: flex; flex-wrap: wrap; gap: 6px; }
+
+/* Afleverbon */
+.note-meta { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 18px; margin-bottom: 20px; }
+.note-sign { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 22px; margin-top: 34px; break-inside: avoid; }
+.note-sign div { border-top: 1px solid #16303d; padding-top: 5px; min-height: 66px; font-size: .84rem; }
+.note-sign div.sig { min-height: 96px; }
+.note-sign .pre { border-top: 0; padding-top: 0; font-size: .95rem; font-weight: 600; }
+.paper .note-box { border: 1px solid #b4c2c6; border-radius: 6px; padding: 9px 12px; font-size: .9rem; margin-top: 14px; }
+.paper .check-box { display: inline-block; width: 15px; height: 15px; border: 1px solid #16303d; vertical-align: -2px; margin-right: 7px; }
+@media print { .paper table { font-size: 11pt; } }
+
+.util .btn-toggle { background: none; border: 0; display: inline-flex; gap: 7px; align-items: center; padding: 7px 10px; border-radius: 8px; color: var(--muted); font: 500 .9rem var(--body); cursor: pointer; }
+.util .btn-toggle:hover { background: var(--surface-2); color: var(--fg); }

@@ -37,7 +37,7 @@ export function OrderForm({ id }: { id?: string }) {
 
   const [h, setH] = useState<OrderHeader>(() => existing ? (({ id: _i, number: _n, status: _s, ...rest }) => rest)(existing) : {
     customer_id: '', order_date: today, channel: 'winkel', salesperson: '', customer_reference: '', order_type: 'direct', fulfilment: 'meenemen',
-    requested_date: null, promised_date: null, delivery_name: '', delivery_phone: '', delivery_address: '', delivery_postal_code: '', delivery_city: '',
+    requested_date: null, promised_date: null, delivery_name: '', delivery_phone: '', delivery_address: '', delivery_postal_code: '', delivery_city: '', delivery_latitude: null, delivery_longitude: null,
     floor: '', has_elevator: false, needs_assembly: false, remove_old_furniture: false, delivery_notes: '', notes: '',
   })
   const [lines, setLines] = useState<Line[]>(() => existing ? s.sales_order_lines.filter((l) => l.sales_order_id === id).map((l) => ({ ...l, key: k++ })) : [])

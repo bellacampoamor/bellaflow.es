@@ -44,7 +44,7 @@ export class SupabaseDriver implements Driver {
 
 const NUMERIC = new Set([
   'weight_kg', 'purchase_price', 'sale_price', 'vat_rate', 'unit_price', 'discount_pct', 'unit_cost',
-  'base_amount', 'vat_amount', 'total', 'deposit_settled', 'line_total', 'amount',
+  'latitude', 'longitude', 'delivery_latitude', 'delivery_longitude', 'base_amount', 'vat_amount', 'total', 'deposit_settled', 'line_total', 'amount',
 ])
 function toNumbers(row: Record<string, unknown>) {
   const out: Record<string, unknown> = { ...row }

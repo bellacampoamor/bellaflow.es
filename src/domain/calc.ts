@@ -177,6 +177,8 @@ export function isPartialDelivery(s: Snapshot, d: Delivery) {
 export const invoicesOnDelivery = (s: Snapshot, d: Delivery) =>
   isPartialDelivery(s, d) || s.settings[0]?.invoice_mode === 'auto'
 
+export const deliveryIsOpen = (d: Delivery) => d.status === 'planned' || d.status === 'ready' || d.status === 'in_transit'
+
 export function deliveryValue(s: Snapshot, deliveryId: string) {
   return round2(s.delivery_lines.filter((l) => l.delivery_id === deliveryId).reduce((n, dl) => {
     const l = s.sales_order_lines.find((x) => x.id === dl.sales_order_line_id) as SalesOrderLine
@@ -222,7 +224,7 @@ export function flowCounts(s: Snapshot, today = todayISO()) {
     inkomend: openShipments.filter((x) => x.expected_date < today).length,
     ontvangst: openShipments.filter((x) => x.expected_date <= addDays(today, 7)).length,
     orders: openOrders.filter((o) => orderStage(s, o) === 'te_plannen').length,
-    levering: s.deliveries.filter((d) => (d.status === 'planned' || d.status === 'in_transit') && d.planned_date <= today).length,
+    levering: s.deliveries.filter((d) => deliveryIsOpen(d) && d.planned_date <= today).length,
     facturatie: openOrders.reduce((n, o) => n + uninvoicedDeliveries(s, o.id).length, 0),
   }
 }

@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { Boxes, ClipboardList, FileText, LayoutDashboard, PackageCheck, Settings2, ShoppingCart, Truck, Warehouse as WarehouseIcon } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { Moon, Sun, Boxes, ClipboardList, FileText, LayoutDashboard, PackageCheck, Settings2, ShoppingCart, Truck, Warehouse as WarehouseIcon } from 'lucide-react'
 import { flowCounts } from './domain/calc'
 import { useApp, useHash } from './ui/app-context'
 import { Logo, Modal } from './ui/kit'
@@ -10,6 +10,7 @@ import { ReceiptForm, Receipts } from './screens/Receipts'
 import { OrderDetail, Orders } from './screens/Orders'
 import { OrderForm } from './screens/OrderForm'
 import { Deliveries } from './screens/Deliveries'
+import { DeliveryNote } from './screens/DeliveryNote'
 import { InvoiceDetail, Invoices } from './screens/Invoices'
 import { Stock } from './screens/Stock'
 import { Admin } from './screens/Admin'
@@ -23,8 +24,25 @@ const STEPS = [
   { key: 'facturatie', label: '6. Facturatie', sub: (n: number) => `${n} te factureren`, icon: FileText, tint: 'bill' },
 ] as const
 
+const THEME_KEY = 'bella-flow-theme'
+function useTheme() {
+  const [theme, setTheme] = useState<'light' | 'dark'>(() => {
+    try {
+      const saved = localStorage.getItem(THEME_KEY)
+      if (saved === 'light' || saved === 'dark') return saved
+    } catch { /* systeemstand */ }
+    return document.documentElement.dataset.theme === 'dark' || matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+  })
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme
+    try { localStorage.setItem(THEME_KEY, theme) } catch { /* alleen deze sessie */ }
+  }, [theme])
+  return [theme, () => setTheme((v) => (v === 'dark' ? 'light' : 'dark'))] as const
+}
+
 export function App({ onResetDemo, onSignOut }: { onResetDemo?: () => Promise<void>; onSignOut?: () => void }) {
   const { s } = useApp()
+  const [theme, toggleTheme] = useTheme()
   const hash = useHash()
   const [confirmReset, setConfirmReset] = useState(false)
   const dash = hash.indexOf('-')
@@ -49,6 +67,7 @@ export function App({ onResetDemo, onSignOut }: { onResetDemo?: () => Promise<vo
             <a href="#overzicht" className={screen === 'overzicht' ? 'on' : ''}><LayoutDashboard size={16} />Overzicht</a>
             <a href="#voorraad" className={screen === 'voorraad' ? 'on' : ''}><Boxes size={16} />Voorraad</a>
             <a href="#beheer" className={screen === 'beheer' ? 'on' : ''}><Settings2 size={16} />Beheer</a>
+            <button className="btn-toggle" onClick={toggleTheme}>{theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}{theme === 'dark' ? 'Dagstand' : 'Nachtstand'}</button>
             {onSignOut && <a href="#overzicht" onClick={onSignOut}>Uitloggen</a>}
           </nav>
         </div>
@@ -93,7 +112,7 @@ function Route({ screen, param }: { screen: string; param: string }) {
       if (param === 'nieuw') return <OrderForm />
       if (param.startsWith('wijzig-')) return <OrderForm id={param.slice(7)} />
       return param ? <OrderDetail id={param} /> : <Orders />
-    case 'levering': return <Deliveries />
+    case 'levering': return param ? <DeliveryNote id={param} /> : <Deliveries />
     case 'facturatie': return param ? <InvoiceDetail id={param} /> : <Invoices />
     case 'voorraad': return <Stock />
     case 'beheer': return <Admin />
