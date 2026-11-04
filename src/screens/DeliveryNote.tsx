@@ -1,8 +1,9 @@
+import { useState } from 'react'
 import { Printer } from 'lucide-react'
 import type { Language } from '../data/types'
 import { markNotePrinted } from '../domain/services'
-import { useApp } from '../ui/app-context'
-import { fmtDate, Head, Pill } from '../ui/kit'
+import { go, useApp } from '../ui/app-context'
+import { fmtDate, Head, Modal, Pill } from '../ui/kit'
 import { tx } from '../i18n'
 
 const T: Record<Language, Record<string, string>> = {
@@ -13,6 +14,7 @@ const T: Record<Language, Record<string, string>> = {
 
 export function DeliveryNote({ id }: { id: string }) {
   const { s, run } = useApp()
+  const [confirmed, setConfirmed] = useState(false)
   const d = s.deliveries.find((x) => x.id === id)
   if (!d) return <div className="panel">{tx("Levering niet gevonden.")} <a href="#levering">{tx("Terug naar de planning")}</a>.</div>
   const o = s.sales_orders.find((x) => x.id === d.sales_order_id)!
@@ -31,9 +33,19 @@ export function DeliveryNote({ id }: { id: string }) {
     await run((db) => markNotePrinted(db, id))
     window.print()
   }
+  const delivered = d.status === 'delivered'
   return (
     <>
+      {delivered && !confirmed && (
+        <Modal title={tx("{0} is al afgeleverd", d.number)} onClose={() => go('levering')} footer={<>
+          <button className="btn" onClick={() => go('levering')}>{tx("Terug naar Levering")}</button>
+          <button className="btn primary" onClick={() => setConfirmed(true)}>{tx("Afleverbon toch openen")}</button>
+        </>}>
+          <p style={{ margin: 0 }}>{tx("Deze levering is afgeleverd op {0}{1}. De afleverbon is alleen nog nodig als naslag of voor een kopie.", fmtDate(d.delivered_at ?? d.planned_date), d.signed_by ? tx(", getekend door {0}", d.signed_by) : '')}</p>
+        </Modal>
+      )}
       <Head title={tx("Afleverbon {0}", d.number)} back={{ href: '#levering', label: tx("Levering aan klant") }} sub={<>
+        {delivered && <><Pill tone="bad">{tx("Al afgeleverd op {0}", fmtDate(d.delivered_at ?? d.planned_date))}</Pill>{' '}</>}
         {ready ? <Pill tone="good">{tx("Akkoord door")} {d.approved_by || 'onbekend'}</Pill> : <Pill tone="warn">{tx("Nog niet klaargezet")}</Pill>}{' '}
         {d.note_printed_at ? <Pill tone="info">{tx("Afgedrukt")}</Pill> : <Pill>{tx("Nog niet afgedrukt")}</Pill>}
       </>}>

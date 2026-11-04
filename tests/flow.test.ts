@@ -153,6 +153,19 @@ describe('van inkoop tot factuur', () => {
   })
 })
 
+describe('afgeleverde levering', () => {
+  it('kan niet meer onderweg of verschoven worden', async () => {
+    const s = await loadSnapshot(db)
+    const product = s.products.find((p) => p.sku === 'LIG-AL-WT')!
+    const id = await createOrder(db, { header: header(s.customers[0].id), lines: [lineFromProduct(product, { qty: 1, warehouse_id: s.warehouses[1].id })] })
+    const line = (await loadSnapshot(db)).sales_order_lines.find((l) => l.sales_order_id === id)!
+    const d = await createDelivery(db, { sales_order_id: id, method: 'eigen_team', planned_date: TODAY, carrier: '', notes: '', lines: [{ sales_order_line_id: line.id, qty: 1 }] })
+    await deliver(d)
+    await expect(setDeliveryInTransit(db, d)).rejects.toThrow()
+    await expect(rescheduleDelivery(db, d, { new_date: '2026-12-01', reason: '', customer_notified: false })).rejects.toThrow()
+  })
+})
+
 describe('rijvolgorde slepen', () => {
   it('bepaalt de nieuwe plek en behoudt de andere volgorde', () => {
     const mids = [100, 200, 300, 400]
