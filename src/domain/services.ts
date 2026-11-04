@@ -356,6 +356,7 @@ export async function updateOrder(db: Driver, id: string, input: OrderInput) {
     }
   }
   const prev = order as SalesOrder
+  if (prev.promised_date !== input.header.promised_date && existing.every((l) => shippedQty(s, l.id) >= l.qty)) fail(tx("Alles op deze verkooporder is al geleverd. Een geleverde datum kan niet meer wijzigen."))
   const moved = prev.delivery_address !== input.header.delivery_address || prev.delivery_postal_code !== input.header.delivery_postal_code || prev.delivery_city !== input.header.delivery_city
   await db.update('sales_orders', id, moved ? { ...input.header, delivery_latitude: null, delivery_longitude: null } : input.header)
   await db.insert('order_events', [event((order as SalesOrder).id, 'gewijzigd', changes.length ? `Verkooporder gewijzigd: ${changes.join(', ')}.` : 'Gegevens van de verkooporder gewijzigd.')])
@@ -365,6 +366,8 @@ export async function rescheduleOrder(db: Driver, orderId: string, input: { new_
   if (!input.new_date) fail(tx("Vul de nieuwe leverdatum in."))
   const s = await loadSnapshot(db)
   const order = s.sales_orders.find((o) => o.id === orderId) ?? fail(tx("Verkooporder niet gevonden."))
+  const allDelivered = orderLines(s, orderId).every((l) => shippedQty(s, l.id) >= l.qty)
+  if (allDelivered) fail(tx("Alles op deze verkooporder is al geleverd. Een geleverde datum kan niet meer wijzigen."))
   const old = (order as SalesOrder).promised_date
   await db.update('sales_orders', orderId, { promised_date: input.new_date })
   await db.insert('order_events', [event(orderId, 'leverdatum', input.reason ? `Leverdatum verschoven: ${input.reason}` : 'Leverdatum verschoven.', { old_date: old, new_date: input.new_date, customer_notified: input.customer_notified })])
@@ -471,6 +474,7 @@ export async function rescheduleDelivery(db: Driver, id: string, input: { new_da
   if (!input.new_date) fail(tx("Vul de nieuwe datum in."))
   const s = await loadSnapshot(db)
   const d = s.deliveries.find((x) => x.id === id)!
+  if (d.status === 'delivered') fail(tx("Een geleverde levering kan niet meer van datum wijzigen."))
   await db.update('deliveries', id, { planned_date: input.new_date, route_position: null })
   await db.insert('order_events', [event(d.sales_order_id, 'leverdatum', `${d.number} verschoven${input.reason ? `: ${input.reason}` : '.'}`, { old_date: d.planned_date, new_date: input.new_date, customer_notified: input.customer_notified })])
 }

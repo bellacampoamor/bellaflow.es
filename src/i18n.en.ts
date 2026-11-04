@@ -806,4 +806,9 @@ export const en: Record<string, string> = {
   "De stuks staan direct op de nieuwe locatie.": "The items are at the new location immediately.",
   "Ontvangen/Geteld": "Received/Counted",
   "Ontvangen/Geteld {0}": "Received/Counted {0}",
+  "Alles op deze verkooporder is al geleverd. Een geleverde datum kan niet meer wijzigen.": "Everything on this sales order has been delivered. A delivered date cannot change.",
+  "Een geleverde levering kan niet meer van datum wijzigen.": "A completed delivery cannot change date.",
+  "Beloofd, nog te leveren": "Promised, still to deliver",
+  "Geldt alleen voor wat nog geleverd moet worden": "Only applies to what still needs delivering",
+  "Al geleverd, blijft ongewijzigd:": "Already delivered, stays unchanged:",
 }

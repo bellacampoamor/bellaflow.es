@@ -7,7 +7,7 @@ import { TABLES } from '../src/data/types'
 import { openLinesOnTransport, linePurchaseStatus, linesToPurchase, flowCounts, freeAt, transportLoad, invoiceBalance, onHandMap, orderStage, reservedMap, stockKey, vatBreakdown } from '../src/domain/calc'
 import { renameOldSuppliers, restoreSuppliers, seedDemo } from '../src/domain/demo'
 import {
-  createDelivery, createInvoice, createOrder, createPurchaseOrder, lineFromProduct, markDelivered, assignShipmentsToTransport, cancelTransport, convertLinesToPurchaseOrders, createTransport, markReady, receiveGoods, rescheduleDelivery, saveRouteOrder, saveSettings, setPurchaseLabel, splitLinesForStock, setDeliveryInTransit, setShipmentWarehouse, setTransportStatus, updateTransport, transferStock,
+  createDelivery, createInvoice, createOrder, createPurchaseOrder, lineFromProduct, markDelivered, assignShipmentsToTransport, cancelTransport, convertLinesToPurchaseOrders, createTransport, markReady, receiveGoods, rescheduleDelivery, rescheduleOrder, saveRouteOrder, saveSettings, setPurchaseLabel, splitLinesForStock, setDeliveryInTransit, setShipmentWarehouse, setTransportStatus, updateTransport, transferStock,
 } from '../src/domain/services'
 import { estimateMatrix, parseRouterTable } from '../src/data/geo'
 import { googleMapsRouteUrl, optimizeRoute, tourCost } from '../src/domain/route'
@@ -341,6 +341,27 @@ describe('ontvangst per transport', () => {
     const end = await loadSnapshot(db)
     expect(end.goods_receipts.filter((r) => r.transport_id === transport)).toHaveLength(1)
     expect(end.transports.find((t) => t.id === transport)!.status).toBe('arrived')
+  })
+})
+
+describe('leverdatum bij deellevering', () => {
+  it('schuift alleen wat nog geleverd moet worden', async () => {
+    const s = await loadSnapshot(db)
+    const product = s.products.find((p) => p.sku === 'LIG-AL-WT')!
+    const id = await createOrder(db, { header: header(s.customers[0].id), lines: [lineFromProduct(product, { qty: 2, warehouse_id: s.warehouses[1].id })] })
+    const line = (await loadSnapshot(db)).sales_order_lines.find((l) => l.sales_order_id === id)!
+    const plan = (qty: number) => createDelivery(db, { sales_order_id: id, method: 'eigen_team', planned_date: TODAY, time_slot: '', carrier: '', notes: '', lines: [{ sales_order_line_id: line.id, qty }] })
+    const first = await plan(1), second = await plan(1)
+    await deliver(first)
+    await rescheduleOrder(db, id, { new_date: '2026-12-20', reason: '', customer_notified: false })
+    let after = await loadSnapshot(db)
+    expect(after.deliveries.find((d) => d.id === first)).toMatchObject({ planned_date: TODAY, delivered_at: TODAY })
+    expect(after.deliveries.find((d) => d.id === second)!.planned_date).toBe('2026-12-20')
+    await expect(rescheduleDelivery(db, first, { new_date: '2026-12-25', reason: '', customer_notified: false })).rejects.toThrow(/geleverde levering/)
+    await deliver(second)
+    await expect(rescheduleOrder(db, id, { new_date: '2026-12-31', reason: '', customer_notified: false })).rejects.toThrow(/al geleverd/)
+    after = await loadSnapshot(db)
+    expect(after.sales_orders.find((o) => o.id === id)!.promised_date).toBe('2026-12-20')
   })
 })
 

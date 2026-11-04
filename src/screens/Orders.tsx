@@ -93,7 +93,7 @@ export function OrderDetail({ id }: { id: string }) {
     <>
       <Head title={o.number} sub={<>{c.company || c.name}, {fmtDate(o.order_date)} <Pill tone={stageTone[stage]}>{tx(STAGE_LABEL[stage])}</Pill></>} back={{ href: '#orders', label: tx("Verkooporders") }}>
         {open && stage !== 'gefactureerd' && <>
-          <button className="btn" onClick={() => setModal('date')}><CalendarClock size={16} />{tx("Leverdatum")}</button>
+          {shipped < qty && <button className="btn" onClick={() => setModal('date')}><CalendarClock size={16} />{tx("Leverdatum")}</button>}
           <a className="btn" href={`#orders-wijzig-${id}`}><Pencil size={16} />{tx("Wijzigen")}</a>
           <button className="btn" onClick={() => setModal('pay')}>{tx("Betaling")}</button>
           <button className="btn primary" disabled={!plannable.length} onClick={() => setModal('plan')}><Truck size={16} />{tx("Levering plannen")}</button>
@@ -204,7 +204,7 @@ export function OrderDetail({ id }: { id: string }) {
               <dt>{tx("Verkoper")}</dt><dd>{s.salespeople.find((x) => x.id === o.salesperson_id)?.name ?? '–'}</dd>
               <dt>{tx("Afleverwijze")}</dt><dd>{{ meenemen: tx("Klant neemt mee"), bezorgen: tx("Bezorgen door eigen team"), verzenden: tx("Verzenden met vervoerder") }[o.fulfilment]}</dd>
               <dt>{tx("Gewenst")}</dt><dd>{fmtDate(o.requested_date)}</dd>
-              <dt>{tx("Beloofd")}</dt><dd>{fmtDate(o.promised_date)}</dd>
+              <dt>{shipped > 0 ? tx("Beloofd, nog te leveren") : tx("Beloofd")}</dt><dd>{fmtDate(o.promised_date)}</dd>
               {o.fulfilment !== 'meenemen' && <><dt>{tx("Adres")}</dt><dd>{o.delivery_name}<br />{o.delivery_address}<br />{o.delivery_postal_code} {o.delivery_city}</dd>
                 <dt>{tx("Situatie")}</dt><dd>{[o.floor, o.has_elevator && 'lift', o.needs_assembly && 'montage', o.remove_old_furniture && tx("oude meubels mee")].filter(Boolean).join(', ') || '–'}</dd></>}
               {o.delivery_notes && <><dt>{tx("Instructies")}</dt><dd>{o.delivery_notes}</dd></>}
@@ -263,6 +263,8 @@ export function RescheduleModal({ order, onClose }: { order: SalesOrder; onClose
   const [notified, setNotified] = useState(false)
   const c = s.customers.find((x) => x.id === order.customer_id)!
   const planned = s.deliveries.filter((d) => d.sales_order_id === order.id && (d.status === 'planned' || d.status === 'ready'))
+  const delivered = s.deliveries.filter((d) => d.sales_order_id === order.id && d.status === 'delivered')
+  const remaining = orderLines(s, order.id).map((l) => ({ id: l.id, description: l.description, qty: l.qty - shippedQty(s, l.id) })).filter((r) => r.qty > 0)
   const message = date ? DATE_MSG[c.language](c.name, order.number, fmtDate(date), reason) : ''
   const copy = async () => {
     try { await navigator.clipboard.writeText(message); toast(tx("Bericht gekopieerd")) } catch { toast(tx("Kopiëren lukte niet. Selecteer de tekst handmatig."), true) }
@@ -272,6 +274,13 @@ export function RescheduleModal({ order, onClose }: { order: SalesOrder; onClose
       <button className="btn" onClick={onClose}>{tx("Annuleren")}</button>
       <button className="btn primary" onClick={async () => { if (await run((db) => rescheduleOrder(db, order.id, { new_date: date, reason, customer_notified: notified }), tx("Leverdatum aangepast"))) onClose() }}>{tx("Leverdatum opslaan")}</button>
     </>}>
+      {delivered.length > 0 && (
+        <div className="note">
+          <strong>{tx("Geldt alleen voor wat nog geleverd moet worden")}</strong>
+          {remaining.map((r) => <div key={r.id}>{tx("{0} × {1}", r.qty, r.description)}</div>)}
+          <div className="muted small" style={{ marginTop: 6 }}>{tx("Al geleverd, blijft ongewijzigd:")} {delivered.map((d) => tx("{0} op {1}", d.number, fmtDate(d.delivered_at))).join(', ')}</div>
+        </div>
+      )}
       <div className="form-grid">
         <TextField label={tx("Nieuwe leverdatum")} type="date" value={date} onChange={setDate} hint={tx("Nu: {0}", fmtDate(order.promised_date))} />
         <TextField className="span-2" label={tx("Reden")} value={reason} onChange={setReason} placeholder={tx("Bijvoorbeeld op verzoek van de klant")} />
