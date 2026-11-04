@@ -799,4 +799,13 @@ export const en: Record<string, string> = {
   "Alle openstaande regels op dit transport schuiven mee.": "All open lines on this transport move along.",
   "De verwachte datum op deze verkooporders wijzigt mee:": "The expected date on these sales orders changes too:",
   ". Informeer de klant als de beloofde datum niet meer klopt.": ". Inform the customer if the promised date no longer holds.",
+  "Kies een transport": "Choose a transport",
+  "{0}, aankomst {1}": "{0}, arrives {1}",
+  "Signaallijst": "Signal list",
+  "{0} regels, waarvan {1} al verkocht": "{0} lines, {1} already sold",
+  "Binnengekomen via inkoop": "Arriving through purchasing",
+  "Verkocht aan": "Sold to",
+  "Inkoopdatum": "Purchase date",
+  "Niet verkocht, voor {0}": "Not sold, for {0}",
+  "Niet compleet": "Incomplete",
 }

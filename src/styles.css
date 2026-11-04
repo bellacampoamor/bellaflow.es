@@ -284,3 +284,7 @@ td input.price { width: 104px; }
 .queue input[type="checkbox"] { width: 18px; min-height: 18px; height: 18px; accent-color: var(--ochre-strong); display: block; }
 .queue-bar { position: sticky; bottom: 0; display: flex; flex-wrap: wrap; gap: 10px; justify-content: space-between; align-items: center; background: var(--surface); padding-top: 12px; margin-top: 6px; border-top: 1px solid var(--line-strong); }
 @media (max-width: 600px) { .queue-bar { position: static; } }
+
+/* Signaallijst */
+.signal th.signal-group { color: var(--petrol); font-family: var(--display); font-size: .86rem; border-bottom: 1px solid var(--line); }
+.signal .sold { border-left: 2px solid var(--line-strong); }

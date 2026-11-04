@@ -6,6 +6,59 @@ import { tx } from '../i18n'
 import { go, useApp } from '../ui/app-context'
 import { AreaField, Empty, fmtDate, Head, Pill, TextField } from '../ui/kit'
 
+function TransportPicker({ value }: { value: string }) {
+  const { s } = useApp()
+  const options = s.transports.filter((t) => t.status !== 'cancelled' && s.inbound_shipments.some((x) => x.transport_id === t.id)).sort((a, b) => b.arrival_date.localeCompare(a.arrival_date))
+  return (
+    <div className="field" style={{ maxWidth: 420, marginBottom: 16 }}>
+      <label htmlFor="receipt-transport">{tx("Transport")}</label>
+      <select id="receipt-transport" value={value} onChange={(e) => e.target.value && go(`ontvangst-${e.target.value}`)}>
+        <option value="">{tx("Kies een transport")}</option>
+        {options.map((t) => <option key={t.id} value={t.id}>{tx("{0}, aankomst {1}", t.number, fmtDate(t.arrival_date))}</option>)}
+      </select>
+    </div>
+  )
+}
+
+/** Signaallijst: wat er op dit transport binnenkomt, naast wat daarvan al verkocht is. */
+function SignalList({ transportId }: { transportId: string }) {
+  const { s } = useApp()
+  const lines = s.inbound_shipments.filter((x) => x.transport_id === transportId).flatMap((x) => s.inbound_shipment_lines.filter((l) => l.shipment_id === x.id).map((l) => {
+    const pol = s.purchase_order_lines.find((p) => p.id === l.purchase_order_line_id)!
+    const sol = s.sales_order_lines.find((y) => y.id === pol.sales_order_line_id)
+    const so = sol && s.sales_orders.find((o) => o.id === sol.sales_order_id)
+    return {
+      id: l.id, qty: l.qty, po: s.purchase_orders.find((p) => p.id === pol.purchase_order_id)!, product: s.products.find((p) => p.id === pol.product_id)?.name,
+      sol, so, customer: so && s.customers.find((c) => c.id === so.customer_id), destination: s.warehouses.find((w) => w.id === x.warehouse_id)?.name, status: x.status,
+    }
+  })).sort((a, b) => a.po.number.localeCompare(b.po.number))
+  const sold = lines.filter((l) => l.so).length
+  return (
+    <section className="panel" style={{ marginBottom: 16 }}>
+      <div className="panel-head">
+        <h2>{tx("Signaallijst")}</h2>
+        <span className="small muted">{tx("{0} regels, waarvan {1} al verkocht", lines.length, sold)}</span>
+      </div>
+      <div className="table-wrap"><table className="signal">
+        <thead>
+          <tr><th colSpan={4} className="signal-group">{tx("Binnengekomen via inkoop")}</th><th colSpan={6} className="signal-group sold">{tx("Verkocht aan")}</th><th></th></tr>
+          <tr><th>{tx("Inkooporder")}</th><th>{tx("Inkoopdatum")}</th><th>{tx("Product")}</th><th className="num">{tx("Aantal")}</th><th className="sold">{tx("Verkooporder")}</th><th>{tx("Datum")}</th><th>{tx("Product")}</th><th className="num">{tx("Aantal")}</th><th>{tx("Klant")}</th><th>{tx("Plaats")}</th><th>{tx("Status")}</th></tr>
+        </thead>
+        <tbody>{lines.map((l) => (
+          <tr key={l.id}>
+            <td><a className="rowlink" href={`#inkoop-${l.po.id}`}>{l.po.number}</a></td><td>{fmtDate(l.po.order_date)}</td><td className="strong">{l.product}</td><td className="num">{l.qty}</td>
+            {l.so ? <>
+              <td className="sold"><a className="rowlink" href={`#orders-${l.so.id}`}>{l.so.number}</a></td><td>{fmtDate(l.so.order_date)}</td><td>{l.sol!.description}{l.sol!.options && <div className="muted small">{l.sol!.options}</div>}</td><td className="num">{l.sol!.qty}</td>
+              <td>{l.customer?.company || l.customer?.name}</td><td>{l.customer?.city}</td>
+            </> : <td className="sold muted" colSpan={6}>{tx("Niet verkocht, voor {0}", l.destination)}</td>}
+            <td>{l.status === 'received' ? <Pill tone="good">{tx("Binnen")}</Pill> : l.status === 'closed' ? <Pill>{tx("Afgesloten")}</Pill> : l.status === 'partial' ? <Pill tone="warn">{tx("Niet compleet")}</Pill> : <Pill tone="info">{tx("Verwacht")}</Pill>}</td>
+          </tr>
+        ))}</tbody>
+      </table></div>
+    </section>
+  )
+}
+
 export function Receipts() {
   const { s } = useApp()
   const today = todayISO()
@@ -14,6 +67,7 @@ export function Receipts() {
   return (
     <>
       <Head title={tx("Goederenontvangst")} sub={tx("Boek per transport in wat er binnenkomt, op de locatie waar het echt ligt. Eén regel mag over meerdere locaties verdeeld worden.")} />
+      <TransportPicker value="" />
       <div className="stack">
         <section className="panel">
           <h2>{tx("Te ontvangen transporten")}</h2>
@@ -93,6 +147,8 @@ export function ReceiptForm({ transportId }: { transportId: string }) {
   return (
     <>
       <Head title={tx("Ontvangst {0}", transport.number)} sub={tx("Verwacht op {0}.", fmtDate(transport.arrival_date))} back={{ href: '#ontvangst', label: tx("Goederenontvangst") }} />
+      <TransportPicker value={transportId} />
+      <SignalList transportId={transportId} />
       {rows.length === 0 && <div className="note">{tx("Alles op dit transport is al ontvangen.")}</div>}
       {rows.length > 0 && <div className="stack">
         <section className="panel">
