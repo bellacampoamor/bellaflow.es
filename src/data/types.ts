@@ -4,6 +4,7 @@ export interface Settings {
   id: string; company_name: string; tax_id: string; address: string; postal_code: string; city: string
   province: string; phone: string; email: string; iban: string
   invoice_mode: 'manual' | 'auto'; payment_days: number; invoice_footer: string
+  prefix_sales_order: string; prefix_purchase: string; prefix_receipt: string; prefix_delivery: string; prefix_invoice: string; prefix_transport: string
 }
 export interface Warehouse {
   id: string; code: string; name: string; kind: 'winkel' | 'magazijn' | 'extern'
@@ -25,7 +26,7 @@ export interface Customer {
 export interface Product {
   id: string; sku: string; name: string; collection: string; category: string; material: string
   color: string; dimensions: string; weight_kg: number; colli: number; purchase_price: number
-  sale_price: number; vat_rate: number; supplier_id: string | null; min_stock: number; is_active: boolean
+  sale_price: number; vat_rate: number; supplier_id: string | null; min_stock: number; is_active: boolean; volume_m3: number
 }
 export type OrderType = 'direct' | 'bestelling'
 export type Fulfilment = 'meenemen' | 'verzenden' | 'bezorgen'
@@ -54,9 +55,13 @@ export interface PurchaseOrderLine {
   id: string; purchase_order_id: string; product_id: string; qty: number; unit_cost: number
   sales_order_line_id: string | null
 }
+export interface Transport {
+  id: string; number: string; departure_date: string; arrival_date: string; carrier: string; reference: string
+  capacity_m3: number; status: 'planned' | 'departed' | 'arrived' | 'cancelled'; notes: string
+}
 export interface InboundShipment {
   id: string; purchase_order_id: string; sequence: number; expected_date: string; original_date: string
-  warehouse_id: string; carrier: string; status: 'expected' | 'partial' | 'received' | 'closed'; notes: string
+  warehouse_id: string; carrier: string; status: 'expected' | 'partial' | 'received' | 'closed'; notes: string; transport_id: string | null
 }
 export interface InboundShipmentLine { id: string; shipment_id: string; purchase_order_line_id: string; qty: number }
 export interface GoodsReceipt {
@@ -100,7 +105,7 @@ export interface Snapshot {
   settings: Settings[]; warehouses: Warehouse[]; suppliers: Supplier[]; customers: Customer[]; products: Product[]
   sales_orders: SalesOrder[]; sales_order_lines: SalesOrderLine[]; order_events: OrderEvent[]
   purchase_orders: PurchaseOrder[]; purchase_order_lines: PurchaseOrderLine[]
-  inbound_shipments: InboundShipment[]; inbound_shipment_lines: InboundShipmentLine[]
+  transports: Transport[]; inbound_shipments: InboundShipment[]; inbound_shipment_lines: InboundShipmentLine[]
   goods_receipts: GoodsReceipt[]; goods_receipt_lines: GoodsReceiptLine[]; stock_movements: StockMovement[]
   deliveries: Delivery[]; delivery_lines: DeliveryLine[]; invoices: Invoice[]; invoice_lines: InvoiceLine[]
   payments: Payment[]; number_series: NumberSeries[]
@@ -110,7 +115,7 @@ export type TableName = keyof Snapshot
 // Volgorde respecteert de foreign keys; gebruikt voor laden en voor seed.sql.
 export const TABLES: TableName[] = [
   'settings', 'warehouses', 'suppliers', 'customers', 'products', 'sales_orders', 'sales_order_lines',
-  'order_events', 'purchase_orders', 'purchase_order_lines', 'inbound_shipments', 'inbound_shipment_lines',
+  'order_events', 'purchase_orders', 'purchase_order_lines', 'transports', 'inbound_shipments', 'inbound_shipment_lines',
   'goods_receipts', 'goods_receipt_lines', 'stock_movements', 'deliveries', 'delivery_lines', 'invoices',
   'invoice_lines', 'payments', 'number_series',
 ]

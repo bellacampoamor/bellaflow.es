@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react'
+import type { InboundShipment } from '../data/types'
 import { Plus, Trash2 } from 'lucide-react'
-import { addDays, linesToPurchase, round2, shipmentLineOpen, todayISO } from '../domain/calc'
-import { cancelPurchaseOrder, createPurchaseOrder, splitQty } from '../domain/services'
+import { addDays, linesToPurchase, purchaseKind, round2, shipmentLineOpen, todayISO } from '../domain/calc'
+import { assignShipmentToTransport, cancelPurchaseOrder, createPurchaseOrder, setShipmentWarehouse, splitQty } from '../domain/services'
 import { go, useApp } from '../ui/app-context'
 import { Combo, Empty, eur, fmtDate, Head, Modal, NumberField, Pill, SelectField, TextField, AreaField, type Tone } from '../ui/kit'
 import { tx } from '../i18n'
@@ -40,7 +41,7 @@ export function Purchases() {
           <h2>{tx("Inkooporders")}</h2>
           {rows.length === 0 && <Empty>{tx("Nog geen inkooporders. Maak de eerste met de knop rechtsboven.")}</Empty>}
           <div className="table-wrap"><table>
-            <thead><tr><th>{tx("Nummer")}</th><th>{tx("Leverancier")}</th><th>{tx("Besteld")}</th><th>{tx("Referentie")}</th><th>{tx("Zendingen")}</th><th className="num">{tx("Ontvangen")}</th><th className="num">{tx("Waarde")}</th><th>{tx("Status")}</th></tr></thead>
+            <thead><tr><th>{tx("Nummer")}</th><th>{tx("Leverancier")}</th><th>{tx("Besteld")}</th><th>{tx("Soort")}</th><th>{tx("Referentie")}</th><th>{tx("Zendingen")}</th><th className="num">{tx("Ontvangen")}</th><th className="num">{tx("Waarde")}</th><th>{tx("Status")}</th></tr></thead>
             <tbody>{rows.map((po) => {
               const { ordered, received, shipments } = poProgress(s, po.id)
               const value = round2(s.purchase_order_lines.filter((l) => l.purchase_order_id === po.id).reduce((n, l) => n + l.qty * l.unit_cost, 0))
@@ -50,7 +51,7 @@ export function Purchases() {
                 <tr key={po.id} className="click" onClick={() => go(`inkoop-${po.id}`)}>
                   <td><a className="rowlink" href={`#inkoop-${po.id}`}>{po.number}</a></td>
                   <td>{s.suppliers.find((x) => x.id === po.supplier_id)?.name}</td>
-                  <td>{fmtDate(po.order_date)}</td><td className="muted">{po.supplier_reference || '–'}</td>
+                  <td>{fmtDate(po.order_date)}</td><td><KindPill kind={purchaseKind(s, po.id)} /></td><td className="muted">{po.supplier_reference || '–'}</td>
                   <td>{shipments.length}</td><td className="num">{received} / {ordered}</td><td className="num">{eur(value)}</td>
                   <td><Pill tone={tone}>{label}</Pill></td>
                 </tr>
@@ -72,10 +73,12 @@ export function PurchaseDetail({ id }: { id: string }) {
   const shipments = s.inbound_shipments.filter((x) => x.purchase_order_id === id).sort((a, b) => a.sequence - b.sequence)
   const pname = (pid: string) => s.products.find((p) => p.id === pid)?.name
   const supplier = s.suppliers.find((x) => x.id === po.supplier_id)
+  const plannedTransports = s.transports.filter((t) => t.status === 'planned').sort((a, b) => a.departure_date.localeCompare(b.departure_date))
+  const canChangeTransport = (x: InboundShipment) => { const t = s.transports.find((r) => r.id === x.transport_id); return !t || t.status === 'planned' }
   const hasReceipts = s.goods_receipts.some((r) => shipments.some((x) => x.id === r.shipment_id))
   return (
     <>
-      <Head title={po.number} sub={tx("{0}, besteld op {1}{2}", supplier?.name, fmtDate(po.order_date), po.supplier_reference ? tx(", referentie {0}", po.supplier_reference) : '')} back={{ href: '#inkoop', label: tx("Inkoop") }}>
+      <Head title={<>{po.number} <KindPill kind={purchaseKind(s, po.id)} /></>} sub={tx("{0}, besteld op {1}{2}", supplier?.name, fmtDate(po.order_date), po.supplier_reference ? tx(", referentie {0}", po.supplier_reference) : '')} back={{ href: '#inkoop', label: tx("Inkoop") }}>
         {po.status === 'open' && !hasReceipts && <button className="btn danger" onClick={() => setConfirm(true)}>{tx("Inkooporder annuleren")}</button>}
       </Head>
       <div className="stack">
@@ -93,7 +96,7 @@ export function PurchaseDetail({ id }: { id: string }) {
         <section className="panel">
           <h2>{tx("Zendingen")}</h2>
           <div className="table-wrap"><table>
-            <thead><tr><th>{tx("Zending")}</th><th>{tx("Verwacht")}</th><th>{tx("Losplek")}</th><th>{tx("Inhoud")}</th><th>{tx("Status")}</th><th></th></tr></thead>
+            <thead><tr><th>{tx("Zending")}</th><th>{tx("Verwacht")}</th><th>{tx("Transport")}</th><th>{tx("Bestemming")}</th><th>{tx("Inhoud")}</th><th>{tx("Status")}</th><th></th></tr></thead>
             <tbody>{shipments.map((x) => {
               const ls = s.inbound_shipment_lines.filter((l) => l.shipment_id === x.id)
               const open = x.status === 'expected' || x.status === 'partial'
@@ -101,7 +104,17 @@ export function PurchaseDetail({ id }: { id: string }) {
                 <tr key={x.id}>
                   <td>{tx("Zending")} {x.sequence}</td>
                   <td>{fmtDate(x.expected_date)}{x.expected_date !== x.original_date && <div className="muted small">{tx("was")} {fmtDate(x.original_date)}</div>}</td>
-                  <td>{s.warehouses.find((w) => w.id === x.warehouse_id)?.name}</td>
+                  <td style={{ minWidth: 170 }}>{open && canChangeTransport(x)
+                    ? <select aria-label={tx("Transport voor zending {0}", x.sequence)} value={x.transport_id ?? ''} onChange={(e) => run((db) => assignShipmentToTransport(db, x.id, e.target.value || null), tx("Transport aangepast"))}>
+                        <option value="">{tx("Nog niet gekoppeld")}</option>
+                        {plannedTransports.map((t) => <option key={t.id} value={t.id}>{tx("{0}, vertrek {1}", t.number, fmtDate(t.departure_date))}</option>)}
+                      </select>
+                    : s.transports.find((t) => t.id === x.transport_id)?.number ?? '–'}</td>
+                  <td style={{ minWidth: 170 }}>{open
+                    ? <select aria-label={tx("Bestemming voor zending {0}", x.sequence)} value={x.warehouse_id} onChange={(e) => run((db) => setShipmentWarehouse(db, x.id, e.target.value), tx("Bestemming aangepast"))}>
+                        {s.warehouses.filter((w) => w.is_active && w.receives_goods).map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
+                      </select>
+                    : s.warehouses.find((w) => w.id === x.warehouse_id)?.name}</td>
                   <td className="small">{ls.map((l) => {
                     const pol = lines.find((p) => p.id === l.purchase_order_line_id)!
                     return <div key={l.id}>{l.qty} {tx("×")} {pname(pol.product_id)}{shipmentLineOpen(s, l.id) < l.qty && <span className="muted"> ({l.qty - shipmentLineOpen(s, l.id)} {tx("binnen)")}</span>}</div>
@@ -125,6 +138,11 @@ export function PurchaseDetail({ id }: { id: string }) {
   )
 }
 
+export function KindPill({ kind }: { kind: 'vulorder' | 'klantorder' | 'gemengd' }) {
+  const map: Record<string, [string, Tone]> = { vulorder: [tx("Vulorder"), 'info'], klantorder: [tx("Klantorder"), 'sell'], gemengd: [tx("Gemengd"), ''] }
+  return <Pill tone={map[kind][1]}>{map[kind][0]}</Pill>
+}
+
 export function ShipmentPill({ status }: { status: string }) {
   const map: Record<string, [string, Tone]> = { expected: [tx("Verwacht"), 'info'], partial: [tx("Deels ontvangen"), 'warn'], received: [tx("Ontvangen"), 'good'], closed: [tx("Afgesloten"), ''] }
   const [l, t] = map[status]
@@ -132,10 +150,10 @@ export function ShipmentPill({ status }: { status: string }) {
 }
 
 interface PoLine { key: number; product_id: string; qty: number; unit_cost: number; sales_order_line_id: string | null }
-interface PoShip { key: number; expected_date: string; warehouse_id: string; carrier: string; pct: number }
+interface PoShip { key: number; expected_date: string; warehouse_id: string; carrier: string; pct: number; transport_id: string | null }
 let k = 1
 
-export function PurchaseForm() {
+export function PurchaseForm({ transportId }: { transportId?: string } = {}) {
   const { s, run } = useApp()
   const today = todayISO()
   const suppliers = s.suppliers.filter((x) => x.is_active)
@@ -146,7 +164,10 @@ export function PurchaseForm() {
   const [notes, setNotes] = useState('')
   const [lines, setLines] = useState<PoLine[]>([])
   const lead = suppliers.find((x) => x.id === supplier)?.lead_time_days ?? 21
-  const [ships, setShips] = useState<PoShip[]>([{ key: k++, expected_date: addDays(today, 21), warehouse_id: receivers[0]?.id ?? '', carrier: '', pct: 100 }])
+  const planned = s.transports.filter((t) => t.status === 'planned').sort((a, b) => a.departure_date.localeCompare(b.departure_date))
+  // Standaard mee met de eerstvolgende vrachtwagen die nog moet vertrekken.
+  const firstTransport = planned.find((t) => t.id === transportId) ?? planned.find((t) => t.departure_date >= today) ?? null
+  const [ships, setShips] = useState<PoShip[]>([{ key: k++, expected_date: firstTransport?.arrival_date ?? addDays(today, 21), warehouse_id: receivers[0]?.id ?? '', carrier: '', pct: 100, transport_id: firstTransport?.id ?? null }])
 
   const waiting = linesToPurchase(s).filter((l) => !lines.some((x) => x.sales_order_line_id === l.id))
   const products = useMemo(() => s.products.filter((p) => p.is_active && (!supplier || p.supplier_id === supplier || !p.supplier_id)).map((p) => ({ value: p.id, label: p.name, sub: tx("{0}, inkoop {1}", p.sku, eur(p.purchase_price)), search: p.sku })), [s.products, supplier])
@@ -162,7 +183,7 @@ export function PurchaseForm() {
   const applyPreset = (n: number) => {
     const wh = ships[0]?.warehouse_id ?? receivers[0]?.id ?? ''
     const base = n === 1 ? [100] : Array.from({ length: n }, (_, i) => (i === n - 1 ? 100 - Math.floor(100 / n) * (n - 1) : Math.floor(100 / n)))
-    setShips(base.map((pct, i) => ({ key: k++, expected_date: addDays(orderDate, lead + i * 14), warehouse_id: wh, carrier: ships[0]?.carrier ?? '', pct })))
+    setShips(base.map((pct, i) => ({ key: k++, expected_date: addDays(orderDate, lead + i * 14), warehouse_id: wh, carrier: ships[0]?.carrier ?? '', pct, transport_id: i === 0 ? ships[0]?.transport_id ?? null : null })))
   }
   const total = round2(lines.reduce((n, l) => n + l.qty * l.unit_cost, 0))
   const pctSum = ships.reduce((n, x) => n + x.pct, 0)
@@ -230,15 +251,18 @@ export function PurchaseForm() {
               <button className="btn sm" onClick={() => applyPreset(1)}>{tx("Alles ineens")}</button>
               <button className="btn sm" onClick={() => applyPreset(2)}>50 / 50</button>
               <button className="btn sm" onClick={() => applyPreset(3)}>{tx("In 3 delen")}</button>
-              <button className="btn sm" onClick={() => setShips((v) => [...v, { key: k++, expected_date: addDays(orderDate, lead), warehouse_id: receivers[0]?.id ?? '', carrier: '', pct: 0 }])}><Plus size={14} />{tx("Zending")}</button>
+              <button className="btn sm" onClick={() => setShips((v) => [...v, { key: k++, expected_date: addDays(orderDate, lead), warehouse_id: receivers[0]?.id ?? '', carrier: '', pct: 0, transport_id: null }])}><Plus size={14} />{tx("Zending")}</button>
             </div>
           </div>
           <div className="stack">
             {ships.map((x, i) => (
               <div key={x.key} className="form-grid" style={{ alignItems: 'end' }}>
                 <TextField label={tx("Zending {0}: verwacht op", i + 1)} type="date" value={x.expected_date} onChange={(v) => patchShip(x.key, { expected_date: v })} />
-                <SelectField label={tx("Komt binnen op")} value={x.warehouse_id} onChange={(v) => patchShip(x.key, { warehouse_id: v })} options={receivers.map((w) => ({ value: w.id, label: w.name }))} />
-                <TextField label={tx("Vervoerder")} value={x.carrier} onChange={(v) => patchShip(x.key, { carrier: v })} />
+                <SelectField label={tx("Bestemming")} value={x.warehouse_id} onChange={(v) => patchShip(x.key, { warehouse_id: v })} options={receivers.map((w) => ({ value: w.id, label: w.name }))} />
+                <SelectField className="span-2" label={tx("Transport naar Spanje")} value={x.transport_id ?? ''} onChange={(v) => {
+                  const t = planned.find((r) => r.id === v)
+                  patchShip(x.key, { transport_id: t?.id ?? null, expected_date: t?.arrival_date ?? x.expected_date })
+                }} options={[{ value: '', label: tx("Nog niet gekoppeld") }, ...planned.map((t) => ({ value: t.id, label: tx("{0}, vertrek {1}, aankomst {2}", t.number, fmtDate(t.departure_date), fmtDate(t.arrival_date)) }))]} />
                 <NumberField label={tx("Deel van de bestelling (%)")} value={x.pct} min={0} onChange={(v) => patchShip(x.key, { pct: v })} />
                 {lines.length > 0 && <div className="small muted span-2">{lines.filter((l) => l.product_id).map((l) => tx("{0} × {1}", splitQty(l.qty, ships.map((y) => y.pct || 0.0001))[i], s.products.find((p) => p.id === l.product_id)?.name)).join(', ')}</div>}
                 {ships.length > 1 && <button className="btn sm" style={{ justifySelf: 'start' }} onClick={() => setShips((v) => v.filter((y) => y.key !== x.key))}>{tx("Zending verwijderen")}</button>}

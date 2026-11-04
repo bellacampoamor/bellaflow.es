@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Plus } from 'lucide-react'
 import type { Customer, Product, Settings, Supplier, Warehouse } from '../data/types'
-import { saveRecord } from '../domain/services'
+import { saveRecord, saveSettings, type PrefixField } from '../domain/services'
 import { useApp } from '../ui/app-context'
 import { AreaField, Check, eur, Head, Modal, NumberField, Pill, SelectField, Tabs, TextField } from '../ui/kit'
 import { CustomerFields } from './OrderForm'
@@ -11,7 +11,7 @@ type Tab = 'magazijnen' | 'producten' | 'leveranciers' | 'klanten' | 'bedrijf'
 
 const NEW = {
   warehouse: { code: '', name: '', kind: 'magazijn', address: '', postal_code: '', city: '', phone: '', contact_name: '', receives_goods: true, ships_goods: true, is_active: true, latitude: null, longitude: null, is_route_origin: false } as Omit<Warehouse, 'id'>,
-  product: { sku: '', name: '', collection: '', category: '', material: '', color: '', dimensions: '', weight_kg: 0, colli: 1, purchase_price: 0, sale_price: 0, vat_rate: 21, supplier_id: null, min_stock: 0, is_active: true } as Omit<Product, 'id'>,
+  product: { sku: '', name: '', collection: '', category: '', material: '', color: '', dimensions: '', weight_kg: 0, colli: 1, purchase_price: 0, sale_price: 0, vat_rate: 21, supplier_id: null, min_stock: 0, is_active: true, volume_m3: 0 } as Omit<Product, 'id'>,
   supplier: { name: '', vat_number: '', contact_name: '', email: '', phone: '', address: '', city: '', country: 'Nederland', lead_time_days: 21, payment_terms: '', notes: '', is_active: true } as Omit<Supplier, 'id'>,
   customer: { kind: 'particulier', name: '', company: '', tax_id: '', email: '', phone: '', language: 'es', address: '', postal_code: '', city: '', province: 'Alicante', country: 'España', notes: '' } as Omit<Customer, 'id'>,
 }
@@ -77,7 +77,14 @@ export function Admin() {
           <NumberField label={tx("Betaaltermijn (dagen)")} value={co.payment_days} min={0} step="1" onChange={(v) => setCo({ ...co, payment_days: v })} />
           <AreaField className="span-all" label={tx("Tekst onderaan de factuur")} value={co.invoice_footer} onChange={(v) => setCo({ ...co, invoice_footer: v })} />
         </div>
-        <button className="btn primary" style={{ marginTop: 14 }} onClick={() => { const { id: _i, ...patch } = co; run((db) => db.update('settings', 'default', patch), tx("Bedrijfsgegevens opgeslagen")) }}>{tx("Opslaan")}</button>
+        <h2 style={{ margin: '22px 0 4px' }}>{tx("Documentnummers")}</h2>
+        <p className="small muted" style={{ margin: '0 0 12px' }}>{tx("Nummers bestaan uit voorvoegsel, jaar en teller. Een nieuw voorvoegsel geldt voor nieuwe documenten en de teller loopt door. Bestaande documenten houden hun nummer.")}</p>
+        <div className="form-grid">
+          {([['prefix_purchase', tx("Inkooporders")], ['prefix_delivery', tx("Afleverbonnen")], ['prefix_invoice', tx("Facturen")], ['prefix_sales_order', tx("Verkooporders")], ['prefix_receipt', tx("Goederenontvangsten")], ['prefix_transport', tx("Transporten")]] as [PrefixField, string][]).map(([field, label]) => (
+            <TextField key={field} label={label} value={co[field]} onChange={(v) => setCo({ ...co, [field]: v.toUpperCase() })} hint={tx("Bijvoorbeeld {0}", `${co[field] || '…'}-${new Date().getFullYear()}-0001`)} />
+          ))}
+        </div>
+        <button className="btn primary" style={{ marginTop: 14 }} onClick={() => { const { id: _i, ...patch } = co; run((db) => saveSettings(db, patch), tx("Bedrijfsgegevens opgeslagen")) }}>{tx("Opslaan")}</button>
       </section>}
 
       {wh && <Modal wide title={wh.id ? wh.name : tx("Magazijn toevoegen")} onClose={() => setWh(null)} footer={<>
@@ -117,6 +124,7 @@ export function Admin() {
           <TextField label={tx("Kleur")} value={pr.color} onChange={(v) => setPr({ ...pr, color: v })} />
           <TextField label={tx("Maten")} value={pr.dimensions} onChange={(v) => setPr({ ...pr, dimensions: v })} placeholder={tx("220 × 92 × 74 cm")} />
           <NumberField label={tx("Gewicht (kg)")} value={pr.weight_kg} min={0} onChange={(v) => setPr({ ...pr, weight_kg: v })} />
+          <NumberField label={tx("Volume (m³)")} value={pr.volume_m3} min={0} onChange={(v) => setPr({ ...pr, volume_m3: v })} />
           <NumberField label={tx("Aantal colli")} value={pr.colli} min={1} step="1" onChange={(v) => setPr({ ...pr, colli: v })} />
           <SelectField label={tx("Leverancier")} value={pr.supplier_id} placeholder={tx("Geen vaste leverancier")} onChange={(v) => setPr({ ...pr, supplier_id: v || null })} options={s.suppliers.map((x) => ({ value: x.id, label: x.name }))} />
           <NumberField label={tx("Inkoopprijs excl. IVA")} value={pr.purchase_price} step="0.01" min={0} onChange={(v) => setPr({ ...pr, purchase_price: v })} />

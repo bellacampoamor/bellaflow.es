@@ -114,7 +114,7 @@ export function App({ onResetDemo, onSignOut }: { onResetDemo?: () => Promise<vo
 function Route({ screen, param }: { screen: string; param: string }) {
   switch (screen) {
     case 'overzicht': return <Overview />
-    case 'inkoop': return param === 'nieuw' ? <PurchaseForm /> : param ? <PurchaseDetail id={param} /> : <Purchases />
+    case 'inkoop': return param === 'nieuw' ? <PurchaseForm /> : param.startsWith('nieuw-') ? <PurchaseForm transportId={param.slice(6)} /> : param ? <PurchaseDetail id={param} /> : <Purchases />
     case 'inkomend': return <Inbound />
     case 'ontvangst': return param ? <ReceiptForm shipmentId={param} /> : <Receipts />
     case 'orders':

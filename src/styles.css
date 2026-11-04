@@ -270,3 +270,8 @@ td input.price { width: 104px; }
 
 .util .btn-toggle { background: none; border: 0; display: inline-flex; gap: 7px; align-items: center; padding: 7px 10px; border-radius: 8px; color: var(--muted); font: 500 .9rem var(--body); cursor: pointer; }
 .util .btn-toggle:hover { background: var(--surface-2); color: var(--fg); }
+
+/* Transport */
+.fill { height: 10px; border-radius: 5px; background: var(--neutral-bg); overflow: hidden; margin-bottom: 4px; }
+.fill span { display: block; height: 100%; border-radius: 5px; }
+.load-row { display: grid; gap: 6px; margin-bottom: 10px; }

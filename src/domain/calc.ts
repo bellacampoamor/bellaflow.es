@@ -228,3 +228,35 @@ export function flowCounts(s: Snapshot, today = todayISO()) {
     facturatie: openOrders.reduce((n, o) => n + uninvoicedDeliveries(s, o.id).length, 0),
   }
 }
+
+// Transport ----------------------------------------------------------------------
+
+export function shipmentLoad(s: Snapshot, shipmentId: string) {
+  const out = { colli: 0, kg: 0, m3: 0, qty: 0 }
+  for (const l of s.inbound_shipment_lines.filter((x) => x.shipment_id === shipmentId)) {
+    const pol = s.purchase_order_lines.find((x) => x.id === l.purchase_order_line_id)
+    const p = s.products.find((x) => x.id === pol?.product_id)
+    if (!p) continue
+    out.qty += l.qty; out.colli += l.qty * p.colli; out.kg += l.qty * p.weight_kg; out.m3 += l.qty * p.volume_m3
+  }
+  return out
+}
+
+export function transportLoad(s: Snapshot, transportId: string) {
+  const out = { colli: 0, kg: 0, m3: 0, qty: 0 }
+  for (const x of s.inbound_shipments.filter((y) => y.transport_id === transportId && y.status !== 'closed')) {
+    const l = shipmentLoad(s, x.id)
+    out.colli += l.colli; out.kg += l.kg; out.m3 += l.m3; out.qty += l.qty
+  }
+  return { ...out, m3: Math.round(out.m3 * 10) / 10 }
+}
+
+/** Vulorder: voor voorraad of showroom. Klantorder: elke regel hoort bij een klant. */
+export function purchaseKind(s: Snapshot, poId: string): 'vulorder' | 'klantorder' | 'gemengd' {
+  const lines = s.purchase_order_lines.filter((l) => l.purchase_order_id === poId)
+  const linked = lines.filter((l) => l.sales_order_line_id).length
+  return linked === 0 ? 'vulorder' : linked === lines.length ? 'klantorder' : 'gemengd'
+}
+
+export const freeAt = (s: Snapshot, productId: string, warehouseId: string) =>
+  (onHandMap(s).get(stockKey(productId, warehouseId)) ?? 0) - (reservedMap(s).get(stockKey(productId, warehouseId)) ?? 0)

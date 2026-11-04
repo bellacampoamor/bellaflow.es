@@ -3,11 +3,11 @@ import { tx } from '../i18n'
 // zodat een geweigerde actie niets half achterlaat.
 import { loadSnapshot, newId, type Driver } from '../data/driver'
 import type {
-  Delivery, Fulfilment, InboundShipment, InvoiceLine, OrderType, Payment, Product, SalesOrder,
+  Delivery, Fulfilment, InboundShipment, InvoiceLine, OrderType, Payment, Product, SalesOrder, Settings,
   SalesOrderLine, Snapshot, StockMovement, TableName,
 } from '../data/types'
 import {
-  addDays, depositAvailable, invoicedDeliveryLineIds, invoicesOnDelivery, lineTotal, onHandMap, orderLines, plannedQty, round2,
+  addDays, depositAvailable, freeAt, invoicedDeliveryLineIds, invoicesOnDelivery, lineTotal, onHandMap, orderLines, plannedQty, round2,
   shipmentLineOpen, shippedQty, stockKey, todayISO, vatBreakdown,
 } from './calc'
 
@@ -19,12 +19,31 @@ const event = (sales_order_id: string, kind: string, message: string, extra: Par
   created_at: new Date().toISOString(), ...extra,
 })
 
+// Nummering ----------------------------------------------------------------------
+
+export type PrefixField = 'prefix_sales_order' | 'prefix_purchase' | 'prefix_receipt' | 'prefix_delivery' | 'prefix_invoice' | 'prefix_transport'
+export const PREFIX_FIELDS: PrefixField[] = ['prefix_sales_order', 'prefix_purchase', 'prefix_receipt', 'prefix_delivery', 'prefix_invoice', 'prefix_transport']
+
+/** De teller hoort bij de soort document, dus een ander voorvoegsel laat de nummers gewoon doorlopen. */
+async function nextDocumentNumber(db: Driver, series: string, field: PrefixField, year: number) {
+  const seq = (await db.nextNumber(series, year)).split('-').pop()
+  const prefix = (await db.list('settings'))[0]?.[field] || series
+  return `${prefix}-${year}-${seq}`
+}
+
+export async function saveSettings(db: Driver, patch: Partial<Settings>) {
+  for (const field of PREFIX_FIELDS) {
+    if (patch[field] !== undefined && !/^[A-Za-z0-9]{1,10}$/.test(patch[field] as string)) fail(tx("Een voorvoegsel bestaat uit 1 tot 10 letters of cijfers, zonder spaties of streepjes."))
+  }
+  await db.update('settings', 'default', patch)
+}
+
 // Inkoop -----------------------------------------------------------------------
 
 export interface PurchaseInput {
   supplier_id: string; order_date: string; supplier_reference: string; notes: string
   lines: { product_id: string; qty: number; unit_cost: number; sales_order_line_id: string | null }[]
-  shipments: { expected_date: string; warehouse_id: string; carrier: string; pct: number }[]
+  shipments: { expected_date: string; warehouse_id: string; carrier: string; pct: number; transport_id?: string | null }[]
 }/** Verdeelt elke regel over de zendingen volgens percentage; afronding telt altijd op tot het totaal. */
 
 /** Verdeelt elke regel over de zendingen volgens percentage; afronding telt altijd op tot het totaal. */
@@ -47,8 +66,9 @@ export async function createPurchaseOrder(db: Driver, input: PurchaseInput) {
   if (input.shipments.some((x) => !x.expected_date || !x.warehouse_id)) fail(tx("Vul per zending een datum en een magazijn in."))
   if (Math.round(input.shipments.reduce((n, x) => n + x.pct, 0)) !== 100) fail(tx("De percentages van de zendingen moeten samen 100% zijn."))
 
+  const transports = await db.list('transports')
   const id = newId()
-  const number = await db.nextNumber('IO', yearOf(input.order_date))
+  const number = await nextDocumentNumber(db, 'IO', 'prefix_purchase', yearOf(input.order_date))
   await db.insert('purchase_orders', [{ id, number, supplier_id: input.supplier_id, order_date: input.order_date, supplier_reference: input.supplier_reference, notes: input.notes, status: 'open' }])
   const lines = input.lines.map((l) => ({ id: newId(), purchase_order_id: id, ...l }))
   await db.insert('purchase_order_lines', lines)
@@ -62,7 +82,9 @@ export async function createPurchaseOrder(db: Driver, input: PurchaseInput) {
     if (!shipLines.length) continue
     seq += 1
     const sid = newId()
-    await db.insert('inbound_shipments', [{ id: sid, purchase_order_id: id, sequence: seq, expected_date: x.expected_date, original_date: x.expected_date, warehouse_id: x.warehouse_id, carrier: x.carrier, status: 'expected', notes: '' }])
+    const transport = transports.find((t) => t.id === x.transport_id)
+    const expected = transport?.arrival_date ?? x.expected_date
+    await db.insert('inbound_shipments', [{ id: sid, purchase_order_id: id, sequence: seq, expected_date: expected, original_date: expected, warehouse_id: x.warehouse_id, carrier: transport?.carrier ?? x.carrier, status: 'expected', notes: '', transport_id: transport?.id ?? null }])
     await db.insert('inbound_shipment_lines', shipLines.map((r) => ({ id: newId(), shipment_id: sid, purchase_order_line_id: r.pol, qty: r.qty })))
   }
   return id
@@ -87,6 +109,63 @@ export async function cancelPurchaseOrder(db: Driver, id: string) {
   for (const x of shipments) await db.update('inbound_shipments', x.id, { status: 'closed' })
 }
 
+// Transport ----------------------------------------------------------------------
+
+export interface TransportInput { departure_date: string; arrival_date: string; carrier: string; reference: string; capacity_m3: number; notes: string }
+
+function validateTransport(input: TransportInput) {
+  if (!input.departure_date || !input.arrival_date) fail(tx("Vul de vertrek- en aankomstdatum in."))
+  if (input.arrival_date < input.departure_date) fail(tx("De aankomst kan niet voor het vertrek liggen."))
+}
+
+export async function createTransport(db: Driver, input: TransportInput) {
+  validateTransport(input)
+  const id = newId()
+  const number = await nextDocumentNumber(db, 'TR', 'prefix_transport', yearOf(input.departure_date))
+  await db.insert('transports', [{ id, number, status: 'planned', ...input }])
+  return id
+}
+
+/** Een nieuwe aankomstdatum schuift alle openstaande zendingen op deze vrachtwagen mee. */
+export async function updateTransport(db: Driver, id: string, input: TransportInput) {
+  validateTransport(input)
+  await db.update('transports', id, input)
+  const shipments = (await db.list('inbound_shipments')).filter((x) => x.transport_id === id && (x.status === 'expected' || x.status === 'partial'))
+  for (const x of shipments) await db.update('inbound_shipments', x.id, { expected_date: input.arrival_date, carrier: input.carrier })
+}
+
+export async function assignShipmentToTransport(db: Driver, shipmentId: string, transportId: string | null) {
+  const s = await loadSnapshot(db)
+  const x = s.inbound_shipments.find((r) => r.id === shipmentId) ?? (fail(tx("Zending niet gevonden.")) as never)
+  if (x.status === 'received' || x.status === 'closed') fail(tx("Deze zending is al afgerond."))
+  const current = s.transports.find((t) => t.id === x.transport_id)
+  if (current && current.status !== 'planned') fail(tx("Dit transport is al vertrokken. De zending kan er niet meer af."))
+  if (!transportId) return void await db.update('inbound_shipments', shipmentId, { transport_id: null })
+  const t = s.transports.find((r) => r.id === transportId) ?? (fail(tx("Transport niet gevonden.")) as never)
+  if (t.status !== 'planned') fail(tx("Dit transport is al vertrokken. Kies een later transport."))
+  await db.update('inbound_shipments', shipmentId, { transport_id: t.id, expected_date: t.arrival_date, carrier: t.carrier })
+}
+
+export async function setTransportStatus(db: Driver, id: string, status: 'departed' | 'arrived') {
+  await db.update('transports', id, { status })
+}
+
+export async function cancelTransport(db: Driver, id: string) {
+  const s = await loadSnapshot(db)
+  const t = s.transports.find((r) => r.id === id)
+  if (t?.status !== 'planned') fail(tx("Dit transport is al vertrokken en kan niet worden geannuleerd."))
+  for (const x of s.inbound_shipments.filter((r) => r.transport_id === id)) await db.update('inbound_shipments', x.id, { transport_id: null })
+  await db.update('transports', id, { status: 'cancelled' })
+}
+
+/** Bestemming van wat nog moet binnenkomen; ook achteraf aan te passen. */
+export async function setShipmentWarehouse(db: Driver, shipmentId: string, warehouseId: string) {
+  const s = await loadSnapshot(db)
+  const x = s.inbound_shipments.find((r) => r.id === shipmentId)
+  if (!x || (x.status !== 'expected' && x.status !== 'partial')) fail(tx("Deze zending is al afgerond. Verhuis de goederen via Voorraad."))
+  await db.update('inbound_shipments', shipmentId, { warehouse_id: warehouseId })
+}
+
 // Goederenontvangst ------------------------------------------------------------
 
 export interface ReceiptRow { shipment_line_id: string; warehouse_id: string; qty_received: number; qty_damaged: number; location_bin: string }
@@ -108,7 +187,7 @@ export async function receiveGoods(db: Driver, input: ReceiptInput) {
     return s.purchase_order_lines.find((l) => l.id === sl.purchase_order_line_id)!
   }
   const id = newId()
-  const number = await db.nextNumber('OV', yearOf(input.received_date))
+  const number = await nextDocumentNumber(db, 'OV', 'prefix_receipt', yearOf(input.received_date))
   await db.insert('goods_receipts', [{ id, number, shipment_id: input.shipment_id, received_date: input.received_date, delivery_note: input.delivery_note, received_by: input.received_by, notes: input.notes }])
   await db.insert('goods_receipt_lines', rows.map((r) => ({ id: newId(), receipt_id: id, product_id: polOf(r.shipment_line_id).product_id, ...r })))
   const moves: StockMovement[] = rows.filter((r) => r.qty_received > 0).map((r) => ({
@@ -143,7 +222,8 @@ export async function transferStock(db: Driver, input: { product_id: string; fro
   if (input.qty <= 0) fail(tx("Vul een aantal in."))
   const s = await loadSnapshot(db)
   const have = onHandMap(s).get(stockKey(input.product_id, input.from_id)) ?? 0
-  if (input.qty > have) fail(tx("Er liggen maar {0} stuks in het gekozen magazijn.", have))
+  const free = freeAt(s, input.product_id, input.from_id)
+  if (input.qty > free) fail(tx("Er zijn {0} stuks vrij om te verhuizen. Van de {1} aanwezig is de rest gereserveerd voor klantorders.", Math.max(0, free), have))
   const common = { product_id: input.product_id, kind: 'overboeking' as const, ref_id: '', note: input.note, moved_at: input.date }
   await db.insert('stock_movements', [
     { id: newId(), warehouse_id: input.from_id, qty: -input.qty, ...common },
@@ -200,7 +280,7 @@ export async function createOrder(db: Driver, input: OrderInput, opts: { autoDel
   const s = await loadSnapshot(db)
   validateOrder(s, input)
   const id = newId()
-  const number = await db.nextNumber('VO', yearOf(input.header.order_date))
+  const number = await nextDocumentNumber(db, 'VO', 'prefix_sales_order', yearOf(input.header.order_date))
   await db.insert('sales_orders', [{ ...input.header, id, number, status: 'open' }])
   const lines = input.lines.map((l) => ({ ...l, id: newId(), sales_order_id: id }))
   await db.insert('sales_order_lines', lines)
@@ -306,7 +386,7 @@ export async function createDelivery(db: Driver, input: DeliveryInput) {
   })
   const id = newId()
   const sequence = s.deliveries.filter((d) => d.sales_order_id === input.sales_order_id).length + 1
-  const number = await db.nextNumber('LV', yearOf(input.planned_date))
+  const number = await nextDocumentNumber(db, 'LV', 'prefix_delivery', yearOf(input.planned_date))
   await db.insert('deliveries', [{ id, number, sales_order_id: input.sales_order_id, sequence, method: input.method, planned_date: input.planned_date, time_slot: input.time_slot, carrier: input.carrier, status: 'planned', delivered_at: null, signed_by: '', notes: input.notes, ready_at: null, approved_by: '', note_printed_at: null, signed_note_received: false, route_position: null }])
   await db.insert('delivery_lines', lines.map((l) => ({ ...l, delivery_id: id })))
   return id
@@ -434,7 +514,7 @@ export async function createInvoice(db: Driver, input: { sales_order_id: string;
   const thisQty = dls.reduce((n, l) => n + l.qty, 0)
   const kind = billedQty + thisQty >= orderQty ? (billedQty === 0 ? 'volledig' : 'eindfactuur') : 'deelfactuur'
 
-  const number = await db.nextNumber('F', yearOf(input.invoice_date))
+  const number = await nextDocumentNumber(db, 'F', 'prefix_invoice', yearOf(input.invoice_date))
   await db.insert('invoices', [{
     id, number, sales_order_id: order.id, customer_id: order.customer_id, kind, invoice_date: input.invoice_date,
     due_date: addDays(input.invoice_date, s.settings[0]?.payment_days ?? 14), base_amount: b.base, vat_amount: b.vat, total: b.total,

@@ -24,6 +24,14 @@ export function Stock() {
   const productOpts = s.products.map((p) => ({ value: p.id, label: p.name, sub: p.sku, search: p.sku }))
   const openModal = (m: 'transfer' | 'correct') => { setModal(m); setProductId(''); setFrom(wh[0]?.id ?? ''); setTo(wh[1]?.id ?? ''); setQty(m === 'transfer' ? 1 : -1); setNote('') }
 
+  const moveToShowroom = (id: string) => {
+    openModal('transfer')
+    const showroom = wh.find((w) => w.kind === 'winkel')
+    const free = (w: string) => (hand.get(stockKey(id, w)) ?? 0) - (res.get(stockKey(id, w)) ?? 0)
+    const source = wh.filter((w) => w.id !== showroom?.id).sort((a, b) => free(b.id) - free(a.id))[0]
+    setProductId(id); setFrom(source?.id ?? ''); setTo(showroom?.id ?? ''); setQty(1)
+  }
+
   return (
     <>
       <Head title={tx("Voorraad")} sub={tx("Per product en per locatie: wat er ligt en wat daarvan vrij is. Vrij is aanwezig minus gereserveerd voor orders.")}>
@@ -36,7 +44,7 @@ export function Stock() {
           {tab === 'stand' && <input style={{ maxWidth: 280, marginBottom: 14 }} aria-label={tx("Product zoeken")} placeholder={tx("Zoek op product of artikelnummer")} value={q} onChange={(e) => setQ(e.target.value)} />}
         </div>
         {tab === 'stand' && <div className="table-wrap"><table>
-          <thead><tr><th>{tx("Product")}</th>{wh.map((w) => <th key={w.id} className="num">{w.name}</th>)}<th className="num">{tx("Totaal vrij")}</th><th className="num">{tx("Onderweg")}</th><th></th></tr></thead>
+          <thead><tr><th>{tx("Product")}</th>{wh.map((w) => <th key={w.id} className="num">{w.name}</th>)}<th className="num">{tx("Totaal vrij")}</th><th className="num">{tx("Onderweg")}</th><th></th><th></th></tr></thead>
           <tbody>{products.map((p) => {
             let free = 0
             return (
@@ -49,6 +57,7 @@ export function Stock() {
                 })}
                 <td className="num strong" style={free < 0 ? { color: 'var(--bad)' } : undefined}>{free}</td>
                 <td className="num">{inbound.get(p.id) || <span className="zero">0</span>}</td>
+                <td style={{ whiteSpace: 'nowrap' }}><button className="btn sm" onClick={() => moveToShowroom(p.id)}>{tx("Verhuizen")}</button></td>
                 <td>{free < p.min_stock && <Pill tone={free < 0 ? 'bad' : 'warn'}>{tx("Onder minimum (")}{p.min_stock})</Pill>}</td>
               </tr>
             )
@@ -74,7 +83,7 @@ export function Stock() {
         </>}>
           <Field label={tx("Product")}>{(id) => <Combo id={id} value={productId} options={productOpts} onChange={setProductId} placeholder={tx("Zoek een product")} />}</Field>
           <div className="form-grid">
-            <SelectField label={modal === 'transfer' ? tx("Van") : tx("Locatie")} value={from} onChange={setFrom} options={wh.map((w) => ({ value: w.id, label: `${w.name}${productId ? ` (${hand.get(stockKey(productId, w.id)) ?? 0})` : ''}` }))} />
+            <SelectField label={modal === 'transfer' ? tx("Van") : tx("Locatie")} value={from} onChange={setFrom} options={wh.map((w) => ({ value: w.id, label: productId ? tx("{0} ({1} vrij)", w.name, (hand.get(stockKey(productId, w.id)) ?? 0) - (res.get(stockKey(productId, w.id)) ?? 0)) : w.name }))} />
             {modal === 'transfer' && <SelectField label={tx("Naar")} value={to} onChange={setTo} options={wh.map((w) => ({ value: w.id, label: `${w.name}${productId ? ` (${hand.get(stockKey(productId, w.id)) ?? 0})` : ''}` }))} />}
             <NumberField label={modal === 'transfer' ? tx("Aantal") : tx("Afwijking (+ of -)")} value={qty} step="1" onChange={setQty} />
           </div>

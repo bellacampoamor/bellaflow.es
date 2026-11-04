@@ -4,8 +4,8 @@ import { newId, type Driver } from '../data/driver'
 import type { Customer, Product, Supplier, Warehouse } from '../data/types'
 import { addDays, todayISO } from './calc'
 import {
-  createDelivery, createInvoice, createOrder, createPurchaseOrder, lineFromProduct, markDelivered, markNotePrinted, markReady, payInvoice,
-  receiveGoods, type OrderHeader, type OrderLineInput,
+  createDelivery, createInvoice, createTransport, createOrder, createPurchaseOrder, lineFromProduct, markDelivered, markNotePrinted, markReady, payInvoice,
+  receiveGoods, setTransportStatus, type OrderHeader, type OrderLineInput,
 } from './services'
 import { loadSnapshot } from '../data/driver'
 
@@ -22,6 +22,7 @@ export async function seedDemo(db: Driver, today = todayISO()) {
     id: 'default', company_name: 'Bella Outdoor and Furnishing', tax_id: '(CIF invullen in Beheer)', address: '(adres invullen in Beheer)',
     postal_code: '', city: 'Campoamor', province: 'Alicante', phone: '', email: '', iban: '(IBAN invullen in Beheer)',
     invoice_mode: 'manual', payment_days: 14, invoice_footer: '',
+    prefix_sales_order: 'VO', prefix_purchase: 'IO', prefix_receipt: 'OV', prefix_delivery: 'LV', prefix_invoice: 'F', prefix_transport: 'TR',
   }])
 
   const wh = (code: string, name: string, kind: Warehouse['kind'], city: string, receives = true): Warehouse => ({
@@ -42,7 +43,7 @@ export async function seedDemo(db: Driver, today = todayISO()) {
   await db.insert('suppliers', [oak, lounge])
 
   const prod = (sku: string, name: string, collection: string, category: string, material: string, color: string, dim: string, kg: number, colli: number, buy: number, sell: number, s: Supplier, min: number): Product => ({
-    id: newId(), sku, name, collection, category, material, color, dimensions: dim, weight_kg: kg, colli, purchase_price: buy, sale_price: sell, vat_rate: 21, supplier_id: s.id, min_stock: min, is_active: true,
+    id: newId(), sku, name, collection, category, material, color, dimensions: dim, weight_kg: kg, colli, purchase_price: buy, sale_price: sell, vat_rate: 21, supplier_id: s.id, min_stock: min, is_active: true, volume_m3: Number((kg / 40).toFixed(2)),
   })
   const sofa = prod('LOU-3Z-TK', 'Loungebank Marbella 3-zits', 'Marbella', 'Loungesets', 'Teak, Sunbrella', 'Zand', '220 × 92 × 74 cm', 68, 2, 890, 1895, lounge, 2)
   const chair = prod('LOU-FT-TK', 'Loungefauteuil Marbella', 'Marbella', 'Loungesets', 'Teak, Sunbrella', 'Zand', '86 × 92 × 74 cm', 29, 1, 390, 795, lounge, 4)
@@ -65,6 +66,13 @@ export async function seedDemo(db: Driver, today = todayISO()) {
   const c6 = cust('Lucía Fernández', '+34 600 000 106', 'lucia@voorbeeld.test', 'es', 'Calle Mayor 7', '03190', 'Pilar de la Horadada')
   await db.insert('customers', [c1, c2, c3, c4, c5, c6])
 
+  const truck = (dep: number, arr: number) => createTransport(db, { departure_date: d(dep), arrival_date: d(arr), carrier: 'Dutch Freight', reference: '', capacity_m3: 90, notes: '' })
+  const trFirst = await truck(-37, -34)
+  const trSecond = await truck(-12, -9)
+  const trLate = await truck(-4, -1)
+  const trNext = await truck(2, 5)
+  await truck(9, 12)
+
   // Beginvoorraad: één volledig ontvangen inkooporder, verdeeld over de locaties.
   const lines = [
     { p: sofa, qty: 8 }, { p: chair, qty: 14 }, { p: coffee, qty: 8 }, { p: bed, qty: 16 }, { p: parasol, qty: 7 },
@@ -72,7 +80,7 @@ export async function seedDemo(db: Driver, today = todayISO()) {
   const po0 = await createPurchaseOrder(db, {
     supplier_id: lounge.id, order_date: d(-48), supplier_reference: 'NZ-88120', notes: 'Eerste voorjaarslevering',
     lines: lines.map((l) => ({ product_id: l.p.id, qty: l.qty, unit_cost: l.p.purchase_price, sales_order_line_id: null })),
-    shipments: [{ expected_date: d(-34), warehouse_id: north.id, carrier: 'Dutch Freight', pct: 100 }],
+    shipments: [{ expected_date: d(-34), warehouse_id: north.id, carrier: 'Dutch Freight', pct: 100, transport_id: trFirst }],
   })
   let s = await loadSnapshot(db)
   const shipLines = (poId: string, seq: number) => {
@@ -103,8 +111,8 @@ export async function seedDemo(db: Driver, today = todayISO()) {
       { product_id: cabinet.id, qty: 4, unit_cost: cabinet.purchase_price, sales_order_line_id: null },
     ],
     shipments: [
-      { expected_date: d(-9), warehouse_id: north.id, carrier: 'Dutch Freight', pct: 50 },
-      { expected_date: d(5), warehouse_id: south.id, carrier: 'Dutch Freight', pct: 50 },
+      { expected_date: d(-9), warehouse_id: north.id, carrier: 'Dutch Freight', pct: 50, transport_id: trSecond },
+      { expected_date: d(5), warehouse_id: south.id, carrier: 'Dutch Freight', pct: 50, transport_id: trNext },
     ],
   })
   s = await loadSnapshot(db)
@@ -201,6 +209,21 @@ export async function seedDemo(db: Driver, today = todayISO()) {
       { product_id: sofa.id, qty: 1, unit_cost: 940, sales_order_line_id: o5l.id },
       { product_id: chair.id, qty: 6, unit_cost: chair.purchase_price, sales_order_line_id: null },
     ],
-    shipments: [{ expected_date: d(-1), warehouse_id: shop.id, carrier: 'Noorderzon eigen vervoer', pct: 100 }],
+    shipments: [{ expected_date: d(-1), warehouse_id: shop.id, carrier: '', pct: 100, transport_id: trLate }],
   })
+
+  // Vulorders: voor de showroom op het volgende transport, en de inkoop van vandaag nog zonder transport.
+  await createPurchaseOrder(db, {
+    supplier_id: lounge.id, order_date: d(-2), supplier_reference: 'NZ-88402', notes: 'Showroom aanvullen',
+    lines: [{ product_id: parasol.id, qty: 6, unit_cost: parasol.purchase_price, sales_order_line_id: null }, { product_id: bed.id, qty: 10, unit_cost: bed.purchase_price, sales_order_line_id: null }],
+    shipments: [{ expected_date: d(5), warehouse_id: shop.id, carrier: '', pct: 100, transport_id: trNext }],
+  })
+  await createPurchaseOrder(db, {
+    supplier_id: oak.id, order_date: today, supplier_reference: 'EH-2340', notes: '',
+    lines: [{ product_id: dining.id, qty: 8, unit_cost: dining.purchase_price, sales_order_line_id: null }],
+    shipments: [{ expected_date: d(12), warehouse_id: south.id, carrier: '', pct: 100 }],
+  })
+  await setTransportStatus(db, trFirst, 'arrived')
+  await setTransportStatus(db, trSecond, 'arrived')
+  await setTransportStatus(db, trLate, 'departed')
 }
