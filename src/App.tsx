@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Archive, Languages, Moon, Store, Sun, Boxes, ClipboardList, FileText, LayoutDashboard, PackageCheck, Settings2, ShoppingCart, Truck, Warehouse as WarehouseIcon } from 'lucide-react'
+import { Archive, Headset, Languages, Moon, Store, Sun, Boxes, ClipboardList, FileText, LayoutDashboard, PackageCheck, Settings2, ShoppingCart, Truck, Warehouse as WarehouseIcon } from 'lucide-react'
 import { flowCounts } from './domain/calc'
 import { useApp, useHash } from './ui/app-context'
 import { Logo, Modal } from './ui/kit'
@@ -69,6 +69,7 @@ export function App({ onResetDemo, onSignOut }: { onResetDemo?: () => Promise<vo
   useEffect(() => { document.documentElement.lang = language }, [language])
   const hash = useHash()
   const [confirmReset, setConfirmReset] = useState(false)
+  const [support, setSupport] = useState(false)
   const dash = hash.indexOf('-')
   const screen = dash < 0 ? hash : hash.slice(0, dash)
   const param = dash < 0 ? '' : hash.slice(dash + 1)
@@ -101,6 +102,7 @@ export function App({ onResetDemo, onSignOut }: { onResetDemo?: () => Promise<vo
             <a href="#beheer" className={screen === 'beheer' ? 'on' : ''}><Settings2 size={16} />{tx("Beheer")}</a>
             <button className="btn-toggle" onClick={switchLanguage}><Languages size={16} />{language === 'nl' ? 'English' : 'Nederlands'}</button>
             <button className="btn-toggle" onClick={toggleTheme}>{theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}{theme === 'dark' ? tx("Dagstand") : tx("Nachtstand")}</button>
+            <button className="btn-toggle" aria-label={tx("Contact en support")} title={tx("Contact en support")} onClick={() => setSupport(true)}><Headset size={18} /></button>
             {onSignOut && <a href="#overzicht" onClick={onSignOut}>{tx("Uitloggen")}</a>}
           </nav>
         </div>
@@ -125,6 +127,12 @@ export function App({ onResetDemo, onSignOut }: { onResetDemo?: () => Promise<vo
           <Route screen={screen} param={param} />
         </div>
       </main>
+      {support && (
+        <Modal title={tx("Contact en support")} onClose={() => setSupport(false)} footer={<button className="btn primary" onClick={() => setSupport(false)}>{tx("Sluiten")}</button>}>
+          <p style={{ margin: 0 }}>{tx("Bella Flow © {0} is gemaakt en uitgegeven door Rick van Hoeven. Alle rechten voorbehouden. Niets uit deze software mag zonder voorafgaande schriftelijke toestemming worden verveelvoudigd, verspreid of openbaar gemaakt.", new Date().getFullYear())}</p>
+          <p style={{ margin: 0 }}>{tx("Voor verdere informatie neem contact op via")} <a href="mailto:support@bellaflow.com">support@bellaflow.com</a></p>
+        </Modal>
+      )}
       {confirmReset && onResetDemo && (
         <Modal title={tx("Voorbeeldgegevens herstellen?")} onClose={() => setConfirmReset(false)} footer={<>
           <button className="btn" onClick={() => setConfirmReset(false)}>{tx("Annuleren")}</button>
