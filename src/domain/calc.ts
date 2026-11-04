@@ -230,8 +230,8 @@ export function flowCounts(s: Snapshot, today = todayISO()) {
   const openOrders = s.sales_orders.filter((o) => o.status === 'open')
   return {
     inkoop: linesToPurchase(s).length,
-    inkomend: openShipments.filter((x) => x.expected_date < today).length,
-    ontvangst: openShipments.filter((x) => x.expected_date <= addDays(today, 7)).length,
+    inkomend: openShipments.filter((x) => x.transport_id && x.expected_date < today).length,
+    ontvangst: s.transports.filter((t) => t.status !== 'cancelled' && t.arrival_date <= addDays(today, 7) && openLinesOnTransport(s, t.id).length > 0).length,
     orders: openOrders.filter((o) => orderStage(s, o) === 'te_plannen').length,
     levering: s.deliveries.filter((d) => deliveryIsOpen(d) && d.planned_date <= today).length,
     facturatie: openOrders.reduce((n, o) => n + uninvoicedDeliveries(s, o.id).length, 0),
@@ -269,3 +269,9 @@ export function purchaseKind(s: Snapshot, poId: string): 'vulorder' | 'klantorde
 
 export const freeAt = (s: Snapshot, productId: string, warehouseId: string) =>
   (onHandMap(s).get(stockKey(productId, warehouseId)) ?? 0) - (reservedMap(s).get(stockKey(productId, warehouseId)) ?? 0)
+
+/** Inkoopregels op een transport waar nog iets van binnen moet komen. */
+export function openLinesOnTransport(s: Snapshot, transportId: string) {
+  const shipments = new Set(s.inbound_shipments.filter((x) => x.transport_id === transportId && shipmentIsOpen(x)).map((x) => x.id))
+  return s.inbound_shipment_lines.filter((l) => shipments.has(l.shipment_id) && shipmentLineOpen(s, l.id) > 0)
+}

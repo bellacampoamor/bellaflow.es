@@ -81,6 +81,11 @@ export function OrderDetail({ id }: { id: string }) {
   } as Record<string, boolean>
   const firstOpen = TRACK.findIndex((t) => !done[t.k])
   const onOrder = lines.filter((l) => l.source === 'bestelling')
+  const arrivals = onOrder.filter((l) => shippedQty(s, l.id) < l.qty && linePurchaseStatus(s, l.id).received < l.qty).map((l) => {
+    const st = linePurchaseStatus(s, l.id)
+    const next = st.shipments.filter((x) => x.transport_id && (x.status === 'expected' || x.status === 'partial')).sort((a, b) => a.expected_date.localeCompare(b.expected_date))[0]
+    return { id: l.id, qty: l.qty, description: l.description, bought: st.purchased >= l.qty, date: next?.expected_date, transport: s.transports.find((t) => t.id === next?.transport_id)?.number }
+  })
   const toPurchase = linesToPurchase(s).filter((l) => l.sales_order_id === id).length
   const plannable = lines.filter((l) => l.warehouse_id && l.qty - plannedQty(s, l.id) > 0)
 
@@ -94,6 +99,13 @@ export function OrderDetail({ id }: { id: string }) {
           <button className="btn primary" disabled={!plannable.length} onClick={() => setModal('plan')}><Truck size={16} />{tx("Levering plannen")}</button>
         </>}
       </Head>
+
+      {open && arrivals.length > 0 && (
+        <div className="note" style={{ marginBottom: 16 }}>
+          <strong>{tx("Verwachte ontvangst")}</strong>
+          {arrivals.map((r) => <div key={r.id}>{tx("{0} × {1}", r.qty, r.description)}: {r.date ? <strong>{fmtDate(r.date)}</strong> : <span className="muted">{r.bought ? tx("ingekocht, nog niet op een transport") : tx("nog niet ingekocht")}</span>}{r.transport ? ` (${r.transport})` : ''}</div>)}
+        </div>
+      )}
 
       <section className="panel" style={{ marginBottom: 16 }}>
         <div className="track">{TRACK.map((t, i) => <div key={t.k} className={done[t.k] ? 'done' : i === firstOpen ? 'now' : ''}>{tx(t.l)}</div>)}</div>
@@ -140,7 +152,7 @@ export function OrderDetail({ id }: { id: string }) {
                 <thead><tr><th>{tx("Product")}</th><th className="num">{tx("Op bestelling")}</th><th className="num">{tx("Ingekocht")}</th><th className="num">{tx("Binnen")}</th><th>{tx("Inkooporder")}</th><th>{tx("Verwacht")}</th></tr></thead>
                 <tbody>{onOrder.map((l) => {
                   const st = linePurchaseStatus(s, l.id)
-                  const next = st.shipments.filter((x) => x.status === 'expected' || x.status === 'partial').sort((a, b) => a.expected_date.localeCompare(b.expected_date))[0]
+                  const next = st.shipments.filter((x) => x.transport_id && (x.status === 'expected' || x.status === 'partial')).sort((a, b) => a.expected_date.localeCompare(b.expected_date))[0]
                   return (
                     <tr key={l.id}>
                       <td className="strong">{l.description}{l.options && <div className="muted small" style={{ fontWeight: 400 }}>{l.options}</div>}</td>

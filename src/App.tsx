@@ -137,7 +137,7 @@ function Route({ screen, param }: { screen: string; param: string }) {
     case 'overzicht': return <Overview />
     case 'inkoop': return param === 'nieuw' ? <PurchaseForm /> : param.startsWith('nieuw-order-') ? <PurchaseForm orderId={param.slice(12)} /> : param.startsWith('nieuw-') ? <PurchaseForm transportId={param.slice(6)} /> : param ? <PurchaseDetail id={param} /> : <Purchases />
     case 'inkomend': return <Inbound />
-    case 'ontvangst': return param ? <ReceiptForm shipmentId={param} /> : <Receipts />
+    case 'ontvangst': return param ? <ReceiptForm transportId={param} /> : <Receipts />
     case 'orders':
       if (param === 'nieuw') return <OrderForm />
       if (param.startsWith('wijzig-')) return <OrderForm id={param.slice(7)} />

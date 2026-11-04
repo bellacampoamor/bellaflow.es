@@ -55,7 +55,8 @@ Schermen praten alleen met `services` en `calc`, nooit rechtstreeks met de opsla
 - **Deelleveringen** worden bij afmelden direct gefactureerd. Hele leveringen volgen de instelling onder Facturatie.
 - **Afleverbon**: een bezorging moet eerst klaargezet en akkoord bevonden worden. Daarna volgt de bon, en bij afmelden de naam van wie tekende.
 - **Route**: per dag voor het eigen team, heen en terug vanaf het magazijn dat onder Beheer als vertrekpunt staat. Tot 9 stops de gegarandeerd kortste rit.
-- **Transport**: inkoop wordt per zending gekoppeld aan een transport. De verwachte datum volgt de aankomst van dat transport. Een inkooporder zonder klantregels is een vulorder; de bestemming kan wijzigen tot de zending binnen is.
+- **Transport**: een inkooporder is altijd volledig ingekocht. In stap 2 wordt elke regel aan een transport gekoppeld (technisch: één rij in `inbound_shipments` per regel). De verwachte ontvangstdatum volgt uit het transport en staat op de verkooporder. Een inkooporder zonder verkoopregels is een vulorder; de bestemming kan per regel wijzigen tot hij binnen is.
+- **Ontvangst** gebeurt per transport en kan regels van meerdere inkooporders bevatten.
 - **Verhuizen**: alleen vrije voorraad kan naar een andere locatie, gereserveerde klantartikelen niet.
 - **Taal**: het scherm is Nederlands of Engels (`src/i18n.en.ts`). Afleverbon, factuur en klantberichten volgen de taal van de klant. Eerder opgeslagen geschiedenisregels blijven in hun oorspronkelijke taal.
 - **Facturen** zijn onwijzigbaar en kunnen niet worden teruggedateerd. De database dwingt dat ook zelf af.

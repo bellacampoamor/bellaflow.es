@@ -1,4 +1,4 @@
-import { addDays, deliveryIsOpen, depositAvailable, deliveryValue, invoiceBalance, invoiceState, linesToPurchase, onHandMap, orderStage, reservedMap, shipmentIsOpen, shipmentOpenQty, STAGE_LABEL, stockKey, todayISO, uninvoicedDeliveries } from '../domain/calc'
+import { addDays, deliveryIsOpen, depositAvailable, deliveryValue, invoiceBalance, invoiceState, linesToPurchase, onHandMap, orderStage, reservedMap, openLinesOnTransport, STAGE_LABEL, stockKey, todayISO, uninvoicedDeliveries } from '../domain/calc'
 import { useApp } from '../ui/app-context'
 import { Empty, eur, fmtDate, fmtShort, Head, Pill } from '../ui/kit'
 import { Plus } from 'lucide-react'
@@ -10,7 +10,7 @@ export function Overview() {
   const name = <T extends { id: string; name: string }>(rows: T[], id: string | null) => rows.find((r) => r.id === id)?.name ?? '–'
   const custOf = (orderId: string) => name(s.customers, s.sales_orders.find((o) => o.id === orderId)?.customer_id ?? null)
 
-  const inbound = s.inbound_shipments.filter(shipmentIsOpen).filter((x) => x.expected_date <= addDays(today, 14)).sort((a, b) => a.expected_date.localeCompare(b.expected_date))
+  const inbound = s.transports.filter((t) => t.status !== 'cancelled' && t.arrival_date <= addDays(today, 14) && openLinesOnTransport(s, t.id).length > 0).sort((a, b) => a.arrival_date.localeCompare(b.arrival_date))
   const deliveries = s.deliveries.filter(deliveryIsOpen).sort((a, b) => a.planned_date.localeCompare(b.planned_date)).slice(0, 6)
   const orders = s.sales_orders.filter((o) => ['te_plannen', 'wacht_op_goederen'].includes(orderStage(s, o)))
   const toBill = s.sales_orders.flatMap((o) => o.status === 'open' ? uninvoicedDeliveries(s, o.id) : [])
@@ -33,23 +33,23 @@ export function Overview() {
 
       <div className="figures">
         <div><b>{s.sales_orders.filter((o) => o.status === 'open' && orderStage(s, o) !== 'gefactureerd').length}</b><span className="muted small">{tx("Lopende verkooporders")}</span></div>
-        <div><b>{inbound.length}</b><span className="muted small">{tx("Zendingen binnen 14 dagen")}</span></div>
+        <div><b>{inbound.length}</b><span className="muted small">{tx("Transporten binnen 14 dagen")}</span></div>
         <div><b>{eur(receivable)}</b><span className="muted small">{tx("Open op facturen")}</span></div>
         <div><b>{eur(deposits)}</b><span className="muted small">{tx("Vooruitbetaald, nog te verrekenen")}</span></div>
       </div>
 
       <div className="work">
         <section className="panel">
-          <div className="panel-head"><h2>{tx("Binnenkomende zendingen")}</h2><a className="small" href="#inkomend">{tx("Alle zendingen")}</a></div>
-          {inbound.length === 0 && <Empty>{tx("Er staan geen zendingen gepland.")}</Empty>}
-          {inbound.map((x) => {
-            const po = s.purchase_orders.find((p) => p.id === x.purchase_order_id)!
-            const late = x.expected_date < today
+          <div className="panel-head"><h2>{tx("Binnenkomende transporten")}</h2><a className="small" href="#inkomend">{tx("Gepland transport")}</a></div>
+          {inbound.length === 0 && <Empty>{tx("Er staan geen transporten gepland.")}</Empty>}
+          {inbound.map((t) => {
+            const lines = openLinesOnTransport(s, t.id)
+            const late = t.arrival_date < today
             return (
-              <a className="task" key={x.id} href={`#ontvangst-${x.id}`}>
-                <div><div className="task-t">{po.number}{tx(", zending")} {x.sequence}</div>
-                  <div className="muted small">{name(s.suppliers, po.supplier_id)}, {shipmentOpenQty(s, x.id)} {tx("stuks naar")} {name(s.warehouses, x.warehouse_id)}</div></div>
-                <Pill tone={late ? 'bad' : x.expected_date === today ? 'warn' : ''}>{late ? tx("Te laat, ") : ''}{fmtShort(x.expected_date)}</Pill>
+              <a className="task" key={t.id} href={`#ontvangst-${t.id}`}>
+                <div><div className="task-t">{t.number}</div>
+                  <div className="muted small">{tx("{0} regels, {1} stuks", lines.length, lines.reduce((n, l) => n + l.qty, 0))}{t.carrier ? `, ${t.carrier}` : ''}</div></div>
+                <Pill tone={late ? 'bad' : t.arrival_date === today ? 'warn' : ''}>{late ? tx("Te laat, ") : ''}{fmtShort(t.arrival_date)}</Pill>
               </a>
             )
           })}

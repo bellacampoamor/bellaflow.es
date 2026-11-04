@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { ArrowRight } from 'lucide-react'
-import { addDays, linePurchaseStatus, linesToPurchase, round2, todayISO } from '../domain/calc'
+import { linePurchaseStatus, linesToPurchase, round2, todayISO } from '../domain/calc'
 import { convertLinesToPurchaseOrders } from '../domain/services'
 import { tx } from '../i18n'
 import { useApp } from '../ui/app-context'
@@ -101,18 +101,15 @@ export function PurchaseQueue({ onDone }: { onDone: () => void }) {
 function ConvertModal({ lines, onClose, onDone, run }: { lines: { id: string; qty: number; product_id: string; supplier_id: string }[]; onClose: () => void; onDone: () => void; run: ReturnType<typeof useApp>['run'] }) {
   const { s } = useApp()
   const today = todayISO()
-  const planned = s.transports.filter((t) => t.status === 'planned').sort((a, b) => a.departure_date.localeCompare(b.departure_date))
   const receivers = s.warehouses.filter((w) => w.is_active && w.receives_goods)
-  const [transport, setTransport] = useState(planned.find((t) => t.departure_date >= today)?.id ?? '')
   const [warehouse, setWarehouse] = useState(receivers.find((w) => w.is_route_origin)?.id ?? receivers[0]?.id ?? '')
   const [date, setDate] = useState(today)
-  const [expected, setExpected] = useState(addDays(today, 21))
   const perSupplier = [...new Set(lines.map((l) => l.supplier_id))].map((id) => {
     const rows = lines.filter((l) => l.supplier_id === id)
     return { id, name: s.suppliers.find((x) => x.id === id)?.name, count: rows.length, value: round2(rows.reduce((n, l) => n + l.qty * (s.products.find((p) => p.id === l.product_id)?.purchase_price ?? 0), 0)) }
   })
   const save = async () => {
-    const ok = await run((db) => convertLinesToPurchaseOrders(db, { lines: lines.map((l) => ({ sales_order_line_id: l.id, supplier_id: l.supplier_id })), order_date: date, transport_id: transport || null, warehouse_id: warehouse, expected_date: expected }), perSupplier.length === 1 ? tx("Inkooporder aangemaakt") : tx("{0} inkooporders aangemaakt", perSupplier.length))
+    const ok = await run((db) => convertLinesToPurchaseOrders(db, { lines: lines.map((l) => ({ sales_order_line_id: l.id, supplier_id: l.supplier_id })), order_date: date, warehouse_id: warehouse }), perSupplier.length === 1 ? tx("Inkooporder aangemaakt") : tx("{0} inkooporders aangemaakt", perSupplier.length))
     if (ok) onDone()
   }
   return (
@@ -125,11 +122,10 @@ function ConvertModal({ lines, onClose, onDone, run }: { lines: { id: string; qt
         <tbody>{perSupplier.map((x) => <tr key={x.id}><td className="strong">{x.name}</td><td className="num">{x.count}</td><td className="num">{eur(x.value)}</td></tr>)}</tbody>
       </table></div>
       <div className="form-grid">
-        <SelectField className="span-2" label={tx("Transport naar Spanje")} value={transport} onChange={setTransport} options={[{ value: '', label: tx("Nog niet gekoppeld") }, ...planned.map((t) => ({ value: t.id, label: tx("{0}, vertrek {1}, aankomst {2}", t.number, fmtDate(t.departure_date), fmtDate(t.arrival_date)) }))]} />
         <SelectField label={tx("Bestemming")} value={warehouse} onChange={setWarehouse} options={receivers.map((w) => ({ value: w.id, label: w.name }))} />
         <TextField label={tx("Besteldatum")} type="date" value={date} onChange={setDate} />
-        {!transport && <TextField label={tx("Verwacht op")} type="date" value={expected} onChange={setExpected} />}
       </div>
+      <p className="small muted" style={{ margin: 0 }}>{tx("Koppel de regels aan een transport in stap 2 zodra de transportlijst bekend is.")}</p>
     </Modal>
   )
 }

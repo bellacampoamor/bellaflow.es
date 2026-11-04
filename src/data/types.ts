@@ -66,7 +66,7 @@ export interface InboundShipment {
 }
 export interface InboundShipmentLine { id: string; shipment_id: string; purchase_order_line_id: string; qty: number }
 export interface GoodsReceipt {
-  id: string; number: string; shipment_id: string; received_date: string; delivery_note: string
+  id: string; number: string; shipment_id: string | null; transport_id: string | null; received_date: string; delivery_note: string
   received_by: string; notes: string
 }
 export interface GoodsReceiptLine {

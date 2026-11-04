@@ -42,57 +42,38 @@ export async function saveSettings(db: Driver, patch: Partial<Settings>) {
 
 export interface PurchaseInput {
   supplier_id: string; order_date: string; supplier_reference: string; notes: string
-  lines: { product_id: string; qty: number; unit_cost: number; sales_order_line_id: string | null }[]
-  shipments: { expected_date: string; warehouse_id: string; carrier: string; pct: number; transport_id?: string | null }[]
-}/** Verdeelt elke regel over de zendingen volgens percentage; afronding telt altijd op tot het totaal. */
-
-/** Verdeelt elke regel over de zendingen volgens percentage; afronding telt altijd op tot het totaal. */
-export function splitQty(qty: number, pcts: number[]) {
-  const sum = pcts.reduce((a, b) => a + b, 0)
-  let cumPct = 0, done = 0
-  return pcts.map((p, i) => {
-    cumPct += p
-    const upto = i === pcts.length - 1 ? qty : Math.ceil((qty * cumPct) / sum)
-    const n = upto - done
-    done = upto
-    return n
-  })
+  /** Bestemming en eventueel al bekend transport; per regel te overschrijven. */
+  warehouse_id: string; transport_id?: string | null
+  lines: { product_id: string; qty: number; unit_cost: number; sales_order_line_id: string | null; warehouse_id?: string; transport_id?: string | null }[]
 }
 
+/** Ingekocht is altijd de hele regel. Elke regel krijgt een eigen rij waarmee hij aan een transport wordt gekoppeld. */
 export async function createPurchaseOrder(db: Driver, input: PurchaseInput) {
   if (!input.supplier_id) fail(tx("Kies een leverancier."))
   if (!input.lines.length || input.lines.some((l) => !l.product_id || l.qty <= 0)) fail(tx("Voeg minimaal één regel toe met product en aantal."))
-  if (!input.shipments.length) fail(tx("Plan minimaal één zending."))
-  if (input.shipments.some((x) => !x.expected_date || !x.warehouse_id)) fail(tx("Vul per zending een datum en een magazijn in."))
-  if (Math.round(input.shipments.reduce((n, x) => n + x.pct, 0)) !== 100) fail(tx("De percentages van de zendingen moeten samen 100% zijn."))
-
+  if (!input.warehouse_id) fail(tx("Kies een bestemming."))
   const transports = await db.list('transports')
+  const supplier = (await db.list('suppliers')).find((x) => x.id === input.supplier_id)
   const id = newId()
   const number = await nextDocumentNumber(db, 'IO', 'prefix_purchase', yearOf(input.order_date))
   await db.insert('purchase_orders', [{ id, number, supplier_id: input.supplier_id, order_date: input.order_date, supplier_reference: input.supplier_reference, notes: input.notes, status: 'open' }])
-  const lines = input.lines.map((l) => ({ id: newId(), purchase_order_id: id, ...l }))
-  await db.insert('purchase_order_lines', lines)
-
-  const pcts = input.shipments.map((x) => x.pct)
-  const perLine = lines.map((l) => splitQty(l.qty, pcts))
-  let seq = 0
-  for (let i = 0; i < input.shipments.length; i++) {
-    const x = input.shipments[i]
-    const shipLines = lines.map((l, li) => ({ pol: l.id, qty: perLine[li][i] })).filter((r) => r.qty > 0)
-    if (!shipLines.length) continue
-    seq += 1
-    const sid = newId()
-    const transport = transports.find((t) => t.id === x.transport_id)
-    const expected = transport?.arrival_date ?? x.expected_date
-    await db.insert('inbound_shipments', [{ id: sid, purchase_order_id: id, sequence: seq, expected_date: expected, original_date: expected, warehouse_id: x.warehouse_id, carrier: transport?.carrier ?? x.carrier, status: 'expected', notes: '', transport_id: transport?.id ?? null }])
-    await db.insert('inbound_shipment_lines', shipLines.map((r) => ({ id: newId(), shipment_id: sid, purchase_order_line_id: r.pol, qty: r.qty })))
+  let sequence = 0
+  for (const { warehouse_id, transport_id, ...line } of input.lines) {
+    sequence += 1
+    const polId = newId(), sid = newId()
+    await db.insert('purchase_order_lines', [{ id: polId, purchase_order_id: id, ...line }])
+    const transport = transports.find((t) => t.id === (transport_id ?? input.transport_id))
+    // Zonder transport is de datum alleen een interne schatting; het scherm toont hem pas na koppeling.
+    const expected = transport?.arrival_date ?? addDays(input.order_date, supplier?.lead_time_days ?? 21)
+    await db.insert('inbound_shipments', [{ id: sid, purchase_order_id: id, sequence, expected_date: expected, original_date: expected, warehouse_id: warehouse_id ?? input.warehouse_id, carrier: transport?.carrier ?? '', status: 'expected', notes: '', transport_id: transport?.id ?? null }])
+    await db.insert('inbound_shipment_lines', [{ id: newId(), shipment_id: sid, purchase_order_line_id: polId, qty: line.qty }])
   }
   return id
 }
 
 export interface ConvertInput {
   lines: { sales_order_line_id: string; supplier_id: string }[]
-  order_date: string; transport_id: string | null; warehouse_id: string; expected_date: string
+  order_date: string; warehouse_id: string
 }
 
 /** Zet aangevinkte regels van verkooporders door: per leverancier één inkooporder. */
@@ -114,27 +95,21 @@ export async function convertLinesToPurchaseOrders(db: Driver, input: ConvertInp
       lines: rows.filter((r) => r.supplier_id === supplier_id).map(({ line }) => ({
         product_id: line.product_id, qty: line.qty, unit_cost: s.products.find((p) => p.id === line.product_id)?.purchase_price ?? 0, sales_order_line_id: line.id,
       })),
-      shipments: [{ expected_date: input.expected_date, warehouse_id: input.warehouse_id, carrier: '', pct: 100, transport_id: input.transport_id }],
+      warehouse_id: input.warehouse_id,
     }))
   }
   return ids
 }
 
-export async function rescheduleShipment(db: Driver, shipmentId: string, newDate: string, reason: string) {
-  if (!newDate) fail(tx("Vul de nieuwe datum in."))
-  const s = await loadSnapshot(db)
-  const x = s.inbound_shipments.find((r) => r.id === shipmentId) ?? fail(tx("Zending niet gevonden."))
-  await db.update('inbound_shipments', shipmentId, { expected_date: newDate, notes: reason || (x as InboundShipment).notes })
-}
-
 export async function closeShipment(db: Driver, shipmentId: string, reason: string) {
   await db.update('inbound_shipments', shipmentId, { status: 'closed', notes: reason })
+  await closeTransportIfDone(db, (await db.list('inbound_shipments')).find((x) => x.id === shipmentId)?.transport_id ?? null)
 }
 
 export async function cancelPurchaseOrder(db: Driver, id: string) {
   const s = await loadSnapshot(db)
   const shipments = s.inbound_shipments.filter((x) => x.purchase_order_id === id)
-  if (s.goods_receipts.some((r) => shipments.some((x) => x.id === r.shipment_id))) fail(tx("Deze inkooporder heeft al ontvangsten. Sluit de openstaande zendingen af."))
+  if (s.goods_receipt_lines.some((r) => s.inbound_shipment_lines.some((l) => l.id === r.shipment_line_id && shipments.some((x) => x.id === l.shipment_id)))) fail(tx("Deze inkooporder heeft al ontvangsten en kan niet worden geannuleerd."))
   await db.update('purchase_orders', id, { status: 'cancelled' })
   for (const x of shipments) await db.update('inbound_shipments', x.id, { status: 'closed' })
 }
@@ -164,16 +139,24 @@ export async function updateTransport(db: Driver, id: string, input: TransportIn
   for (const x of shipments) await db.update('inbound_shipments', x.id, { expected_date: input.arrival_date, carrier: input.carrier })
 }
 
-export async function assignShipmentToTransport(db: Driver, shipmentId: string, transportId: string | null) {
+/** Koppelt inkoopregels aan een transport; de verwachte ontvangstdatum volgt daaruit. Null koppelt los. */
+export async function assignShipmentsToTransport(db: Driver, shipmentIds: string[], transportId: string | null) {
   const s = await loadSnapshot(db)
-  const x = s.inbound_shipments.find((r) => r.id === shipmentId) ?? (fail(tx("Zending niet gevonden.")) as never)
-  if (x.status === 'received' || x.status === 'closed') fail(tx("Deze zending is al afgerond."))
-  const current = s.transports.find((t) => t.id === x.transport_id)
-  if (current && current.status !== 'planned') fail(tx("Dit transport is al vertrokken. De zending kan er niet meer af."))
-  if (!transportId) return void await db.update('inbound_shipments', shipmentId, { transport_id: null })
-  const t = s.transports.find((r) => r.id === transportId) ?? (fail(tx("Transport niet gevonden.")) as never)
-  if (t.status !== 'planned') fail(tx("Dit transport is al vertrokken. Kies een later transport."))
-  await db.update('inbound_shipments', shipmentId, { transport_id: t.id, expected_date: t.arrival_date, carrier: t.carrier })
+  const t = transportId ? s.transports.find((r) => r.id === transportId) ?? (fail(tx("Transport niet gevonden.")) as never) : null
+  if (t && t.status !== 'planned') fail(tx("Dit transport is al vertrokken. Kies een later transport."))
+  for (const id of shipmentIds) {
+    const x = s.inbound_shipments.find((r) => r.id === id) ?? (fail(tx("Inkoopregel niet gevonden.")) as never)
+    if (x.status === 'received' || x.status === 'closed') fail(tx("Deze regel is al ontvangen."))
+    const current = s.transports.find((r) => r.id === x.transport_id)
+    if (current && current.status !== 'planned') fail(tx("Dit transport is al vertrokken. De regel kan er niet meer af."))
+  }
+  for (const id of shipmentIds) await db.update('inbound_shipments', id, t ? { transport_id: t.id, expected_date: t.arrival_date, carrier: t.carrier } : { transport_id: null })
+}
+
+async function closeTransportIfDone(db: Driver, transportId: string | null) {
+  if (!transportId) return
+  const shipments = (await db.list('inbound_shipments')).filter((x) => x.transport_id === transportId)
+  if (shipments.length && shipments.every((x) => x.status === 'received' || x.status === 'closed')) await db.update('transports', transportId, { status: 'arrived' })
 }
 
 export async function setTransportStatus(db: Driver, id: string, status: 'departed' | 'arrived') {
@@ -192,14 +175,14 @@ export async function cancelTransport(db: Driver, id: string) {
 export async function setShipmentWarehouse(db: Driver, shipmentId: string, warehouseId: string) {
   const s = await loadSnapshot(db)
   const x = s.inbound_shipments.find((r) => r.id === shipmentId)
-  if (!x || (x.status !== 'expected' && x.status !== 'partial')) fail(tx("Deze zending is al afgerond. Verhuis de goederen via Voorraad."))
+  if (!x || (x.status !== 'expected' && x.status !== 'partial')) fail(tx("Deze regel is al ontvangen. Verhuis de goederen via Voorraad."))
   await db.update('inbound_shipments', shipmentId, { warehouse_id: warehouseId })
 }
 
 // Goederenontvangst ------------------------------------------------------------
 
 export interface ReceiptRow { shipment_line_id: string; warehouse_id: string; qty_received: number; qty_damaged: number; location_bin: string }
-export interface ReceiptInput { shipment_id: string; received_date: string; delivery_note: string; received_by: string; notes: string; rows: ReceiptRow[] }
+export interface ReceiptInput { transport_id?: string | null; received_date: string; delivery_note: string; received_by: string; notes: string; rows: ReceiptRow[] }
 
 export async function receiveGoods(db: Driver, input: ReceiptInput) {
   const s = await loadSnapshot(db)
@@ -210,7 +193,7 @@ export async function receiveGoods(db: Driver, input: ReceiptInput) {
   for (const r of rows) perLine.set(r.shipment_line_id, (perLine.get(r.shipment_line_id) ?? 0) + r.qty_received)
   for (const [lineId, n] of perLine) {
     const open = shipmentLineOpen(s, lineId)
-    if (n > open) fail(tx("Er staat nog {0} open op deze regel, maar er is {1} ingevuld. Corrigeer het aantal of verdeel de rest over een andere zending.", open, n))
+    if (n > open) fail(tx("Er staat nog {0} open op deze regel, maar er is {1} ingevuld. Corrigeer het aantal.", open, n))
   }
   const polOf = (slId: string) => {
     const sl = s.inbound_shipment_lines.find((l) => l.id === slId)!
@@ -218,7 +201,7 @@ export async function receiveGoods(db: Driver, input: ReceiptInput) {
   }
   const id = newId()
   const number = await nextDocumentNumber(db, 'OV', 'prefix_receipt', yearOf(input.received_date))
-  await db.insert('goods_receipts', [{ id, number, shipment_id: input.shipment_id, received_date: input.received_date, delivery_note: input.delivery_note, received_by: input.received_by, notes: input.notes }])
+  await db.insert('goods_receipts', [{ id, number, shipment_id: null, transport_id: input.transport_id ?? null, received_date: input.received_date, delivery_note: input.delivery_note, received_by: input.received_by, notes: input.notes }])
   await db.insert('goods_receipt_lines', rows.map((r) => ({ id: newId(), receipt_id: id, product_id: polOf(r.shipment_line_id).product_id, ...r })))
   const moves: StockMovement[] = rows.filter((r) => r.qty_received > 0).map((r) => ({
     id: newId(), product_id: polOf(r.shipment_line_id).product_id, warehouse_id: r.warehouse_id, qty: r.qty_received,
@@ -239,9 +222,12 @@ export async function receiveGoods(db: Driver, input: ReceiptInput) {
   }
 
   const after = await loadSnapshot(db)
-  const shipLines = after.inbound_shipment_lines.filter((l) => l.shipment_id === input.shipment_id)
-  const allIn = shipLines.every((l) => shipmentLineOpen(after, l.id) === 0)
-  await db.update('inbound_shipments', input.shipment_id, { status: allIn ? 'received' : 'partial' })
+  const shipmentIds = new Set(rows.map((r) => after.inbound_shipment_lines.find((l) => l.id === r.shipment_line_id)!.shipment_id))
+  for (const shipmentId of shipmentIds) {
+    const allIn = after.inbound_shipment_lines.filter((l) => l.shipment_id === shipmentId).every((l) => shipmentLineOpen(after, l.id) === 0)
+    await db.update('inbound_shipments', shipmentId, { status: allIn ? 'received' : 'partial' })
+  }
+  await closeTransportIfDone(db, input.transport_id ?? null)
   return id
 }
 

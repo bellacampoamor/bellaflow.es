@@ -4,10 +4,10 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { loadSnapshot } from '../src/data/driver'
 import { LocalDriver } from '../src/data/localDriver'
 import { TABLES } from '../src/data/types'
-import { linePurchaseStatus, linesToPurchase, flowCounts, freeAt, purchaseKind, transportLoad, invoiceBalance, onHandMap, orderStage, reservedMap, stockKey, vatBreakdown } from '../src/domain/calc'
+import { openLinesOnTransport, linePurchaseStatus, linesToPurchase, flowCounts, freeAt, purchaseKind, transportLoad, invoiceBalance, onHandMap, orderStage, reservedMap, stockKey, vatBreakdown } from '../src/domain/calc'
 import { seedDemo } from '../src/domain/demo'
 import {
-  createDelivery, createInvoice, createOrder, createPurchaseOrder, lineFromProduct, markDelivered, assignShipmentToTransport, cancelTransport, convertLinesToPurchaseOrders, createTransport, markReady, receiveGoods, rescheduleDelivery, saveRouteOrder, saveSettings, splitLinesForStock, setDeliveryInTransit, setShipmentWarehouse, setTransportStatus, updateTransport, splitQty, transferStock,
+  createDelivery, createInvoice, createOrder, createPurchaseOrder, lineFromProduct, markDelivered, assignShipmentsToTransport, cancelTransport, convertLinesToPurchaseOrders, createTransport, markReady, receiveGoods, rescheduleDelivery, saveRouteOrder, saveSettings, splitLinesForStock, setDeliveryInTransit, setShipmentWarehouse, setTransportStatus, updateTransport, transferStock,
 } from '../src/domain/services'
 import { estimateMatrix, parseRouterTable } from '../src/data/geo'
 import { googleMapsRouteUrl, optimizeRoute, tourCost } from '../src/domain/route'
@@ -31,11 +31,6 @@ const deliver = async (id: string) => {
 }
 
 describe('rekenen', () => {
-  it('verdeelt aantallen zonder verlies', () => {
-    expect(splitQty(5, [50, 50])).toEqual([3, 2])
-    expect(splitQty(1, [50, 50])).toEqual([1, 0])
-    expect(splitQty(24, [50, 25, 25])).toEqual([12, 6, 6])
-  })
   it('haalt IVA uit een prijs inclusief', () => {
     expect(vatBreakdown([{ total: 121, vat_rate: 21 }])).toMatchObject({ base: 100, vat: 21, total: 121 })
   })
@@ -62,24 +57,20 @@ describe('van inkoop tot factuur', () => {
 
     // Inkoop 50/50.
     const poId = await createPurchaseOrder(db, {
-      supplier_id: s.suppliers[0].id, order_date: TODAY, supplier_reference: '', notes: '',
+      supplier_id: s.suppliers[0].id, order_date: TODAY, supplier_reference: '', notes: '', warehouse_id: north.id,
       lines: [{ product_id: product.id, qty: 10, unit_cost: 100, sales_order_line_id: line.id }],
-      shipments: [
-        { expected_date: TODAY, warehouse_id: north.id, carrier: '', pct: 50 },
-        { expected_date: TODAY, warehouse_id: south.id, carrier: '', pct: 50 },
-      ],
     })
     s = await loadSnapshot(db)
     const shipments = s.inbound_shipments.filter((x) => x.purchase_order_id === poId)
-    expect(shipments).toHaveLength(2)
+    expect(shipments).toHaveLength(1)
     const sl1 = s.inbound_shipment_lines.find((l) => l.shipment_id === shipments[0].id)!
 
     // Te veel ontvangen wordt geweigerd en laat niets achter.
-    await expect(receiveGoods(db, { shipment_id: shipments[0].id, received_date: TODAY, delivery_note: '', received_by: '', notes: '', rows: [{ shipment_line_id: sl1.id, warehouse_id: north.id, qty_received: 6, qty_damaged: 0, location_bin: '' }] })).rejects.toThrow(/nog 5 open/)
+    await expect(receiveGoods(db, { received_date: TODAY, delivery_note: '', received_by: '', notes: '', rows: [{ shipment_line_id: sl1.id, warehouse_id: north.id, qty_received: 11, qty_damaged: 0, location_bin: '' }] })).rejects.toThrow(/nog 10 open/)
 
     // Eerste zending verdeeld over twee magazijnen, één beschadigd blijft open.
     await receiveGoods(db, {
-      shipment_id: shipments[0].id, received_date: TODAY, delivery_note: 'PB1', received_by: '', notes: '',
+      received_date: TODAY, delivery_note: 'PB1', received_by: '', notes: '',
       rows: [
         { shipment_line_id: sl1.id, warehouse_id: north.id, qty_received: 3, qty_damaged: 1, location_bin: '' },
         { shipment_line_id: sl1.id, warehouse_id: south.id, qty_received: 1, qty_damaged: 0, location_bin: '' },
@@ -112,8 +103,7 @@ describe('van inkoop tot factuur', () => {
 
     // Rest leveren: voorraad moet er zijn, dus eerst overboeken en de tweede zending ontvangen.
     s = await loadSnapshot(db)
-    const sl2 = s.inbound_shipment_lines.find((l) => l.shipment_id === shipments[1].id)!
-    await receiveGoods(db, { shipment_id: shipments[1].id, received_date: TODAY, delivery_note: 'PB2', received_by: '', notes: '', rows: [{ shipment_line_id: sl2.id, warehouse_id: north.id, qty_received: 5, qty_damaged: 0, location_bin: '' }] })
+    await receiveGoods(db, { received_date: TODAY, delivery_note: 'PB2', received_by: '', notes: '', rows: [{ shipment_line_id: sl1.id, warehouse_id: north.id, qty_received: 6, qty_damaged: 0, location_bin: '' }] })
     await transferStock(db, { product_id: product.id, from_id: south.id, to_id: north.id, qty: 1, note: '', date: TODAY })
     const d2 = await createDelivery(db, { sales_order_id: orderId, method: 'eigen_team', planned_date: TODAY, time_slot: '', carrier: '', notes: '', lines: [{ sales_order_line_id: line.id, qty: 7 }] })
     await deliver(d2)
@@ -200,7 +190,7 @@ describe('transport en vulorders', () => {
     const po = await createPurchaseOrder(db, {
       supplier_id: s.suppliers[0].id, order_date: TODAY, supplier_reference: '', notes: '',
       lines: [{ product_id: product.id, qty: 5, unit_cost: 100, sales_order_line_id: null }],
-      shipments: [{ expected_date: '2026-12-31', warehouse_id: campoamor.id, carrier: '', pct: 100, transport_id: transport }],
+      warehouse_id: campoamor.id, transport_id: transport,
     })
     const shipment = (await loadSnapshot(db)).inbound_shipments.find((x) => x.purchase_order_id === po)!
     return { po, product, showroom, campoamor, transport, shipment }
@@ -217,7 +207,7 @@ describe('transport en vulorders', () => {
     await updateTransport(db, transport, { departure_date: '2026-11-12', arrival_date: '2026-11-16', carrier: 'X', reference: '', capacity_m3: 10, notes: '' })
     expect((await loadSnapshot(db)).inbound_shipments.find((x) => x.id === shipment.id)!.expected_date).toBe('2026-11-16')
     await setTransportStatus(db, transport, 'departed')
-    await expect(assignShipmentToTransport(db, shipment.id, null)).rejects.toThrow(/al vertrokken/)
+    await expect(assignShipmentsToTransport(db, [shipment.id], null)).rejects.toThrow(/al vertrokken/)
     await expect(cancelTransport(db, transport)).rejects.toThrow(/al vertrokken/)
   })
   it('bestemming wijzigt achteraf, ook na vertrek, en de ontvangst stelt die voor', async () => {
@@ -260,7 +250,7 @@ describe('verkoop stuurt inkoop', () => {
     expect(freeAt(s, product.id, campoamor.id)).toBe(0)
     const line = s.sales_order_lines.find((l) => l.sales_order_id === orderId && l.source === 'bestelling')!
     // Deels ingekocht: de rest blijft op de lijst.
-    await createPurchaseOrder(db, { supplier_id: s.suppliers[0].id, order_date: TODAY, supplier_reference: '', notes: '', lines: [{ product_id: product.id, qty: 3, unit_cost: 1, sales_order_line_id: line.id }], shipments: [{ expected_date: TODAY, warehouse_id: campoamor.id, carrier: '', pct: 100 }] })
+    await createPurchaseOrder(db, { supplier_id: s.suppliers[0].id, order_date: TODAY, supplier_reference: '', notes: '', lines: [{ product_id: product.id, qty: 3, unit_cost: 1, sales_order_line_id: line.id }], warehouse_id: campoamor.id })
     s = await loadSnapshot(db)
     expect(linesToPurchase(s).find((l) => l.id === line.id)!.qty).toBe(1)
     expect(linePurchaseStatus(s, line.id)).toMatchObject({ purchased: 3, received: 0 })
@@ -302,14 +292,37 @@ describe('doorzetten naar inkoop', () => {
     const transport = s.transports.find((t) => t.status === 'planned')!
     const ids = await convertLinesToPurchaseOrders(db, {
       lines: queue.map((l) => ({ sales_order_line_id: l.id, supplier_id: s.products.find((p) => p.id === l.product_id)!.supplier_id! })),
-      order_date: TODAY, transport_id: transport.id, warehouse_id: s.warehouses[1].id, expected_date: TODAY,
+      order_date: TODAY, warehouse_id: s.warehouses[1].id,
     })
     expect(ids).toHaveLength(suppliersIn.size)
     const after = await loadSnapshot(db)
     expect(linesToPurchase(after)).toHaveLength(0)
     for (const l of queue) expect(linePurchaseStatus(after, l.id).purchased).toBe(l.qty)
-    expect(after.inbound_shipments.filter((x) => ids.includes(x.purchase_order_id)).every((x) => x.transport_id === transport.id && x.expected_date === transport.arrival_date)).toBe(true)
-    await expect(convertLinesToPurchaseOrders(db, { lines: [{ sales_order_line_id: queue[0].id, supplier_id: s.suppliers[0].id }], order_date: TODAY, transport_id: null, warehouse_id: s.warehouses[1].id, expected_date: TODAY })).rejects.toThrow(/al ingekocht/)
+    // Elke regel eigen rij, nog zonder transport. Na koppelen volgt de verwachte datum uit het transport.
+    const rows = after.inbound_shipments.filter((x) => ids.includes(x.purchase_order_id))
+    expect(rows).toHaveLength(queue.length)
+    expect(rows.every((x) => x.transport_id === null)).toBe(true)
+    await assignShipmentsToTransport(db, [rows[0].id], transport.id)
+    const linked = await loadSnapshot(db)
+    expect(linked.inbound_shipments.find((x) => x.id === rows[0].id)).toMatchObject({ transport_id: transport.id, expected_date: transport.arrival_date })
+    expect(linked.inbound_shipments.find((x) => x.id === rows[1].id)!.transport_id).toBeNull()
+    await expect(convertLinesToPurchaseOrders(db, { lines: [{ sales_order_line_id: queue[0].id, supplier_id: s.suppliers[0].id }], order_date: TODAY, warehouse_id: s.warehouses[1].id })).rejects.toThrow(/al ingekocht/)
+  })
+})
+
+describe('ontvangst per transport', () => {
+  it('boekt regels van meerdere inkooporders in en rondt het transport af', async () => {
+    const s = await loadSnapshot(db)
+    const product = s.products.find((p) => p.sku === 'LIG-AL-WT')!
+    const transport = await createTransport(db, { departure_date: TODAY, arrival_date: TODAY, carrier: '', reference: '', capacity_m3: 10, notes: '' })
+    for (const sup of s.suppliers) await createPurchaseOrder(db, { supplier_id: sup.id, order_date: TODAY, supplier_reference: '', notes: '', warehouse_id: s.warehouses[1].id, transport_id: transport, lines: [{ product_id: product.id, qty: 1, unit_cost: 1, sales_order_line_id: null }] })
+    const mid = await loadSnapshot(db)
+    const open = openLinesOnTransport(mid, transport)
+    expect(open).toHaveLength(s.suppliers.length)
+    await receiveGoods(db, { transport_id: transport, received_date: TODAY, delivery_note: '', received_by: '', notes: '', rows: open.map((l) => ({ shipment_line_id: l.id, warehouse_id: s.warehouses[1].id, qty_received: 1, qty_damaged: 0, location_bin: '' })) })
+    const end = await loadSnapshot(db)
+    expect(end.goods_receipts.filter((r) => r.transport_id === transport)).toHaveLength(1)
+    expect(end.transports.find((t) => t.id === transport)!.status).toBe('arrived')
   })
 })
 
@@ -326,7 +339,7 @@ describe('nummering', () => {
     const before = await loadSnapshot(db)
     const count = before.number_series.find((x) => x.id === 'IO-2026')!.last_number
     await saveSettings(db, { prefix_purchase: 'BELLA' })
-    const id = await createPurchaseOrder(db, { supplier_id: before.suppliers[0].id, order_date: TODAY, supplier_reference: '', notes: '', lines: [{ product_id: before.products[0].id, qty: 1, unit_cost: 1, sales_order_line_id: null }], shipments: [{ expected_date: TODAY, warehouse_id: before.warehouses[0].id, carrier: '', pct: 100 }] })
+    const id = await createPurchaseOrder(db, { supplier_id: before.suppliers[0].id, order_date: TODAY, supplier_reference: '', notes: '', lines: [{ product_id: before.products[0].id, qty: 1, unit_cost: 1, sales_order_line_id: null }], warehouse_id: before.warehouses[0].id })
     const after = await loadSnapshot(db)
     expect(after.purchase_orders.find((p) => p.id === id)!.number).toBe(`BELLA-2026-${String(count + 1).padStart(4, '0')}`)
     await expect(saveSettings(db, { prefix_invoice: 'F 1' })).rejects.toThrow(/voorvoegsel/)
