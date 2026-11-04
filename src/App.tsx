@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Languages, Moon, Store, Sun, Boxes, ClipboardList, FileText, LayoutDashboard, PackageCheck, Settings2, ShoppingCart, Truck, Warehouse as WarehouseIcon } from 'lucide-react'
+import { Archive, Languages, Moon, Store, Sun, Boxes, ClipboardList, FileText, LayoutDashboard, PackageCheck, Settings2, ShoppingCart, Truck, Warehouse as WarehouseIcon } from 'lucide-react'
 import { flowCounts } from './domain/calc'
 import { useApp, useHash } from './ui/app-context'
 import { Logo, Modal } from './ui/kit'
@@ -15,6 +15,7 @@ import { InvoiceDetail, Invoices } from './screens/Invoices'
 import { Stock } from './screens/Stock'
 import { Admin } from './screens/Admin'
 import { Driver } from './screens/Driver'
+import { Archive as ArchiveScreen } from './screens/Archive'
 import { getLanguage, setLanguage, tx } from './i18n'
 
 // Twee gescheiden processen, elk met eigen menu-optie en eigen stappen.
@@ -95,6 +96,7 @@ export function App({ onResetDemo, onSignOut }: { onResetDemo?: () => Promise<vo
               const F = FLOWS[k], Icon = F.icon
               return <a key={k} href={`#${F.home}`} className={flow === k ? 'on flow-link' : 'flow-link'}><Icon size={16} />{tx(F.label)}</a>
             })}
+            <a href="#archief" className={screen === 'archief' ? 'on' : ''}><Archive size={16} />{tx("Archief")}</a>
             <a href="#voorraad" className={screen === 'voorraad' ? 'on' : ''}><Boxes size={16} />{tx("Voorraad")}</a>
             <a href="#beheer" className={screen === 'beheer' ? 'on' : ''}><Settings2 size={16} />{tx("Beheer")}</a>
             <button className="btn-toggle" onClick={switchLanguage}><Languages size={16} />{language === 'nl' ? 'English' : 'Nederlands'}</button>
@@ -145,8 +147,9 @@ function Route({ screen, param }: { screen: string; param: string }) {
       if (param === 'nieuw') return <OrderForm />
       if (param.startsWith('wijzig-')) return <OrderForm id={param.slice(7)} />
       return param ? <OrderDetail id={param} /> : <Orders />
-    case 'levering': return param ? <DeliveryNote id={param} /> : <Deliveries />
-    case 'facturatie': return param ? <InvoiceDetail id={param} /> : <Invoices />
+    case 'levering': return param.startsWith('print-') ? <DeliveryNote key={param} id={param.slice(6)} autoPrint /> : param ? <DeliveryNote key={param} id={param} /> : <Deliveries />
+    case 'facturatie': return param.startsWith('print-') ? <InvoiceDetail key={param} id={param.slice(6)} autoPrint /> : param ? <InvoiceDetail key={param} id={param} /> : <Invoices />
+    case 'archief': return <ArchiveScreen />
     case 'voorraad': return <Stock />
     case 'beheer': return <Admin />
     default: return (

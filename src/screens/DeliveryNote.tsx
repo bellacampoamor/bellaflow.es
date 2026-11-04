@@ -3,7 +3,7 @@ import { Printer } from 'lucide-react'
 import type { Language } from '../data/types'
 import { documentLanguage } from '../domain/calc'
 import { markNotePrinted } from '../domain/services'
-import { go, useApp } from '../ui/app-context'
+import { go, useApp, useAutoPrint } from '../ui/app-context'
 import { fmtDate, Head, Modal, Pill } from '../ui/kit'
 import { tx } from '../i18n'
 
@@ -13,10 +13,11 @@ export const NOTE_TEXT: Record<Language, Record<string, string>> = {
   en: { title: 'Delivery note', date: 'Delivery date', order: 'Order', ref: 'Your reference', to: 'Deliver to', bill: 'Customer', tel: 'Tel.', part: 'Part delivery', of: 'of', code: 'Item', prod: 'Product', opts: 'Finish', pkg: 'Packages', qty: 'Qty', from: 'Warehouse', notes: 'Instructions', floor: 'Floor', lift: 'Lift', assembly: 'Assembly', remove: 'Remove old furniture', yes: 'yes', no: 'no', confirm: 'The customer confirms receipt of the listed products in good condition.', remarks: 'Remarks on receipt', name: 'Name', sign: 'Customer signature', when: 'Date and time', stop: 'Stop' },
 }
 
-export function DeliveryNote({ id }: { id: string }) {
+export function DeliveryNote({ id, autoPrint = false }: { id: string; autoPrint?: boolean }) {
   const { s, run } = useApp()
-  const [confirmed, setConfirmed] = useState(false)
+  const [confirmed, setConfirmed] = useState(autoPrint)
   const d = s.deliveries.find((x) => x.id === id)
+  useAutoPrint(autoPrint, !!d)
   if (!d) return <div className="panel">{tx("Levering niet gevonden.")} <a href="#levering">{tx("Terug naar de planning")}</a>.</div>
   const o = s.sales_orders.find((x) => x.id === d.sales_order_id)!
   const c = s.customers.find((x) => x.id === o.customer_id)!

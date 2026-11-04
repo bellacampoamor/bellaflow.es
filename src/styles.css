@@ -331,3 +331,6 @@ body.route-dragging, body.route-dragging * { cursor: grabbing !important; user-s
 .drv-signed { display: grid; gap: 8px; justify-items: start; }
 .drv-signed img, .note-signature img { display: block; max-width: 100%; height: 110px; background: #fff; border: 1px solid var(--line); border-radius: 6px; }
 .note-signature { display: grid; gap: 8px; margin-top: 18px; break-inside: avoid; }
+
+/* Archief */
+.print-icons { display: flex; gap: 6px; flex-wrap: nowrap; }

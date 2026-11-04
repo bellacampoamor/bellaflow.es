@@ -3,7 +3,7 @@ import { FileText } from 'lucide-react'
 import type { Language, Payment } from '../data/types'
 import { deliveryValue, depositAvailable, documentLanguage, invoiceBalance, invoiceState, todayISO, uninvoicedDeliveries, vatBreakdown } from '../domain/calc'
 import { ensureProformas, invoiceProformas, payInvoice } from '../domain/services'
-import { go, useApp } from '../ui/app-context'
+import { go, useApp, useAutoPrint } from '../ui/app-context'
 import { Empty, eur, fmtDate, Head, Modal, NumberField, Pill, SelectField, Tabs, TextField } from '../ui/kit'
 import { tx } from '../i18n'
 
@@ -101,9 +101,10 @@ const T: Record<Language, Record<string, string>> = {
   en: { title: 'Invoice', deelfactuur: 'Partial invoice', eindfactuur: 'Final invoice', volledig: 'Invoice', date: 'Date', due: 'Due date', order: 'Order', to: 'Bill to', desc: 'Description', qty: 'Qty', price: 'Price', disc: 'Disc.', total: 'Total', base: 'Tax base', vat: 'IVA', deposit: 'Advance applied', paid: 'Paid', due_amt: 'Amount due', pay: 'Pay by bank transfer to', tax: 'Tax ID' },
 }
 
-export function InvoiceDetail({ id }: { id: string }) {
+export function InvoiceDetail({ id, autoPrint = false }: { id: string; autoPrint?: boolean }) {
   const { s, run } = useApp()
   const inv = s.invoices.find((i) => i.id === id)
+  useAutoPrint(autoPrint, !!inv)
   const [pay, setPay] = useState(false)
   const [amount, setAmount] = useState(() => (inv ? invoiceBalance(s, inv) : 0))
   const [method, setMethod] = useState<Payment['method']>('overboeking')

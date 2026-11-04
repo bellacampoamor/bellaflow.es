@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { loadSnapshot } from '../src/data/driver'
 import { LocalDriver } from '../src/data/localDriver'
 import { TABLES } from '../src/data/types'
-import { openLinesOnTransport, linePurchaseStatus, linesToPurchase, documentLanguage, flowCounts, freeAt, transportLoad, invoiceBalance, onHandMap, orderStage, orderTab, reservedMap, stockKey, vatBreakdown } from '../src/domain/calc'
+import { archiveRows, openLinesOnTransport, linePurchaseStatus, linesToPurchase, documentLanguage, flowCounts, freeAt, transportLoad, invoiceBalance, onHandMap, orderStage, orderTab, reservedMap, stockKey, vatBreakdown } from '../src/domain/calc'
 import { renameOldSuppliers, restoreSuppliers, seedDemo } from '../src/domain/demo'
 import {
   createDelivery, createInvoice, createOrder, createPurchaseOrder, invoiceProformas, lineFromProduct, markDelivered, assignShipmentsToTransport, cancelTransport, convertLinesToPurchaseOrders, createTransport, markReady, receiveGoods, rescheduleDelivery, rescheduleOrder, saveRouteOrder, saveSettings, setPurchaseLabel, signDelivery, splitLinesForStock, setDeliveryInTransit, setShipmentWarehouse, setTransportStatus, updateTransport, transferStock,
@@ -177,6 +177,21 @@ describe('afgeleverde levering', () => {
     await deliver(d)
     await expect(setDeliveryInTransit(db, d)).rejects.toThrow()
     await expect(rescheduleDelivery(db, d, { new_date: '2026-12-01', reason: '', customer_notified: false })).rejects.toThrow()
+  })
+})
+
+describe('archief', () => {
+  it('toont per levering wat compleet is en wat nog gefactureerd moet worden', async () => {
+    let s = await loadSnapshot(db)
+    const lucia = s.sales_orders.find((o) => o.number === 'VO-2026-0002')!
+    expect(archiveRows(s).find((r) => r.order.id === lucia.id)).toMatchObject({ complete: false, invoice: null })
+    expect(archiveRows(s).some((r) => r.order.number === 'VO-2026-0003')).toBe(false)
+    const row = archiveRows(s).find((r) => r.order.id === lucia.id)!
+    const [inv] = await invoiceProformas(db, { delivery_ids: [row.delivery.id], invoice_date: TODAY })
+    s = await loadSnapshot(db)
+    const done = archiveRows(s).find((r) => r.order.id === lucia.id)!
+    expect(done.complete).toBe(true)
+    expect(done.invoice?.id).toBe(inv)
   })
 })
 
