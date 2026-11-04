@@ -6,6 +6,7 @@ import { LocalDriver } from './data/localDriver'
 import { createSupabase, SupabaseDriver } from './data/supabaseDriver'
 import { seedDemo } from './domain/demo'
 import { AppProvider } from './ui/app-context'
+import { LogoFull } from './ui/kit'
 import './styles.css'
 
 const Loading = () => <div className="wrap" style={{ paddingBlock: 40 }}>Gegevens laden…</div>
@@ -49,7 +50,7 @@ function SupabaseRoot({ sb }: { sb: SupabaseClient }) {
     return (
       <div className="wrap login">
         <form className="panel" onSubmit={login}>
-          <div className="brand"><b>BELLA</b><i>FLOW</i></div>
+          <div className="brand"><LogoFull /></div>
           <div className="field"><label htmlFor="login-email">E-mailadres</label><input id="login-email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} /></div>
           <div className="field"><label htmlFor="login-pass">Wachtwoord</label><input id="login-pass" type="password" required value={password} onChange={(e) => setPassword(e.target.value)} /></div>
           {error && <div className="note bad">{error}</div>}

@@ -1,6 +1,7 @@
 node_modules
 dist
 dist-preview
+dist-login
 .env
 .env.local
 *.log

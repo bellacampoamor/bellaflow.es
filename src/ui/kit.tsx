@@ -2,6 +2,17 @@
 import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react'
 import { X } from 'lucide-react'
 
+const brandFile = (name: string) => `${import.meta.env.BASE_URL}assets/brand/${name}`
+
+/** Op smalle schermen het compacte logo. */
+export const Logo = () => (
+  <picture>
+    <source media="(max-width: 520px)" srcSet={brandFile('bellaflow-logo-small.png')} />
+    <img className="logo" src={brandFile('bellaflow-logo-medium.png')} width={800} height={147} alt="Bella Flow" />
+  </picture>
+)
+export const LogoFull = () => <img className="logo-full" src={brandFile('bellaflow-logo-full-tagline.png')} width={2400} height={502} alt="Bella Flow" />
+
 export const eur = (n: number) => new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' }).format(n || 0)
 export const fmtDate = (iso?: string | null) => {
   if (!iso) return '–'

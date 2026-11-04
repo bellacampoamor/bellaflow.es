@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Boxes, ClipboardList, FileText, LayoutDashboard, PackageCheck, Settings2, ShoppingCart, Truck, Warehouse as WarehouseIcon } from 'lucide-react'
 import { flowCounts } from './domain/calc'
 import { useApp, useHash } from './ui/app-context'
-import { Modal } from './ui/kit'
+import { Logo, Modal } from './ui/kit'
 import { Overview } from './screens/Overview'
 import { PurchaseDetail, PurchaseForm, Purchases } from './screens/Purchases'
 import { Inbound } from './screens/Inbound'
@@ -44,7 +44,7 @@ export function App({ onResetDemo, onSignOut }: { onResetDemo?: () => Promise<vo
       )}
       <header className="top wrap">
         <div className="inner top-row">
-          <a className="brand" href="#overzicht" aria-label="Bella Flow, naar overzicht"><b>BELLA</b><i>FLOW</i></a>
+          <a className="brand" href="#overzicht" aria-label="Bella Flow, naar overzicht"><Logo /></a>
           <nav className="util" aria-label="Algemeen">
             <a href="#overzicht" className={screen === 'overzicht' ? 'on' : ''}><LayoutDashboard size={16} />Overzicht</a>
             <a href="#voorraad" className={screen === 'voorraad' ? 'on' : ''}><Boxes size={16} />Voorraad</a>
