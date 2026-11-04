@@ -395,3 +395,9 @@ revoke execute on function next_number(text, integer) from public;
 grant execute on function next_number(text, integer) to authenticated;
 
 insert into settings (id) values ('default');
+
+-- De drie locaties van Bella Outdoor and Furnishing.
+insert into warehouses (code, name, kind, city) values
+  ('SHR-CAM', 'Showroom Campoamor', 'winkel', 'Campoamor'),
+  ('MAG-CAM', 'Magazijn Campoamor', 'magazijn', 'Campoamor'),
+  ('MAG-ALM', 'Magazijn Almoradí', 'magazijn', 'Almoradí');

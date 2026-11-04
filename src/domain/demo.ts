@@ -21,9 +21,9 @@ export async function seedDemo(db: Driver, today = todayISO()) {
   const wh = (code: string, name: string, kind: Warehouse['kind'], city: string, receives = true): Warehouse => ({
     id: newId(), code, name, kind, address: '', postal_code: '', city, phone: '', contact_name: '', receives_goods: receives, ships_goods: true, is_active: true,
   })
-  const shop = wh('WNK', 'Winkel Campoamor', 'winkel', 'Campoamor')
-  const north = wh('MAG-1', 'Magazijn Torrevieja', 'magazijn', 'Torrevieja')
-  const south = wh('MAG-2', 'Magazijn San Javier', 'magazijn', 'San Javier')
+  const shop = wh('SHR-CAM', 'Showroom Campoamor', 'winkel', 'Campoamor')
+  const north = wh('MAG-CAM', 'Magazijn Campoamor', 'magazijn', 'Campoamor')
+  const south = wh('MAG-ALM', 'Magazijn Almoradí', 'magazijn', 'Almoradí')
   await db.insert('warehouses', [shop, north, south])
 
   const sup = (name: string, city: string, lead: number): Supplier => ({

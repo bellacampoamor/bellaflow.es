@@ -84,7 +84,7 @@ export function Admin() {
         <button className="btn primary" onClick={async () => { if (need(wh.code && wh.name, 'Vul een code en een naam in.') && await run((db) => saveRecord(db, 'warehouses', wh as Warehouse), 'Magazijn opgeslagen')) setWh(null) }}>Opslaan</button>
       </>}>
         <div className="form-grid">
-          <TextField label="Code" value={wh.code} onChange={(v) => setWh({ ...wh, code: v })} placeholder="MAG-3" />
+          <TextField label="Code" value={wh.code} onChange={(v) => setWh({ ...wh, code: v })} placeholder="MAG-CAM" />
           <TextField className="span-2" label="Naam" value={wh.name} onChange={(v) => setWh({ ...wh, name: v })} />
           <SelectField label="Soort" value={wh.kind} onChange={(v) => setWh({ ...wh, kind: v })} options={[{ value: 'winkel', label: 'Winkel' }, { value: 'magazijn', label: 'Magazijn' }, { value: 'extern', label: 'Externe opslag' }]} />
           <TextField className="span-2" label="Adres" value={wh.address} onChange={(v) => setWh({ ...wh, address: v })} />

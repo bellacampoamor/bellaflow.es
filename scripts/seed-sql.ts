@@ -8,7 +8,7 @@ const lit = (v: unknown): string => {
 
 /** Zet een snapshot om naar INSERT-regels. De factuurbewaking staat tijdens het laden uit. */
 export function toSeedSql(s: Snapshot) {
-  const out = ['delete from settings;', 'alter table invoices disable trigger invoices_guard;']
+  const out = ['delete from settings;', 'delete from warehouses;', 'alter table invoices disable trigger invoices_guard;']
   for (const t of TABLES) {
     for (const row of s[t] as unknown as Record<string, unknown>[]) {
       const cols = Object.keys(row)
