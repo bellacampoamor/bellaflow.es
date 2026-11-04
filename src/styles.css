@@ -249,7 +249,18 @@ td input.price { width: 104px; }
 
 /* Routeplanning */
 .route-bar { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; justify-content: space-between; background: var(--surface-2); border-radius: 8px; padding: 9px 12px; margin-bottom: 8px; font-size: .9rem; }
-.stop { display: grid; grid-template-columns: 32px minmax(0, 1fr); gap: 10px; align-items: start; border-bottom: 1px solid var(--line); padding: 10px 0; }
+.stop { position: relative; display: grid; grid-template-columns: 32px minmax(0, 1fr); gap: 10px; align-items: start; border-bottom: 1px solid var(--line); padding: 10px 14px; margin-inline: -14px; border-radius: 8px; background: var(--surface); }
+@media (hover: hover) {
+  .stop { cursor: grab; }
+  .stop:hover { background: var(--surface-2); }
+  .stop:hover .stop-grip { opacity: 1; }
+}
+.stop-grip { position: absolute; left: 0; top: 0; bottom: 0; width: 16px; display: grid; place-items: center; color: var(--muted); opacity: 0; cursor: grab; touch-action: none; }
+@media (hover: none) { .stop-grip { opacity: 1; } }
+.stop.shifting { transition: transform .16s ease; }
+.stop.dragging { z-index: 5; transition: none; cursor: grabbing; background: var(--surface); box-shadow: 0 10px 28px rgb(0 0 0 / .22); }
+.stop.dragging .stop-grip { opacity: 1; }
+body.route-dragging, body.route-dragging * { cursor: grabbing !important; user-select: none; }
 .stop:last-child { border-bottom: 0; }
 .stop .task { border: 0; padding: 0; }
 .stop-nr { display: flex; flex-direction: column; align-items: center; gap: 2px; }

@@ -75,3 +75,16 @@ export function googleMapsRouteUrl(origin: Point, stops: Point[]) {
   if (stops.length) q.set('waypoints', stops.map(ll).join('|'))
   return `https://www.google.com/maps/dir/?${q.toString()}`
 }
+
+/** Zet één element op een nieuwe plek in de lijst. */
+export function moveItem<T>(items: T[], from: number, to: number): T[] {
+  const next = [...items]
+  const [item] = next.splice(from, 1)
+  next.splice(to, 0, item)
+  return next
+}
+
+/** Nieuwe plek van een gesleepte rij: het aantal andere rijen waarvan het midden boven het midden van de gesleepte rij ligt. */
+export function dropIndex(midpoints: number[], from: number, draggedMid: number) {
+  return midpoints.filter((m, i) => i !== from && m < draggedMid).length
+}

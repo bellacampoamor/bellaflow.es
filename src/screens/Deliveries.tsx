@@ -1,15 +1,16 @@
 import { useState } from 'react'
-import { CalendarClock, Check as CheckIcon, ChevronDown, ChevronUp, ClipboardCheck, FileText, Map as MapIcon, Route, Truck } from 'lucide-react'
+import { CalendarClock, Check as CheckIcon, ChevronDown, ChevronUp, ClipboardCheck, FileText, GripVertical, Map as MapIcon, Route, Truck } from 'lucide-react'
 import { geocodeAddress, travelMatrix, type TravelMatrix } from '../data/geo'
 import type { Delivery, SalesOrder } from '../data/types'
 import { deliveryIsOpen, invoicesOnDelivery, isPartialDelivery, onHandMap, stockKey, todayISO } from '../domain/calc'
 import { googleMapsRouteUrl, MAPS_MAX_WAYPOINTS, optimizeRoute, tourCost, type Point } from '../domain/route'
 import { cancelDelivery, markDelivered, markReady, rescheduleDelivery, saveRouteOrder, setDeliveryInTransit, setOrderCoordinates } from '../domain/services'
 import { go, useApp } from '../ui/app-context'
+import { useRouteDrag } from '../ui/useRouteDrag'
 import { Check, Empty, fmtDate, fmtShort, Head, Modal, Pill, Tabs, TextField } from '../ui/kit'
 import { tx } from '../i18n'
 
-const METHOD = { meenemen: 'Klant haalt op', vervoerder: 'Vervoerder', eigen_team: 'Eigen team' }
+const METHOD = { meenemen: 'Klant haalt op', vervoerder: 'Vervoerder' }
 const coords = (o: SalesOrder): Point | null => (o.delivery_latitude != null && o.delivery_longitude != null ? { latitude: o.delivery_latitude, longitude: o.delivery_longitude } : null)/** Rekenresultaat per dag; de matrix blijft bewaard zodat handmatig schuiven de totalen bijwerkt. */
 
 /** Rekenresultaat per dag; de matrix blijft bewaard zodat handmatig schuiven de totalen bijwerkt. */
@@ -36,6 +37,8 @@ export function Deliveries() {
 
   const byPosition = (a: Delivery, b: Delivery) => (a.route_position ?? 999) - (b.route_position ?? 999) || a.number.localeCompare(b.number)
   const dayStops = (day: string) => planning.filter((d) => d.planned_date === day && d.method === 'eigen_team').sort(byPosition)
+
+  const { begin, rowState } = useRouteDrag((_day, ids) => run((db) => saveRouteOrder(db, ids)))
 
   const calculate = async (day: string) => {
     if (!originPoint) return toast(tx("Stel onder Beheer een magazijn met coördinaten in als vertrekpunt."), true)
@@ -87,7 +90,7 @@ export function Deliveries() {
   }
   const hours = (m: number) => (m >= 60 ? tx("{0} u {1} min", Math.floor(m / 60), m % 60) : tx("{0} min", m))
 
-  const renderCard = (d: Delivery, position?: { day: string; nr: number; last: boolean }) => {
+  const renderCard = (d: Delivery, position?: { day: string; index: number; ids: string[] }) => {
     const o = orderOf(d)
     const c = s.customers.find((x) => x.id === o.customer_id)!
     const lines = s.delivery_lines.filter((l) => l.delivery_id === d.id)
@@ -101,7 +104,10 @@ export function Deliveries() {
             {d.status !== 'planned' && needsNote && !d.note_printed_at && <Pill tone="warn">{tx("Bon nog niet afgedrukt")}</Pill>}
           </div>
           <div className="small">{c.company || c.name}{o.fulfilment !== 'meenemen' ? `, ${o.delivery_address}, ${o.delivery_city}` : ''}{o.delivery_phone ? `, ${o.delivery_phone}` : ''}</div>
-          <div className="muted small">{tx(METHOD[d.method])}{d.carrier && d.carrier !== METHOD[d.method] ? ` (${d.carrier})` : ''}{d.time_slot ? `, ${d.time_slot}` : ''}{o.needs_assembly ? tx(", montage") : ''}{o.floor ? `, ${o.floor}` : ''}{o.has_elevator ? tx(", lift") : ''}</div>
+          <div className="muted small">{[
+            d.method !== 'eigen_team' ? tx(METHOD[d.method]) + (d.carrier && d.carrier !== METHOD[d.method] ? ` (${d.carrier})` : '') : '',
+            d.time_slot, o.needs_assembly ? tx("montage") : '', o.floor, o.has_elevator ? tx("lift") : '',
+          ].filter(Boolean).join(', ')}</div>
           <div className="small" style={{ marginTop: 5 }}>{lines.map((l) => {
             const sol = s.sales_order_lines.find((x) => x.id === l.sales_order_line_id)!
             const have = hand.get(stockKey(sol.product_id, l.warehouse_id)) ?? 0
@@ -128,12 +134,15 @@ export function Deliveries() {
       </div>
     )
     if (!position) return <div key={d.id}>{card}</div>
+    const { day, index, ids } = position
+    const row = rowState(day, d.id, index)
     return (
-      <div className="stop" key={d.id}>
+      <div className={`stop${row.dragging ? ' dragging' : ''}${row.active ? ' shifting' : ''}`} key={d.id} style={row.active ? { transform: `translateY(${row.y}px)` } : undefined} onPointerDown={(e) => begin(e, day, d.id, ids)}>
+        {ids.length > 1 && <span className="stop-grip" title={tx("Sleep om de volgorde in de route te wijzigen")} aria-hidden="true"><GripVertical size={16} /></span>}
         <div className="stop-nr">
-          <button className="btn icon" aria-label={tx("{0} eerder in de route", d.number)} disabled={position.nr === 1} onClick={() => shift(position.day, d.id, -1)}><ChevronUp size={16} /></button>
-          <b>{position.nr}</b>
-          <button className="btn icon" aria-label={tx("{0} later in de route", d.number)} disabled={position.last} onClick={() => shift(position.day, d.id, 1)}><ChevronDown size={16} /></button>
+          <button className="btn icon" aria-label={tx("{0} eerder in de route", d.number)} disabled={index === 0} onClick={() => shift(day, d.id, -1)}><ChevronUp size={16} /></button>
+          <b>{row.nr}</b>
+          <button className="btn icon" aria-label={tx("{0} later in de route", d.number)} disabled={index === ids.length - 1} onClick={() => shift(day, d.id, 1)}><ChevronDown size={16} /></button>
         </div>
         {card}
       </div>
@@ -158,7 +167,7 @@ export function Deliveries() {
               {stops.length > 0 && (
                 <div className="route-bar">
                   <div>
-                    <strong>{tx("Eigen team:")} {stops.length} {stops.length === 1 ? 'stop' : 'stops'}</strong>{tx(", heen en terug vanaf")} {origin?.name ?? tx("magazijn (nog in te stellen)")}
+                    <strong>{tx("Bezorgroute:")} {stops.length} {stops.length === 1 ? 'stop' : 'stops'}</strong>{tx(", heen en terug vanaf")} {origin?.name ?? tx("magazijn (nog in te stellen)")}
                     {sum && <div className="small">{sum.km} {tx("km,")} {hours(sum.min)} {tx("rijden")}{sum.source === 'schatting' ? tx(", geschat: de routeservice was niet bereikbaar") : ''}{tx(". Tijd bij de klant niet meegerekend.")}</div>}
                     {positioned && stops.some((d) => d.time_slot) && <div className="small muted">{tx("De volgorde houdt geen rekening met tijdvakken.")}</div>}
                   </div>
@@ -168,7 +177,7 @@ export function Deliveries() {
                   </div>
                 </div>
               )}
-              {stops.map((d, i) => renderCard(d, { day, nr: i + 1, last: i === stops.length - 1 }))}
+              <div className="stops">{stops.map((d, i) => renderCard(d, { day, index: i, ids: stops.map((x) => x.id) }))}</div>
               {others.map((d) => renderCard(d))}
             </section>
           )

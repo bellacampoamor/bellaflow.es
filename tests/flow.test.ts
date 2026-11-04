@@ -10,7 +10,7 @@ import {
   createDelivery, createInvoice, createOrder, createPurchaseOrder, lineFromProduct, markDelivered, assignShipmentsToTransport, cancelTransport, convertLinesToPurchaseOrders, createTransport, markReady, receiveGoods, rescheduleDelivery, rescheduleOrder, saveRouteOrder, saveSettings, setPurchaseLabel, splitLinesForStock, setDeliveryInTransit, setShipmentWarehouse, setTransportStatus, updateTransport, transferStock,
 } from '../src/domain/services'
 import { estimateMatrix, parseRouterTable } from '../src/data/geo'
-import { googleMapsRouteUrl, optimizeRoute, tourCost } from '../src/domain/route'
+import { dropIndex, googleMapsRouteUrl, moveItem, optimizeRoute, tourCost } from '../src/domain/route'
 import { en } from '../src/i18n.en'
 import { toSeedSql } from '../scripts/seed-sql'
 
@@ -150,6 +150,18 @@ describe('van inkoop tot factuur', () => {
     for (const v of onHandMap(s).values()) expect(v).toBeGreaterThanOrEqual(0)
     const c = flowCounts(s, TODAY)
     for (const key of ['inkoop', 'inkomend', 'ontvangst', 'orders', 'levering', 'facturatie'] as const) expect(c[key], key).toBeGreaterThan(0)
+  })
+})
+
+describe('rijvolgorde slepen', () => {
+  it('bepaalt de nieuwe plek en behoudt de andere volgorde', () => {
+    const mids = [100, 200, 300, 400]
+    expect(dropIndex(mids, 0, 250)).toBe(1)
+    expect(dropIndex(mids, 0, 450)).toBe(3)
+    expect(dropIndex(mids, 3, 50)).toBe(0)
+    expect(dropIndex(mids, 2, 310)).toBe(2)
+    expect(moveItem(['a', 'b', 'c', 'd'], 0, 2)).toEqual(['b', 'c', 'a', 'd'])
+    expect(moveItem(['a', 'b', 'c', 'd'], 3, 0)).toEqual(['d', 'a', 'b', 'c'])
   })
 })
 

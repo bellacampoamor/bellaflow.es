@@ -309,14 +309,14 @@ export function PlanDeliveryModal({ order, onClose }: { order: SalesOrder; onClo
     <Modal wide title={isPartial ? tx("Deellevering plannen") : tx("Levering plannen")} onClose={onClose} footer={<>
       <button className="btn" onClick={onClose}>{tx("Annuleren")}</button>
       <button className="btn primary" onClick={async () => {
-        if (await run((db) => createDelivery(db, { sales_order_id: order.id, method, planned_date: date, time_slot: slot, carrier, notes, lines: Object.entries(qty).map(([sales_order_line_id, q]) => ({ sales_order_line_id, qty: q })) }), tx("Levering gepland"))) onClose()
+        if (await run((db) => createDelivery(db, { sales_order_id: order.id, method, planned_date: date, time_slot: slot, carrier: method === 'vervoerder' ? carrier : '', notes, lines: Object.entries(qty).map(([sales_order_line_id, q]) => ({ sales_order_line_id, qty: q })) }), tx("Levering gepland"))) onClose()
       }}>{tx("Levering plannen")}</button>
     </>}>
       <div className="form-grid">
         <TextField label={tx("Leverdatum")} type="date" value={date} onChange={setDate} />
-        <SelectField label={tx("Wijze")} value={method} onChange={setMethod} options={[{ value: 'eigen_team', label: tx("Eigen team") }, { value: 'vervoerder', label: tx("Vervoerder") }, { value: 'meenemen', label: tx("Klant haalt op") }]} />
+        <SelectField label={tx("Wijze")} value={method} onChange={setMethod} options={[{ value: 'eigen_team', label: tx("Bezorgen door eigen team") }, { value: 'vervoerder', label: tx("Vervoerder") }, { value: 'meenemen', label: tx("Klant haalt op") }]} />
         <TextField label={tx("Tijdvak")} value={slot} onChange={setSlot} placeholder="09:00-12:00" />
-        <TextField label={method === 'eigen_team' ? tx("Team of chauffeur") : tx("Vervoerder")} value={carrier} onChange={setCarrier} />
+        {method === 'vervoerder' && <TextField label={tx("Vervoerder")} value={carrier} onChange={setCarrier} />}
       </div>
       <div className="table-wrap flush"><table>
         <thead><tr><th>{tx("Product")}</th><th>{tx("Uit magazijn")}</th><th className="num">{tx("Aanwezig")}</th><th className="num">{tx("Open")}</th><th>{tx("Mee in deze levering")}</th></tr></thead>
