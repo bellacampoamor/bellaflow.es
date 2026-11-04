@@ -1,6 +1,6 @@
-// Verstuurt één mail uit email_outbox via Brevo. De ontvangers komen uit de database, niet uit het verzoek,
+// Verstuurt één mail uit email_outbox via Resend. De ontvangers komen uit de database, niet uit het verzoek,
 // zodat deze functie niet als open mailserver te gebruiken is.
-// Instellen: supabase secrets set BREVO_API_KEY=...  Het winkeladres moet in Brevo een geverifieerde afzender zijn.
+// Instellen: supabase secrets set RESEND_API_KEY=...  Het domein van het winkeladres moet in Resend geverifieerd zijn.
 import { createClient } from 'npm:@supabase/supabase-js@2'
 
 const CORS = {
@@ -28,21 +28,21 @@ Deno.serve(async (req) => {
   const { data: settings } = await db.from('settings').select('company_name, shop_email').limit(1).single()
   if (!settings?.shop_email) return reply(400, { error: 'Stel onder Beheer het winkel e-mailadres in.' })
 
-  const res = await fetch('https://api.brevo.com/v3/smtp/email', {
+  const res = await fetch('https://api.resend.com/emails', {
     method: 'POST',
-    headers: { 'api-key': Deno.env.get('BREVO_API_KEY')!, 'Content-Type': 'application/json' },
+    headers: { Authorization: `Bearer ${Deno.env.get('RESEND_API_KEY')!}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      sender: { email: settings.shop_email, name: settings.company_name },
-      replyTo: { email: settings.shop_email },
-      to: [{ email: mail.to_email }],
-      ...(mail.bcc_email ? { bcc: [{ email: mail.bcc_email }] } : {}),
+      from: `${settings.company_name} <${settings.shop_email}>`,
+      reply_to: settings.shop_email,
+      to: [mail.to_email],
+      ...(mail.bcc_email ? { bcc: [mail.bcc_email] } : {}),
       subject: mail.subject,
-      textContent: mail.body_text,
-      ...(file ? { attachment: [{ name: file.file_name, content: file.content_base64 }] } : {}),
+      text: mail.body_text,
+      ...(file ? { attachments: [{ filename: file.file_name, content: file.content_base64 }] } : {}),
     }),
   })
   if (!res.ok) {
-    const error = `Brevo ${res.status}: ${await res.text()}`
+    const error = `Resend ${res.status}: ${await res.text()}`
     await db.from('email_outbox').update({ status: 'failed', error }).eq('id', id)
     return reply(502, { error })
   }

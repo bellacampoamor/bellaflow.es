@@ -76,5 +76,5 @@ Schermen praten alleen met `services` en `calc`, nooit rechtstreeks met de opsla
 De browserversie met voorbeeldgegevens verstuurt nooit mail. Voor echte mail op Supabase:
 
 1. `supabase functions deploy send-email`
-2. `supabase secrets set BREVO_API_KEY=...`
-3. Verifieer het winkeladres (Beheer) in Brevo als afzender.
+2. `supabase secrets set RESEND_API_KEY=...`
+3. Verifieer het domein van het winkeladres (Beheer) in Resend.
