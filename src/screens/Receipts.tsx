@@ -146,8 +146,7 @@ export function ReceiptForm({ transportId }: { transportId: string }) {
     <>
       <Head title={tx("Ontvangst {0}", transport.number)} sub={tx("Verwacht op {0}.", fmtDate(transport.arrival_date))} back={{ href: '#ontvangst', label: tx("Goederenontvangst") }} />
       <TransportPicker value={transportId} />
-      <SignalList transportId={transportId} />
-      {rows.length === 0 && <div className="note">{tx("Alles op dit transport is al ontvangen.")}</div>}
+      {rows.length === 0 && <><div className="note" style={{ marginBottom: 16 }}>{tx("Alles op dit transport is al ontvangen.")}</div><SignalList transportId={transportId} /></>}
       {rows.length > 0 && <div className="stack">
         <section className="panel">
           <h2>{tx("Goederenontvangst")}</h2>
@@ -179,6 +178,7 @@ export function ReceiptForm({ transportId }: { transportId: string }) {
             {missing > 0 && tx(" {0} stuks niet ontvangen, die blijven open staan.", missing)}
           </div>
         </section>
+        <SignalList transportId={transportId} />
         <section className="panel"><AreaField label={tx("Opmerkingen")} value={notes} onChange={setNotes} /></section>
         <div className="sticky-save">
           <a className="btn" href="#ontvangst">{tx("Annuleren")}</a>
