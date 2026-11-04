@@ -103,7 +103,7 @@ export interface Invoice {
   base_amount: number; vat_amount: number; total: number; deposit_settled: number; language: Language
 }
 export interface InvoiceLine {
-  id: string; invoice_id: string; delivery_line_id: string | null; description: string; qty: number
+  id: string; invoice_id: string; delivery_line_id: string | null; article_number: string; description: string; qty: number
   unit_price: number; discount_pct: number; vat_rate: number; line_total: number
 }
 export interface Payment {

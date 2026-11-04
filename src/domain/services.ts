@@ -592,7 +592,7 @@ export async function createInvoice(db: Driver, input: { sales_order_id: string;
   const lines: InvoiceLine[] = dls.map((dl) => {
     const l = s.sales_order_lines.find((x) => x.id === dl.sales_order_line_id)!
     return {
-      id: newId(), invoice_id: id, delivery_line_id: dl.id,
+      id: newId(), invoice_id: id, delivery_line_id: dl.id, article_number: s.products.find((p) => p.id === l.product_id)?.sku ?? '',
       description: l.options ? `${l.description} (${l.options})` : l.description,
       qty: dl.qty, unit_price: l.unit_price, discount_pct: l.discount_pct, vat_rate: l.vat_rate,
       line_total: lineTotal({ ...l, qty: dl.qty }),

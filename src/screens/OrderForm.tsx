@@ -5,7 +5,7 @@ import { inboundByProduct, lineTotal, onHandMap, plannedQty, reservedMap, round2
 import { createOrder, lineFromProduct, saveRecord, splitLinesForStock, updateOrder, type OrderHeader, type OrderLineInput } from '../domain/services'
 import { loadSnapshot } from '../data/driver'
 import { go, useApp } from '../ui/app-context'
-import { AreaField, Check, Combo, Empty, eur, Field, Head, Modal, NumberField, SelectField, TextField } from '../ui/kit'
+import { AreaField, Check, Combo, Empty, eur, Field, Head, Modal, NumberField, SelectField, TextField, Sku } from '../ui/kit'
 import { tx } from '../i18n'
 
 type Line = OrderLineInput & { key: number }
@@ -153,6 +153,7 @@ export function OrderForm({ id }: { id?: string }) {
                 const others = l.product_id ? warehouses.filter((w) => w.id !== l.warehouse_id && freeAt(l.product_id, w.id) > 0) : []
                 return (
                   <div key={l.key} style={{ borderBottom: '1px solid var(--line)', paddingBottom: 14 }}>
+                    {l.product_id && <div className="small" style={{ marginBottom: 4 }}><span className="muted">{tx("Artikelnummer")}: </span><Sku code={s.products.find((p) => p.id === l.product_id)?.sku} /></div>}
                     <div className="form-grid">
                       <Field className="span-2" label={tx("Product")}>{(fid) => <Combo id={fid} value={l.product_id} options={prodOptions} placeholder={tx("Zoek op naam of artikelnummer")} onChange={(v) => pickProduct(l.key, v)} />}</Field>
                       <TextField label={tx("Uitvoering")} value={l.options} onChange={(v) => patch(l.key, { options: v })} placeholder={tx("Stof, kleur, afwerking")} />

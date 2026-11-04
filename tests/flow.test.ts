@@ -259,6 +259,15 @@ describe('mail van de getekende afleverbon', () => {
   })
 })
 
+describe('artikelnummer', () => {
+  it('gaat vast mee op de factuurregel', async () => {
+    const s = await loadSnapshot(db)
+    const lines = s.invoice_lines.filter((l) => l.delivery_line_id)
+    expect(lines.length).toBeGreaterThan(0)
+    for (const l of lines) expect(l.article_number).toMatch(/\S/)
+  })
+})
+
 describe('taal van documenten', () => {
   it('volgt de keuze onder Beheer en anders de klant', () => {
     expect(documentLanguage('klant', 'es')).toBe('es')

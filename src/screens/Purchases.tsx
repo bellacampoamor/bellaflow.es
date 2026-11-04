@@ -5,7 +5,7 @@ import { assignShipmentsToTransport, cancelPurchaseOrder, createPurchaseOrder, s
 import type { PurchaseLabel } from '../data/types'
 import { tx } from '../i18n'
 import { go, useApp } from '../ui/app-context'
-import { AreaField, Combo, Empty, eur, fmtDate, Head, Modal, Pill, SelectField, Tabs, TextField, type Tone } from '../ui/kit'
+import { AreaField, Combo, Empty, eur, fmtDate, Head, Modal, Pill, SelectField, Sku, Tabs, TextField, type Tone } from '../ui/kit'
 import { PurchaseQueue } from './PurchaseQueue'
 
 type Snap = ReturnType<typeof useApp>['s']
@@ -100,7 +100,7 @@ export function PurchaseDetail({ id }: { id: string }) {
               const open = shipmentIsOpen(x) && po.status === 'open'
               return (
                 <tr key={l.id}>
-                  <td className="strong">{s.products.find((p) => p.id === l.product_id)?.name}</td>
+                  <td className="strong">{s.products.find((p) => p.id === l.product_id)?.name}<Sku code={s.products.find((p) => p.id === l.product_id)?.sku} /></td>
                   <td>{so ? <a className="rowlink" href={`#orders-${so.id}`}>{so.number}</a> : <span className="muted">{tx("Voorraad")}</span>}</td>
                   <td className="num">{l.qty}</td><td className="num">{eur(l.unit_cost)}</td><td className="num">{eur(l.qty * l.unit_cost)}</td>
                   <td>{open && (!t || t.status === 'planned')
@@ -190,7 +190,7 @@ export function PurchaseForm({ orderId }: { orderId?: string } = {}) {
                 const so = l.sales_order_line_id && s.sales_orders.find((o) => o.id === s.sales_order_lines.find((x) => x.id === l.sales_order_line_id)?.sales_order_id)
                 return (
                   <tr key={l.key}>
-                    <td><Combo value={l.product_id} options={products} placeholder={tx("Zoek op naam of artikelnummer")} onChange={(v) => patchLine(l.key, { product_id: v, unit_cost: s.products.find((p) => p.id === v)?.purchase_price ?? 0 })} /></td>
+                    <td><Combo value={l.product_id} options={products} placeholder={tx("Zoek op naam of artikelnummer")} onChange={(v) => patchLine(l.key, { product_id: v, unit_cost: s.products.find((p) => p.id === v)?.purchase_price ?? 0 })} /><Sku code={s.products.find((p) => p.id === l.product_id)?.sku} /></td>
                     <td className="muted">{so ? so.number : tx("Voorraad")}</td>
                     <td className="num"><input className="qty" aria-label={tx("Aantal")} type="number" min={1} value={l.qty} onChange={(e) => patchLine(l.key, { qty: Number(e.target.value) })} /></td>
                     <td className="num"><input className="price" aria-label={tx("Inkoopprijs")} type="number" step="0.01" min={0} value={l.unit_cost} onChange={(e) => patchLine(l.key, { unit_cost: Number(e.target.value) })} /></td>

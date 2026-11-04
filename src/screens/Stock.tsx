@@ -3,7 +3,7 @@ import { ArrowLeftRight, SlidersHorizontal } from 'lucide-react'
 import { onHandMap, reservedMap, stockKey, todayISO } from '../domain/calc'
 import { correctStock, transferStock } from '../domain/services'
 import { useApp } from '../ui/app-context'
-import { Combo, Empty, Field, fmtDate, Head, Modal, NumberField, Pill, SelectField, Tabs, TextField } from '../ui/kit'
+import { Combo, Empty, Field, fmtDate, Head, Modal, NumberField, Pill, SelectField, Sku, Tabs, TextField } from '../ui/kit'
 import { tx } from '../i18n'
 
 export function Stock() {
@@ -65,7 +65,7 @@ export function Stock() {
         {tab === 'moves' && (moves.length === 0 ? <Empty>{tx("Nog geen mutaties.")}</Empty> : <div className="table-wrap"><table>
           <thead><tr><th>{tx("Datum")}</th><th>{tx("Product")}</th><th>{tx("Locatie")}</th><th>{tx("Soort")}</th><th>{tx("Bron")}</th><th className="num">{tx("Aantal")}</th></tr></thead>
           <tbody>{moves.map((m) => (
-            <tr key={m.id}><td>{fmtDate(m.moved_at)}</td><td>{s.products.find((p) => p.id === m.product_id)?.name}</td><td>{s.warehouses.find((w) => w.id === m.warehouse_id)?.name}</td><td>{m.kind === 'overboeking' ? tx("Verhuizing") : tx(m.kind[0].toUpperCase() + m.kind.slice(1))}</td><td className="muted">{m.ref_id || m.note || '–'}</td><td className="num strong" style={{ color: m.qty < 0 ? 'var(--bad)' : 'var(--good)' }}>{m.qty > 0 ? '+' : ''}{m.qty}</td></tr>
+            <tr key={m.id}><td>{fmtDate(m.moved_at)}</td><td>{s.products.find((p) => p.id === m.product_id)?.name}<Sku code={s.products.find((p) => p.id === m.product_id)?.sku} /></td><td>{s.warehouses.find((w) => w.id === m.warehouse_id)?.name}</td><td>{m.kind === 'overboeking' ? tx("Verhuizing") : tx(m.kind[0].toUpperCase() + m.kind.slice(1))}</td><td className="muted">{m.ref_id || m.note || '–'}</td><td className="num strong" style={{ color: m.qty < 0 ? 'var(--bad)' : 'var(--good)' }}>{m.qty > 0 ? '+' : ''}{m.qty}</td></tr>
           ))}</tbody>
         </table></div>)}
       </section>

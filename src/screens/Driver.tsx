@@ -1,12 +1,12 @@
 import { useRef, useState } from 'react'
 import { ArrowLeft, Check as CheckIcon, ChevronLeft, ChevronRight, Map as MapIcon, Phone } from 'lucide-react'
 import type { Delivery } from '../data/types'
-import { addDays, documentLanguage, todayISO } from '../domain/calc'
+import { addDays, articleNo, documentLanguage, todayISO } from '../domain/calc'
 import { NOTE_TEXT } from '../domain/noteText'
 import { googleMapsRouteUrl, MAPS_MAX_WAYPOINTS, type Point } from '../domain/route'
 import { signDelivery } from '../domain/services'
 import { go, useApp } from '../ui/app-context'
-import { Empty, fmtDate, fmtShort, Pill } from '../ui/kit'
+import { Empty, fmtDate, fmtShort, Pill, Sku } from '../ui/kit'
 import { SignaturePad, type SignaturePadHandle } from '../ui/SignaturePad'
 import { tx } from '../i18n'
 
@@ -99,7 +99,7 @@ function DriverStop({ id }: { id: string }) {
           {o.delivery_phone && <div><a className="drv-tel" href={`tel:${o.delivery_phone.replace(/\s/g, '')}`}><Phone size={15} />{o.delivery_phone}</a></div>}
         </div>
         <ul className="drv-lines">{lines.map((l) => (
-          <li key={l.id}><b>{l.qty} ×</b><span>{l.sol.description}{l.sol.options && <span className="muted small"><br />{l.sol.options}</span>}</span></li>
+          <li key={l.id}><b>{l.qty} ×</b><span>{l.sol.description}<Sku code={articleNo(s, l.sol.product_id)} />{l.sol.options && <span className="muted small"><br />{l.sol.options}</span>}</span></li>
         ))}</ul>
         <div className="note-box" style={{ margin: 0 }}>
           {t.floor}: {o.floor || '–'}, {t.lift}: {o.has_elevator ? t.yes : t.no}, {t.assembly}: {o.needs_assembly ? t.yes : t.no}, {t.remove}: {o.remove_old_furniture ? t.yes : t.no}

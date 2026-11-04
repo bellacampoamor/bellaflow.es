@@ -335,3 +335,8 @@ body.route-dragging, body.route-dragging * { cursor: grabbing !important; user-s
 /* Archief */
 .print-icons { display: flex; gap: 6px; flex-wrap: nowrap; }
 .mail-state { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; margin-top: 4px; }
+
+/* Artikelnummer */
+.sku { display: block; color: var(--muted); font-size: .78rem; font-weight: 400; font-variant-numeric: tabular-nums; letter-spacing: .01em; }
+.sku.inline, .inline-sku .sku { display: inline; margin-left: 6px; }
+.small > .sku { display: inline; }

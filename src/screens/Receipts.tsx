@@ -1,10 +1,10 @@
 import { useState } from 'react'
 import { PackageCheck, Split, Trash2 } from 'lucide-react'
-import { openLinesOnTransport, shipmentLineOpen, todayISO } from '../domain/calc'
+import { articleNo, openLinesOnTransport, shipmentLineOpen, todayISO } from '../domain/calc'
 import { receiveGoods } from '../domain/services'
 import { tx } from '../i18n'
 import { go, useApp } from '../ui/app-context'
-import { AreaField, Empty, fmtDate, Head, Pill } from '../ui/kit'
+import { AreaField, Empty, fmtDate, Head, Pill, Sku } from '../ui/kit'
 
 function TransportPicker({ value }: { value: string }) {
   const { s } = useApp()
@@ -28,7 +28,7 @@ function SignalList({ transportId }: { transportId: string }) {
     const sol = s.sales_order_lines.find((y) => y.id === pol.sales_order_line_id)
     const so = sol && s.sales_orders.find((o) => o.id === sol.sales_order_id)
     return {
-      id: l.id, qty: l.qty, po: s.purchase_orders.find((p) => p.id === pol.purchase_order_id)!, product: s.products.find((p) => p.id === pol.product_id)?.name,
+      id: l.id, qty: l.qty, po: s.purchase_orders.find((p) => p.id === pol.purchase_order_id)!, product: s.products.find((p) => p.id === pol.product_id)?.name, sku: articleNo(s, pol.product_id),
       sol, so, customer: so && s.customers.find((c) => c.id === so.customer_id), destination: s.warehouses.find((w) => w.id === x.warehouse_id)?.name, status: x.status,
     }
   })).sort((a, b) => a.po.number.localeCompare(b.po.number))
@@ -46,9 +46,9 @@ function SignalList({ transportId }: { transportId: string }) {
         </thead>
         <tbody>{lines.map((l) => (
           <tr key={l.id}>
-            <td><a className="rowlink" href={`#inkoop-${l.po.id}`}>{l.po.number}</a></td><td>{fmtDate(l.po.order_date)}</td><td className="strong">{l.product}</td><td className="num">{l.qty}</td>
+            <td><a className="rowlink" href={`#inkoop-${l.po.id}`}>{l.po.number}</a></td><td>{fmtDate(l.po.order_date)}</td><td className="strong">{l.product}<Sku code={l.sku} /></td><td className="num">{l.qty}</td>
             {l.so ? <>
-              <td className="sold"><a className="rowlink" href={`#orders-${l.so.id}`}>{l.so.number}</a></td><td>{fmtDate(l.so.order_date)}</td><td>{l.sol!.description}{l.sol!.options && <div className="muted small">{l.sol!.options}</div>}</td><td className="num">{l.sol!.qty}</td>
+              <td className="sold"><a className="rowlink" href={`#orders-${l.so.id}`}>{l.so.number}</a></td><td>{fmtDate(l.so.order_date)}</td><td>{l.sol!.description}<Sku code={articleNo(s, l.sol!.product_id)} />{l.sol!.options && <div className="muted small">{l.sol!.options}</div>}</td><td className="num">{l.sol!.qty}</td>
               <td>{l.customer?.company || l.customer?.name}</td><td>{l.customer?.city}</td>
             </> : <td className="sold muted" colSpan={6}>{tx("Niet verkocht, voor {0}", l.destination)}</td>}
             <td>{l.status === 'received' ? <Pill tone="good">{tx("Binnen")}</Pill> : l.status === 'closed' ? <Pill>{tx("Afgesloten")}</Pill> : l.status === 'partial' ? <Pill tone="warn">{tx("Niet compleet")}</Pill> : <Pill tone="info">{tx("Verwacht")}</Pill>}</td>
@@ -160,7 +160,7 @@ export function ReceiptForm({ transportId }: { transportId: string }) {
               const so = sol && s.sales_orders.find((o) => o.id === sol.sales_order_id)
               return (
                 <tr key={r.key}>
-                  <td>{first ? <><span className="strong">{p.name}</span>{so && <div className="small"><Pill tone="sell">{tx("Voor {0}", so.number)}</Pill></div>}</> : <span className="muted small">{tx("zelfde product")}</span>}</td>
+                  <td>{first ? <><span className="strong">{p.name}</span><Sku code={p.sku} />{so && <div className="small"><Pill tone="sell">{tx("Voor {0}", so.number)}</Pill></div>}</> : <span className="muted small">{tx("zelfde product")}</span>}</td>
                   <td className="muted">{first ? po.number : ''}</td>
                   <td className="num">{first ? shipmentLineOpen(s, r.shipment_line_id) : ''}</td>
                   <td><select aria-label={tx("Magazijn voor {0}", p.name)} value={r.warehouse_id} onChange={(e) => patch(r.key, { warehouse_id: e.target.value })}>{warehouses.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}</select></td>

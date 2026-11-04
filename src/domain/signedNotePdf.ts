@@ -64,7 +64,8 @@ export async function signedNotePdf(s: Snapshot, deliveryId: string) {
   y -= 6
   for (const l of s.delivery_lines.filter((x) => x.delivery_id === d.id)) {
     const sol = s.sales_order_lines.find((x) => x.id === l.sales_order_line_id)!
-    put(`${l.qty} x  ${sol.description}${sol.options ? ` (${sol.options})` : ''}`)
+    const sku = s.products.find((p) => p.id === sol.product_id)?.sku
+    put(`${l.qty} x  ${sku ? `${sku}  ` : ''}${sol.description}${sol.options ? ` (${sol.options})` : ''}`)
   }
   y -= 14
   put(t.confirm, { font: bold })

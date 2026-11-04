@@ -1,10 +1,10 @@
 import { useMemo, useState } from 'react'
 import { CalendarClock, Copy, FileText, Pencil, Plus, Truck } from 'lucide-react'
 import type { Delivery, Payment, SalesOrder } from '../data/types'
-import { linePurchaseStatus, linesToPurchase, depositAvailable, depositPaid, invoiceBalance, lineTotal, onHandMap, orderLines, orderOutstanding, orderStage, orderTab, orderTotal, plannedQty, shippedQty, STAGE_LABEL, stockKey, todayISO, uninvoicedDeliveries, type OrderStage, type OrderTab } from '../domain/calc'
+import { articleNo, linePurchaseStatus, linesToPurchase, depositAvailable, depositPaid, invoiceBalance, lineTotal, onHandMap, orderLines, orderOutstanding, orderStage, orderTab, orderTotal, plannedQty, shippedQty, STAGE_LABEL, stockKey, todayISO, uninvoicedDeliveries, type OrderStage, type OrderTab } from '../domain/calc'
 import { addOrderPayment, cancelOrder, createDelivery, defaultMethod, rescheduleOrder, setLineWarehouse } from '../domain/services'
 import { go, useApp } from '../ui/app-context'
-import { Check, Empty, eur, fmtDate, Head, Modal, NumberField, Pill, SelectField, Tabs, TextField, type Tone } from '../ui/kit'
+import { Check, Empty, eur, fmtDate, Head, Modal, NumberField, Pill, SelectField, Sku, Tabs, TextField, type Tone } from '../ui/kit'
 import { tx } from '../i18n'
 
 export const stageTone: Record<OrderStage, Tone> = {
@@ -58,6 +58,7 @@ export function OrderDetail({ id }: { id: string }) {
   const { s, run } = useApp()
   const o = s.sales_orders.find((x) => x.id === id)
   const [modal, setModal] = useState<'date' | 'plan' | 'pay' | 'cancel' | null>(null)
+  const withSku = (l?: { product_id: string; description: string }) => `${articleNo(s, l?.product_id)} ${l?.description ?? ''}`.trim()
   if (!o) return <div className="panel">{tx("Verkooporder niet gevonden.")} <a href="#orders">{tx("Terug naar verkooporders")}</a>.</div>
   const c = s.customers.find((x) => x.id === o.customer_id)!
   const lines = orderLines(s, id)
@@ -83,7 +84,7 @@ export function OrderDetail({ id }: { id: string }) {
   const arrivals = onOrder.filter((l) => shippedQty(s, l.id) < l.qty && linePurchaseStatus(s, l.id).received < l.qty).map((l) => {
     const st = linePurchaseStatus(s, l.id)
     const next = st.shipments.filter((x) => x.transport_id && (x.status === 'expected' || x.status === 'partial')).sort((a, b) => a.expected_date.localeCompare(b.expected_date))[0]
-    return { id: l.id, qty: l.qty, description: l.description, bought: st.purchased >= l.qty, date: next?.expected_date, transport: s.transports.find((t) => t.id === next?.transport_id)?.number }
+    return { id: l.id, qty: l.qty, description: withSku(l), bought: st.purchased >= l.qty, date: next?.expected_date, transport: s.transports.find((t) => t.id === next?.transport_id)?.number }
   })
   const toPurchase = linesToPurchase(s).filter((l) => l.sales_order_id === id).length
   const plannable = lines.filter((l) => l.warehouse_id && l.qty - plannedQty(s, l.id) > 0)
@@ -121,7 +122,7 @@ export function OrderDetail({ id }: { id: string }) {
                 const here = l.warehouse_id ? hand.get(stockKey(l.product_id, l.warehouse_id)) ?? 0 : 0
                 return (
                   <tr key={l.id}>
-                    <td className="strong">{l.description}{l.take_now && <> <Pill tone="good">{tx("Meegenomen")}</Pill></>}{l.options && <div className="muted small" style={{ fontWeight: 400 }}>{l.options}</div>}</td>
+                    <td className="strong">{l.description}<Sku code={articleNo(s, l.product_id)} />{l.take_now && <> <Pill tone="good">{tx("Meegenomen")}</Pill></>}{l.options && <div className="muted small" style={{ fontWeight: 400 }}>{l.options}</div>}</td>
                     <td style={{ minWidth: 170 }}>
                       {!l.warehouse_id ? <Pill tone="warn">{tx("Op bestelling")}</Pill>
                         : open && unplanned ? (
@@ -154,7 +155,7 @@ export function OrderDetail({ id }: { id: string }) {
                   const next = st.shipments.filter((x) => x.transport_id && (x.status === 'expected' || x.status === 'partial')).sort((a, b) => a.expected_date.localeCompare(b.expected_date))[0]
                   return (
                     <tr key={l.id}>
-                      <td className="strong">{l.description}{l.options && <div className="muted small" style={{ fontWeight: 400 }}>{l.options}</div>}</td>
+                      <td className="strong">{l.description}<Sku code={articleNo(s, l.product_id)} />{l.options && <div className="muted small" style={{ fontWeight: 400 }}>{l.options}</div>}</td>
                       <td className="num">{l.qty}</td>
                       <td className="num" style={st.purchased < l.qty ? { color: 'var(--bad)', fontWeight: 600 } : undefined}>{st.purchased}</td>
                       <td className="num">{st.received}</td>
@@ -173,7 +174,7 @@ export function OrderDetail({ id }: { id: string }) {
             {deliveries.map((d) => (
               <a key={d.id} href={d.status === 'planned' || d.status === 'cancelled' || d.method === 'meenemen' ? '#levering' : `#levering-${d.id}`} className="task">
                 <div><div className="task-t">{d.number}{d.sequence > 1 || deliveries.length > 1 ? tx(", deellevering {0}", d.sequence) : ''}</div>
-                  <div className="muted small">{s.delivery_lines.filter((l) => l.delivery_id === d.id).map((l) => tx("{0} × {1}", l.qty, lines.find((x) => x.id === l.sales_order_line_id)?.description)).join(', ')}</div></div>
+                  <div className="muted small">{s.delivery_lines.filter((l) => l.delivery_id === d.id).map((l) => tx("{0} × {1}", l.qty, withSku(lines.find((x) => x.id === l.sales_order_line_id)))).join(', ')}</div></div>
                 <DeliveryPill d={d} />
               </a>
             ))}
@@ -263,7 +264,7 @@ export function RescheduleModal({ order, onClose }: { order: SalesOrder; onClose
   const c = s.customers.find((x) => x.id === order.customer_id)!
   const planned = s.deliveries.filter((d) => d.sales_order_id === order.id && (d.status === 'planned' || d.status === 'ready'))
   const delivered = s.deliveries.filter((d) => d.sales_order_id === order.id && d.status === 'delivered')
-  const remaining = orderLines(s, order.id).map((l) => ({ id: l.id, description: l.description, qty: l.qty - shippedQty(s, l.id) })).filter((r) => r.qty > 0)
+  const remaining = orderLines(s, order.id).map((l) => ({ id: l.id, description: `${articleNo(s, l.product_id)} ${l.description}`.trim(), qty: l.qty - shippedQty(s, l.id) })).filter((r) => r.qty > 0)
   const message = date ? DATE_MSG[c.language](c.name, order.number, fmtDate(date), reason) : ''
   const copy = async () => {
     try { await navigator.clipboard.writeText(message); toast(tx("Bericht gekopieerd")) } catch { toast(tx("Kopiëren lukte niet. Selecteer de tekst handmatig."), true) }
@@ -323,7 +324,7 @@ export function PlanDeliveryModal({ order, onClose }: { order: SalesOrder; onClo
           const here = l.warehouse_id ? hand.get(stockKey(l.product_id, l.warehouse_id)) ?? 0 : 0
           return (
             <tr key={l.id}>
-              <td>{l.description}</td>
+              <td>{l.description}<Sku code={articleNo(s, l.product_id)} /></td>
               <td>{l.warehouse_id ? s.warehouses.find((w) => w.id === l.warehouse_id)?.name : <Pill tone="warn">{tx("Nog niet binnen")}</Pill>}</td>
               <td className="num">{l.warehouse_id ? here : '–'}</td><td className="num">{open}</td>
               <td><input className="qty" aria-label={tx("Aantal {0}", l.description)} type="number" min={0} max={open} disabled={!l.warehouse_id} value={qty[l.id]} onChange={(e) => setQty((v) => ({ ...v, [l.id]: Number(e.target.value) }))} /></td>

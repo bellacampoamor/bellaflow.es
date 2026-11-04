@@ -165,3 +165,8 @@ export function Tabs<T extends string>({ tabs, value, onChange }: { tabs: { valu
 }
 
 export const Empty = ({ children }: { children: ReactNode }) => <div className="empty">{children}</div>
+
+/** Artikelnummer onder of naast een productnaam, overal hetzelfde. */
+export function Sku({ code }: { code?: string | null }) {
+  return code ? <span className="sku">{code}</span> : null
+}

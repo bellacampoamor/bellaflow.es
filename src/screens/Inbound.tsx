@@ -5,7 +5,7 @@ import { addDays, ordersAffectedByShipment, shipmentIsOpen, shipmentLoad, todayI
 import { assignShipmentsToTransport, cancelTransport, closeShipment, createTransport, setShipmentWarehouse, setTransportStatus, updateTransport, type TransportInput } from '../domain/services'
 import { tx } from '../i18n'
 import { useApp } from '../ui/app-context'
-import { AreaField, Empty, fmtDate, fmtShort, Head, Modal, NumberField, Pill, Tabs, TextField, type Tone } from '../ui/kit'
+import { AreaField, Empty, fmtDate, fmtShort, Head, Modal, NumberField, Pill, Sku, Tabs, TextField, type Tone } from '../ui/kit'
 import { LabelPill } from './Purchases'
 
 const DEFAULT_CAPACITY = 90
@@ -84,7 +84,7 @@ export function Inbound() {
                 return (
                   <tr key={x.id}>
                     <td><input type="checkbox" aria-label={tx("{0} aanvinken", i.product?.name)} checked={picked.has(x.id)} onChange={(e) => setPicked((v) => { const n = new Set(v); if (e.target.checked) n.add(x.id); else n.delete(x.id); return n })} /></td>
-                    <td><a className="rowlink" href={`#inkoop-${i.po.id}`}>{i.po.number}</a></td><td>{i.supplier}</td><td className="strong">{i.product?.name}</td><td className="num">{i.qty}</td><td className="num">{round1(shipmentLoad(s, x.id).m3)}</td>
+                    <td><a className="rowlink" href={`#inkoop-${i.po.id}`}>{i.po.number}</a></td><td>{i.supplier}</td><td className="strong">{i.product?.name}<Sku code={i.product?.sku} /></td><td className="num">{i.qty}</td><td className="num">{round1(shipmentLoad(s, x.id).m3)}</td>
                     <td>{i.salesOrder ? <a className="rowlink" href={`#orders-${i.salesOrder.id}`}>{i.salesOrder.number}</a> : <LabelPill label={i.po.label} />}</td>
                     <td>{destination(x, tx("Bestemming voor {0}", i.product?.name))}</td>
                   </tr>
@@ -137,7 +137,7 @@ export function Inbound() {
                   const isOpen = shipmentIsOpen(x)
                   return (
                     <tr key={x.id}>
-                      <td><a className="rowlink" href={`#inkoop-${i.po.id}`}>{i.po.number}</a></td><td>{i.supplier}</td><td className="strong">{i.product?.name}</td><td className="num">{i.qty}</td><td className="num">{round1(shipmentLoad(s, x.id).m3)}</td>
+                      <td><a className="rowlink" href={`#inkoop-${i.po.id}`}>{i.po.number}</a></td><td>{i.supplier}</td><td className="strong">{i.product?.name}<Sku code={i.product?.sku} /></td><td className="num">{i.qty}</td><td className="num">{round1(shipmentLoad(s, x.id).m3)}</td>
                       <td>{i.salesOrder ? <a className="rowlink" href={`#orders-${i.salesOrder.id}`}>{i.salesOrder.number}</a> : <LabelPill label={i.po.label} />}</td>
                       <td>{isOpen ? destination(x, tx("Bestemming voor {0}", i.product?.name)) : <>{s.warehouses.find((w) => w.id === x.warehouse_id)?.name} <Pill tone="good">{tx("Ontvangen")}</Pill></>}</td>
                       <td className="num">

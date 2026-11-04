@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { CalendarClock, ChevronDown, ChevronUp, ClipboardCheck, FileText, GripVertical, Map as MapIcon, PackageCheck, Route, Smartphone, Truck } from 'lucide-react'
 import { geocodeAddress, travelMatrix, type TravelMatrix } from '../data/geo'
 import type { Delivery, SalesOrder } from '../data/types'
-import { deliveryIsOpen, onHandMap, stockKey, todayISO } from '../domain/calc'
+import { articleNo, deliveryIsOpen, onHandMap, stockKey, todayISO } from '../domain/calc'
 import { googleMapsRouteUrl, MAPS_MAX_WAYPOINTS, optimizeRoute, tourCost, type Point } from '../domain/route'
 import { cancelDelivery, markDelivered, markReady, rescheduleDelivery, saveRouteOrder, setDeliveryInTransit, setOrderCoordinates } from '../domain/services'
 import { go, useApp } from '../ui/app-context'
@@ -114,7 +114,7 @@ export function Deliveries() {
           <div className="small" style={{ marginTop: 5 }}>{lines.map((l) => {
             const sol = s.sales_order_lines.find((x) => x.id === l.sales_order_line_id)!
             const have = hand.get(stockKey(sol.product_id, l.warehouse_id)) ?? 0
-            return <div key={l.id}>{l.qty} {tx("×")} {sol.description} <span className="muted">{tx("uit")} {s.warehouses.find((w) => w.id === l.warehouse_id)?.name}</span>{have < l.qty && <span style={{ color: 'var(--bad)' }}> {tx("(maar")} {have} {tx("aanwezig)")}</span>}</div>
+            return <div key={l.id}>{l.qty} {tx("×")} {sol.description} <span className="sku inline">{articleNo(s, sol.product_id)}</span> <span className="muted">{tx("uit")} {s.warehouses.find((w) => w.id === l.warehouse_id)?.name}</span>{have < l.qty && <span style={{ color: 'var(--bad)' }}> {tx("(maar")} {have} {tx("aanwezig)")}</span>}</div>
           })}</div>
           {notFound.includes(o.id) && (
             <div className="btn-row" style={{ marginTop: 6, alignItems: 'center' }}>
@@ -225,7 +225,7 @@ function PrepareModal({ d, onClose }: { d: Delivery; onClose: () => void }) {
         const sol = s.sales_order_lines.find((x) => x.id === l.sales_order_line_id)!
         const have = hand.get(stockKey(sol.product_id, l.warehouse_id)) ?? 0
         return <Check key={l.id} checked={!!checked[l.id]} onChange={(v) => setChecked((c) => ({ ...c, [l.id]: v }))}
-          label={tx("{0} × {1}{2}, {3}: {4} aanwezig", l.qty, sol.description, sol.options ? ` (${sol.options})` : '', s.warehouses.find((w) => w.id === l.warehouse_id)?.name, have)} />
+          label={tx("{0} × {1}{2}, {3}: {4} aanwezig", l.qty, `${articleNo(s, sol.product_id)} ${sol.description}`.trim(), sol.options ? ` (${sol.options})` : '', s.warehouses.find((w) => w.id === l.warehouse_id)?.name, have)} />
       })}</div>
       <TextField label={tx("Akkoord bevonden door")} value={approver} onChange={setApprover} />
     </Modal>

@@ -295,3 +295,6 @@ export function archiveRows(s: Snapshot): ArchiveRow[] {
     })
   }).sort((a, b) => b.order.number.localeCompare(a.order.number) || a.delivery.number.localeCompare(b.delivery.number))
 }
+
+/** Artikelnummer van een product; leeg als het product niet bestaat. */
+export const articleNo = (s: Snapshot, productId: string | null | undefined) => s.products.find((p) => p.id === productId)?.sku ?? ''

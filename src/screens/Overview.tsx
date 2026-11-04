@@ -1,6 +1,6 @@
-import { addDays, deliveryIsOpen, depositAvailable, deliveryValue, invoiceBalance, invoiceState, linesToPurchase, onHandMap, orderStage, reservedMap, openLinesOnTransport, STAGE_LABEL, stockKey, todayISO, uninvoicedDeliveries } from '../domain/calc'
+import { addDays, articleNo, deliveryIsOpen, depositAvailable, deliveryValue, invoiceBalance, invoiceState, linesToPurchase, onHandMap, orderStage, reservedMap, openLinesOnTransport, STAGE_LABEL, stockKey, todayISO, uninvoicedDeliveries } from '../domain/calc'
 import { useApp } from '../ui/app-context'
-import { Empty, eur, fmtDate, fmtShort, Head, Pill } from '../ui/kit'
+import { Empty, eur, fmtDate, fmtShort, Head, Pill, Sku } from '../ui/kit'
 import { Plus } from 'lucide-react'
 import { tx } from '../i18n'
 
@@ -102,13 +102,13 @@ export function Overview() {
           {toBuy.length === 0 && lowStock.length === 0 && <Empty>{tx("Niets om in te kopen.")}</Empty>}
           {toBuy.map((l) => (
             <a className="task" key={l.id} href="#inkoop-nieuw">
-              <div><div className="task-t">{l.qty} {tx("×")} {l.description}</div><div className="muted small">{tx("Voor")} {s.sales_orders.find((o) => o.id === l.sales_order_id)?.number}{l.options ? `, ${l.options}` : ''}</div></div>
+              <div><div className="task-t">{l.qty} {tx("×")} {l.description}<Sku code={articleNo(s, l.product_id)} /></div><div className="muted small">{tx("Voor")} {s.sales_orders.find((o) => o.id === l.sales_order_id)?.number}{l.options ? `, ${l.options}` : ''}</div></div>
               <Pill tone="warn">{tx("Op bestelling")}</Pill>
             </a>
           ))}
           {lowStock.map((p) => (
             <a className="task" key={p.id} href="#voorraad">
-              <div><div className="task-t">{p.name}</div><div className="muted small">{tx("Minimaal")} {p.min_stock} {tx("vrij op voorraad")}</div></div>
+              <div><div className="task-t">{p.name}<Sku code={p.sku} /></div><div className="muted small">{tx("Minimaal")} {p.min_stock} {tx("vrij op voorraad")}</div></div>
               <Pill>{tx("Onder minimum")}</Pill>
             </a>
           ))}

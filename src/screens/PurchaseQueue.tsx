@@ -1,10 +1,10 @@
 import { useMemo, useState } from 'react'
 import { ArrowRight } from 'lucide-react'
-import { linePurchaseStatus, linesToPurchase, round2, todayISO } from '../domain/calc'
+import { articleNo, linePurchaseStatus, linesToPurchase, round2, todayISO } from '../domain/calc'
 import { convertLinesToPurchaseOrders } from '../domain/services'
 import { tx } from '../i18n'
 import { useApp } from '../ui/app-context'
-import { Empty, eur, fmtDate, Modal, SelectField, TextField } from '../ui/kit'
+import { Empty, eur, fmtDate, Modal, SelectField, Sku, TextField } from '../ui/kit'
 
 /** Regels van verkooporders die nog ingekocht moeten worden, klaar om door te zetten naar een leverancier. */
 export function PurchaseQueue({ onDone }: { onDone: () => void }) {
@@ -70,7 +70,7 @@ export function PurchaseQueue({ onDone }: { onDone: () => void }) {
                 return (
                   <tr key={l.id}>
                     <td><input type="checkbox" aria-label={tx("{0} aanvinken", l.description)} checked={selected.has(l.id)} onChange={(e) => toggle([l.id], e.target.checked)} /></td>
-                    <td className="strong">{l.description}</td>
+                    <td className="strong">{l.description}<Sku code={articleNo(s, l.product_id)} /></td>
                     <td className="muted">{l.options || '–'}</td>
                     <td className="num">{l.qty}{bought > 0 && <div className="muted small">{tx("{0} al ingekocht", bought)}</div>}</td>
                     <td><select aria-label={tx("Leverancier voor {0}", l.description)} value={supplierFor(l)} onChange={(e) => setSuppliers((v) => ({ ...v, [l.id]: e.target.value }))}>

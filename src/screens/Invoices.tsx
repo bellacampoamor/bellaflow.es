@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { FileText } from 'lucide-react'
 import type { Language, Payment } from '../data/types'
-import { deliveryValue, depositAvailable, documentLanguage, invoiceBalance, invoiceState, todayISO, uninvoicedDeliveries, vatBreakdown } from '../domain/calc'
+import { articleNo, deliveryValue, depositAvailable, documentLanguage, invoiceBalance, invoiceState, todayISO, uninvoicedDeliveries, vatBreakdown } from '../domain/calc'
 import { ensureProformas, invoiceProformas, payInvoice } from '../domain/services'
 import { go, useApp, useAutoPrint } from '../ui/app-context'
 import { Empty, eur, fmtDate, Head, Modal, NumberField, Pill, SelectField, Tabs, TextField } from '../ui/kit'
@@ -96,9 +96,9 @@ function InvoiceProformasModal({ ids, onClose, onDone }: { ids: string[]; onClos
 }
 
 const T: Record<Language, Record<string, string>> = {
-  es: { title: 'Factura', deelfactuur: 'Factura parcial', eindfactuur: 'Factura final', volledig: 'Factura', date: 'Fecha', due: 'Vencimiento', order: 'Pedido', to: 'Facturar a', desc: 'Descripción', qty: 'Cant.', price: 'Precio', disc: 'Dto.', total: 'Total', base: 'Base imponible', vat: 'IVA', deposit: 'Anticipo aplicado', paid: 'Pagado', due_amt: 'Importe a pagar', pay: 'Pago por transferencia a', tax: 'NIF' },
-  nl: { title: 'Factuur', deelfactuur: 'Deelfactuur', eindfactuur: 'Eindfactuur', volledig: 'Factuur', date: 'Datum', due: 'Vervaldatum', order: 'Order', to: 'Factuur aan', desc: 'Omschrijving', qty: 'Aantal', price: 'Prijs', disc: 'Korting', total: 'Totaal', base: 'Grondslag', vat: 'IVA', deposit: 'Vooruitbetaling verrekend', paid: 'Betaald', due_amt: 'Te betalen', pay: 'Betaling per overboeking op', tax: 'NIF' },
-  en: { title: 'Invoice', deelfactuur: 'Partial invoice', eindfactuur: 'Final invoice', volledig: 'Invoice', date: 'Date', due: 'Due date', order: 'Order', to: 'Bill to', desc: 'Description', qty: 'Qty', price: 'Price', disc: 'Disc.', total: 'Total', base: 'Tax base', vat: 'IVA', deposit: 'Advance applied', paid: 'Paid', due_amt: 'Amount due', pay: 'Pay by bank transfer to', tax: 'Tax ID' },
+  es: { title: 'Factura', code: 'Referencia', deelfactuur: 'Factura parcial', eindfactuur: 'Factura final', volledig: 'Factura', date: 'Fecha', due: 'Vencimiento', order: 'Pedido', to: 'Facturar a', desc: 'Descripción', qty: 'Cant.', price: 'Precio', disc: 'Dto.', total: 'Total', base: 'Base imponible', vat: 'IVA', deposit: 'Anticipo aplicado', paid: 'Pagado', due_amt: 'Importe a pagar', pay: 'Pago por transferencia a', tax: 'NIF' },
+  nl: { title: 'Factuur', code: 'Artikelnummer', deelfactuur: 'Deelfactuur', eindfactuur: 'Eindfactuur', volledig: 'Factuur', date: 'Datum', due: 'Vervaldatum', order: 'Order', to: 'Factuur aan', desc: 'Omschrijving', qty: 'Aantal', price: 'Prijs', disc: 'Korting', total: 'Totaal', base: 'Grondslag', vat: 'IVA', deposit: 'Vooruitbetaling verrekend', paid: 'Betaald', due_amt: 'Te betalen', pay: 'Betaling per overboeking op', tax: 'NIF' },
+  en: { title: 'Invoice', code: 'Item no.', deelfactuur: 'Partial invoice', eindfactuur: 'Final invoice', volledig: 'Invoice', date: 'Date', due: 'Due date', order: 'Order', to: 'Bill to', desc: 'Description', qty: 'Qty', price: 'Price', disc: 'Disc.', total: 'Total', base: 'Tax base', vat: 'IVA', deposit: 'Advance applied', paid: 'Paid', due_amt: 'Amount due', pay: 'Pay by bank transfer to', tax: 'Tax ID' },
 }
 
 export function InvoiceDetail({ id, autoPrint = false }: { id: string; autoPrint?: boolean }) {
@@ -116,6 +116,8 @@ export function InvoiceDetail({ id, autoPrint = false }: { id: string; autoPrint
   const lines = s.invoice_lines.filter((l) => l.invoice_id === id)
   const co = s.settings[0]
   const t = T[documentLanguage(co.language_invoice, inv.language)]
+  // Facturen van voor het artikelnummer op de factuurregel
+  const articleOf = (dl: string | null) => articleNo(s, s.sales_order_lines.find((x) => x.id === s.delivery_lines.find((y) => y.id === dl)?.sales_order_line_id)?.product_id)
   const b = vatBreakdown(lines.map((l) => ({ total: l.line_total, vat_rate: l.vat_rate })))
   const paid = s.payments.filter((p) => p.invoice_id === id).reduce((n, p) => n + p.amount, 0)
   const balance = invoiceBalance(s, inv)
@@ -146,8 +148,8 @@ export function InvoiceDetail({ id, autoPrint = false }: { id: string; autoPrint
           <div className="small">{c.address}<br />{c.postal_code} {c.city}, {c.country}{c.tax_id && <><br />{t.tax}: {c.tax_id}</>}</div>
         </div>
         <div className="table-wrap flush"><table>
-          <thead><tr><th>{t.desc}</th><th className="num">{t.qty}</th><th className="num">{t.price}</th><th className="num">{t.disc}</th><th className="num">{t.vat}</th><th className="num">{t.total}</th></tr></thead>
-          <tbody>{lines.map((l) => <tr key={l.id}><td>{l.description}</td><td className="num">{l.qty}</td><td className="num">{eur(l.unit_price)}</td><td className="num">{l.discount_pct ? `${l.discount_pct}%` : ''}</td><td className="num">{l.vat_rate}%</td><td className="num">{eur(l.line_total)}</td></tr>)}</tbody>
+          <thead><tr><th>{t.code}</th><th>{t.desc}</th><th className="num">{t.qty}</th><th className="num">{t.price}</th><th className="num">{t.disc}</th><th className="num">{t.vat}</th><th className="num">{t.total}</th></tr></thead>
+          <tbody>{lines.map((l) => <tr key={l.id}><td>{l.article_number || articleOf(l.delivery_line_id)}</td><td>{l.description}</td><td className="num">{l.qty}</td><td className="num">{eur(l.unit_price)}</td><td className="num">{l.discount_pct ? `${l.discount_pct}%` : ''}</td><td className="num">{l.vat_rate}%</td><td className="num">{eur(l.line_total)}</td></tr>)}</tbody>
         </table></div>
         <div className="totals" style={{ marginTop: 18 }}>
           <div><span>{t.base}</span><span>{eur(inv.base_amount)}</span></div>
