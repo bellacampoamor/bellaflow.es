@@ -25,3 +25,5 @@ create table email_attachments (
 );
 alter table email_attachments enable row level security;
 create policy team_all on email_attachments for all to authenticated using (true) with check (true);
+grant select, insert, update, delete on email_outbox to authenticated;
+grant select, insert, update, delete on email_attachments to authenticated;
