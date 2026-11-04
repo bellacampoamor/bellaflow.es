@@ -294,7 +294,7 @@ body.route-dragging, body.route-dragging * { cursor: grabbing !important; user-s
 .util a.flow-link { color: var(--petrol); font-weight: 600; }
 .util a.flow-link.on { background: var(--primary); color: var(--on-primary); }
 .queue-head td { background: var(--surface-2); }
-.queue input[type="checkbox"] { width: 18px; min-height: 18px; height: 18px; accent-color: var(--ochre-strong); display: block; }
+.queue input[type="checkbox"] { min-width: 18px; width: 18px; min-height: 18px; height: 18px; accent-color: var(--ochre-strong); display: block; }
 .queue-bar { position: sticky; bottom: 0; display: flex; flex-wrap: wrap; gap: 10px; justify-content: space-between; align-items: center; background: var(--surface); padding-top: 12px; margin-top: 6px; border-top: 1px solid var(--line-strong); }
 @media (max-width: 600px) { .queue-bar { position: static; } }
 

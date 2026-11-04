@@ -34,7 +34,7 @@ export function Invoices() {
             </div>}
           </div>
           {proformas.length === 0 && <Empty>{tx("Er staan geen proforma's klaar.")}</Empty>}
-          {proformas.length > 0 && <div className="table-wrap"><table>
+          {proformas.length > 0 && <div className="table-wrap"><table className="queue">
             <thead><tr><th aria-label={tx("Aanvinken")} /><th>{tx("Proforma")}</th><th>{tx("Verkooporder")}</th><th>{tx("Klant")}</th><th>{tx("Levering")}</th><th>{tx("Geleverd")}</th><th className="num">{tx("Bedrag")}</th><th className="num">{tx("Te verrekenen")}</th></tr></thead>
             <tbody>{proformas.map(({ d, o, c }) => {
               const dep = depositAvailable(s, o.id)
