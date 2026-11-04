@@ -89,7 +89,7 @@ export function Receipts() {
           <h2>{tx("Eerdere ontvangsten")}</h2>
           {history.length === 0 && <Empty>{tx("Nog niets ontvangen.")}</Empty>}
           {history.length > 0 && <div className="table-wrap"><table>
-            <thead><tr><th>{tx("Nummer")}</th><th>{tx("Datum")}</th><th>{tx("Transport")}</th><th>{tx("Pakbon")}</th><th>{tx("Verdeling over locaties")}</th><th className="num">{tx("Goed")}</th><th className="num">{tx("Schade")}</th></tr></thead>
+            <thead><tr><th>{tx("Nummer")}</th><th>{tx("Datum")}</th><th>{tx("Transport")}</th><th>{tx("Pakbon")}</th><th>{tx("Verdeling over locaties")}</th><th className="num">{tx("Ontvangen")}</th></tr></thead>
             <tbody>{history.map((r) => {
               const lines = s.goods_receipt_lines.filter((l) => l.receipt_id === r.id)
               const perW = new Map<string, number>()
@@ -100,7 +100,6 @@ export function Receipts() {
                   <td>{s.transports.find((t) => t.id === r.transport_id)?.number ?? '–'}</td><td className="muted">{r.delivery_note || '–'}</td>
                   <td className="small">{[...perW].filter(([, n]) => n > 0).map(([w, n]) => tx("{0} op {1}", n, s.warehouses.find((y) => y.id === w)?.name)).join(', ')}{r.notes && <div className="muted">{r.notes}</div>}</td>
                   <td className="num">{lines.reduce((n, l) => n + l.qty_received, 0)}</td>
-                  <td className="num">{lines.reduce((n, l) => n + l.qty_damaged, 0) || <span className="zero">0</span>}</td>
                 </tr>
               )
             })}</tbody>
@@ -139,7 +138,9 @@ export function ReceiptForm({ transportId }: { transportId: string }) {
   }
   const totals = new Map<string, number>()
   for (const r of rows) totals.set(r.warehouse_id, (totals.get(r.warehouse_id) ?? 0) + r.qty_received)
-  const damaged = rows.reduce((n, r) => n + r.qty_damaged, 0)
+  const received = new Map<string, number>()
+  for (const r of rows) received.set(r.shipment_line_id, (received.get(r.shipment_line_id) ?? 0) + r.qty_received)
+  const missing = [...received].reduce((n, [id, got]) => n + Math.max(0, shipmentLineOpen(s, id) - got), 0)
   const save = async () => {
     const ok = await run((db) => receiveGoods(db, { transport_id: transportId, received_date: date, delivery_note: note, received_by: by, notes, rows: rows.map(({ key: _k, ...r }) => r) }), tx("Goederen ingeboekt, voorraad bijgewerkt"))
     if (ok) go('ontvangst')
@@ -161,9 +162,9 @@ export function ReceiptForm({ transportId }: { transportId: string }) {
         </section>
         <section className="panel">
           <h2>{tx("Wat is er binnengekomen?")}</h2>
-          <p className="muted small" style={{ marginTop: -6 }}>{tx("Ingevuld met alles op dit transport. Pas alleen aan wat afwijkt. Beschadigde stuks komen niet in de voorraad.")}</p>
+          <p className="muted small" style={{ marginTop: -6 }}>{tx("Vul per regel in wat er daadwerkelijk is ontvangen. Wat ontbreekt blijft open staan.")}</p>
           <div className="table-wrap"><table>
-            <thead><tr><th style={{ minWidth: 200 }}>{tx("Product")}</th><th>{tx("Inkooporder")}</th><th className="num">{tx("Aantal")}</th><th style={{ minWidth: 190 }}>{tx("Locatie")}</th><th>{tx("Goed")}</th><th>{tx("Schade")}</th><th>{tx("Plek in magazijn")}</th><th></th></tr></thead>
+            <thead><tr><th style={{ minWidth: 200 }}>{tx("Product")}</th><th>{tx("Inkooporder")}</th><th className="num">{tx("Besteld")}</th><th style={{ minWidth: 190 }}>{tx("Locatie")}</th><th>{tx("Ontvangen")}</th><th>{tx("Plek in magazijn")}</th><th></th></tr></thead>
             <tbody>{rows.map((r, i) => {
               const { p, pol, po } = lineInfo(r.shipment_line_id)
               const first = rows.findIndex((y) => y.shipment_line_id === r.shipment_line_id) === i
@@ -175,8 +176,7 @@ export function ReceiptForm({ transportId }: { transportId: string }) {
                   <td className="muted">{first ? po.number : ''}</td>
                   <td className="num">{first ? shipmentLineOpen(s, r.shipment_line_id) : ''}</td>
                   <td><select aria-label={tx("Magazijn voor {0}", p.name)} value={r.warehouse_id} onChange={(e) => patch(r.key, { warehouse_id: e.target.value })}>{warehouses.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}</select></td>
-                  <td><input className="qty" aria-label={tx("Goed ontvangen {0}", p.name)} type="number" min={0} value={r.qty_received} onChange={(e) => patch(r.key, { qty_received: Number(e.target.value) })} /></td>
-                  <td><input className="qty" aria-label={tx("Schade {0}", p.name)} type="number" min={0} value={r.qty_damaged} onChange={(e) => patch(r.key, { qty_damaged: Number(e.target.value) })} /></td>
+                  <td><input className="qty" aria-label={tx("Ontvangen {0}", p.name)} type="number" min={0} value={r.qty_received} onChange={(e) => patch(r.key, { qty_received: Number(e.target.value) })} /></td>
                   <td><input aria-label={tx("Locatie {0}", p.name)} value={r.location_bin} placeholder={tx("Bijv. A-12")} onChange={(e) => patch(r.key, { location_bin: e.target.value })} /></td>
                   <td style={{ whiteSpace: 'nowrap' }}>
                     <button className="btn sm" onClick={() => split(r)}><Split size={14} />{tx("Verdelen")}</button>
@@ -188,7 +188,7 @@ export function ReceiptForm({ transportId }: { transportId: string }) {
           </table></div>
           <div className="note" style={{ marginTop: 14 }}>
             {tx("Wordt ingeboekt:")} {[...totals].filter(([, n]) => n > 0).map(([w, n]) => tx("{0} op {1}", n, s.warehouses.find((y) => y.id === w)?.name)).join(', ') || tx("nog niets")}.
-            {damaged > 0 && tx(" {0} met schade, niet in voorraad.", damaged)}
+            {missing > 0 && tx(" {0} stuks niet ontvangen, die blijven open staan.", missing)}
           </div>
         </section>
         <section className="panel"><AreaField label={tx("Opmerkingen")} value={notes} onChange={setNotes} /></section>

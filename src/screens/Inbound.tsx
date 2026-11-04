@@ -167,7 +167,7 @@ export function Inbound() {
           <button className="btn" onClick={() => setClose(null)}>{tx("Annuleren")}</button>
           <button className="btn primary" onClick={async () => { if (await run((db) => closeShipment(db, close.id, reason), tx("Regel afgesloten"))) setClose(null) }}>{tx("Regel afsluiten")}</button>
         </>}>
-          <p style={{ margin: 0 }}>{tx("Wat nog open staat wordt niet meer verwacht, bijvoorbeeld na schade.")}</p>
+          <p style={{ margin: 0 }}>{tx("Wat nog open staat wordt niet meer verwacht.")}</p>
           <TextField label={tx("Reden")} value={reason} onChange={setReason} placeholder={tx("Bijvoorbeeld gecrediteerd door leverancier")} />
         </Modal>
       )}

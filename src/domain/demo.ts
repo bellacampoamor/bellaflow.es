@@ -133,12 +133,12 @@ export async function seedDemo(db: Driver, today = todayISO()) {
   })
   s = await loadSnapshot(db)
   await receiveGoods(db, {
-    transport_id: trSecond, received_date: d(-8), delivery_note: 'PB-45102', received_by: 'Magazijn', notes: 'Eén stoel met krasschade, gemeld bij leverancier',
+    transport_id: trSecond, received_date: d(-8), delivery_note: 'PB-45102', received_by: 'Magazijn', notes: 'Eén stoel niet ontvangen, gemeld bij leverancier',
     rows: linesOn(trSecond).flatMap((l) => {
       const isChair = pOf(l.id) === dining.id
       const good = isChair ? l.qty - 1 : l.qty
       return [
-        { shipment_line_id: l.id, warehouse_id: north.id, qty_received: Math.ceil(good / 2), qty_damaged: isChair ? 1 : 0, location_bin: 'B-03' },
+        { shipment_line_id: l.id, warehouse_id: north.id, qty_received: Math.ceil(good / 2), qty_damaged: 0, location_bin: 'B-03' },
         { shipment_line_id: l.id, warehouse_id: south.id, qty_received: Math.floor(good / 2), qty_damaged: 0, location_bin: 'C-01' },
       ]
     }),
