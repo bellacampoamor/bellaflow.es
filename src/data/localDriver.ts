@@ -1,5 +1,5 @@
 import type { Driver } from './driver'
-import { TABLES, type Snapshot, type TableName } from './types'
+import { TABLES, type EmailAttachment, type Snapshot, type TableName } from './types'
 
 const KEY = 'bella-flow-v1'
 
@@ -42,6 +42,8 @@ export class LocalDriver implements Driver {
     if (i >= 0) rows.splice(i, 1)
     this.save()
   }
+  // Voorbeeldgegevens in de browser: er gaat nooit echte mail de deur uit.
+  async sendEmail(_id: string, _attachment: EmailAttachment): Promise<'sent' | 'demo'> { return 'demo' }
   async nextNumber(series: string, year: number) {
     const id = `${series}-${year}`
     let row = this.data.number_series.find((r) => r.id === id)

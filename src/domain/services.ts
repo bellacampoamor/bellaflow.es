@@ -3,6 +3,7 @@ import { tx } from '../i18n'
 // zodat een geweigerde actie niets half achterlaat.
 import { loadSnapshot, newId, type Driver } from '../data/driver'
 import type {
+  EmailStatus, Language,
   Delivery, Fulfilment, InboundShipment, InvoiceLine, OrderType, Payment, Product, PurchaseLabel, SalesOrder, Settings,
   SalesOrderLine, Snapshot, StockMovement, TableName,
 } from '../data/types'
@@ -35,6 +36,7 @@ export async function saveSettings(db: Driver, patch: Partial<Settings>) {
   for (const field of PREFIX_FIELDS) {
     if (patch[field] !== undefined && !/^[A-Za-z0-9]{1,10}$/.test(patch[field] as string)) fail(tx("Een voorvoegsel bestaat uit 1 tot 10 letters of cijfers, zonder spaties of streepjes."))
   }
+  if (patch.shop_email && !isEmail(patch.shop_email)) fail(tx("Vul een geldig winkel e-mailadres in."))
   await db.update('settings', 'default', patch)
 }
 
@@ -513,6 +515,41 @@ export async function signDelivery(db: Driver, id: string, input: { signature: s
   if (d.status === 'planned') fail(tx("Deze levering is nog niet klaargezet."))
   await markDelivered(db, id, { date: input.date, signed_by: input.signed_by, signed_note_received: true })
   await db.update('deliveries', id, { signature_data: input.signature, signed_at: new Date().toISOString() })
+  return mailSignedNote(db, id)
+}
+
+const MAIL_TEXT: Record<Language, { subject: (n: string, c: string) => string; body: (name: string, n: string, c: string) => string }> = {
+  es: { subject: (n, c) => `Albarán de entrega firmado ${n}, ${c}`, body: (name, n, c) => `Estimado/a ${name}:\n\nAdjuntamos el albarán de entrega firmado ${n}.\n\nGracias por su compra.\n\n${c}` },
+  nl: { subject: (n, c) => `Getekende afleverbon ${n}, ${c}`, body: (name, n, c) => `Beste ${name},\n\nHierbij ontvangt u de getekende afleverbon ${n}.\n\nBedankt voor uw aankoop.\n\n${c}` },
+  en: { subject: (n, c) => `Signed delivery note ${n}, ${c}`, body: (name, n, c) => `Dear ${name},\n\nPlease find attached the signed delivery note ${n}.\n\nThank you for your purchase.\n\n${c}` },
+}
+const isEmail = (v: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim())
+
+/** Mailt de getekende bon naar de klant met een bcc naar de winkel. Een mislukte mail maakt de levering nooit ongedaan. */
+export async function mailSignedNote(db: Driver, deliveryId: string): Promise<EmailStatus> {
+  const s = await loadSnapshot(db)
+  const d = s.deliveries.find((x) => x.id === deliveryId) ?? (fail(tx("Levering niet gevonden.")) as never)
+  const o = s.sales_orders.find((x) => x.id === d.sales_order_id)!
+  const c = s.customers.find((x) => x.id === o.customer_id)!
+  const co = s.settings[0]
+  const to = isEmail(c.email ?? '') ? c.email.trim() : ''
+  const text = MAIL_TEXT[c.language]
+  const existing = s.email_outbox.find((m) => m.delivery_id === deliveryId)
+  const id = existing?.id ?? newId()
+  const status0: EmailStatus = to ? 'pending' : 'no_recipient'
+  const fields = { to_email: to, bcc_email: co?.shop_email?.trim() ?? '', status: status0, error: to ? '' : tx("Geen e-mailadres bekend bij de klant.") }
+  if (existing) await db.update('email_outbox', id, fields)
+  else await db.insert('email_outbox', [{ id, kind: 'getekende_afleverbon', delivery_id: deliveryId, subject: text.subject(d.number, co?.company_name ?? ''), body_text: text.body(c.name, d.number, co?.company_name ?? ''), created_at: new Date().toISOString(), sent_at: null, ...fields }])
+  if (!to) return 'no_recipient'
+  try {
+    const { signedNotePdf } = await import('./signedNotePdf')
+    const result = await db.sendEmail(id, await signedNotePdf(s, deliveryId))
+    await db.update('email_outbox', id, { status: result, error: '', sent_at: result === 'sent' ? new Date().toISOString() : null })
+    return result
+  } catch (e) {
+    await db.update('email_outbox', id, { status: 'failed', error: e instanceof Error ? e.message : String(e) })
+    return 'failed'
+  }
 }
 
 /** Leveringen van voor de proforma krijgen alsnog een nummer, zodat ze aangevinkt kunnen worden. */

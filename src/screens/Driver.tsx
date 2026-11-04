@@ -2,12 +2,12 @@ import { useRef, useState } from 'react'
 import { ArrowLeft, Check as CheckIcon, ChevronLeft, ChevronRight, Map as MapIcon, Phone } from 'lucide-react'
 import type { Delivery } from '../data/types'
 import { addDays, documentLanguage, todayISO } from '../domain/calc'
+import { NOTE_TEXT } from '../domain/noteText'
 import { googleMapsRouteUrl, MAPS_MAX_WAYPOINTS, type Point } from '../domain/route'
 import { signDelivery } from '../domain/services'
 import { go, useApp } from '../ui/app-context'
 import { Empty, fmtDate, fmtShort, Pill } from '../ui/kit'
 import { SignaturePad, type SignaturePadHandle } from '../ui/SignaturePad'
-import { NOTE_TEXT } from './DeliveryNote'
 import { tx } from '../i18n'
 
 const canSign = (d: Delivery) => d.status === 'ready' || d.status === 'in_transit'
@@ -66,7 +66,7 @@ function DriverRoute({ day, setDay }: { day: string; setDay: (d: string) => void
 }
 
 function DriverStop({ id }: { id: string }) {
-  const { s, run } = useApp()
+  const { s, run, toast } = useApp()
   const pad = useRef<SignaturePadHandle>(null)
   const [hasInk, setHasInk] = useState(false)
   const d = s.deliveries.find((x) => x.id === id)
@@ -79,7 +79,13 @@ function DriverStop({ id }: { id: string }) {
   const address = [o.delivery_address, o.delivery_postal_code, o.delivery_city].filter(Boolean).join(', ')
   const confirm = async () => {
     const signature = pad.current?.toDataUrl() ?? ''
-    if (await run((db) => signDelivery(db, id, { signature, signed_by: name, date: todayISO() }), tx("{0} is afgeleverd", d.number))) go('chauffeur')
+    let mail = ''
+    const ok = await run(async (db) => { mail = await signDelivery(db, id, { signature, signed_by: name, date: todayISO() }) })
+    if (!ok) return
+    if (mail === 'sent') toast(tx("{0} is afgeleverd en de bon is gemaild", d.number))
+    else if (mail === 'demo') toast(tx("{0} is afgeleverd. Voorbeeldgegevens: er is niets gemaild", d.number))
+    else toast(tx("{0} is afgeleverd, maar de bon is niet gemaild. Meld dit op kantoor", d.number), true)
+    go('chauffeur')
   }
   return (
     <>

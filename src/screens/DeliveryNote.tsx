@@ -1,17 +1,12 @@
 import { useState } from 'react'
 import { Printer } from 'lucide-react'
-import type { Language } from '../data/types'
 import { documentLanguage } from '../domain/calc'
+import { NOTE_TEXT } from '../domain/noteText'
 import { markNotePrinted } from '../domain/services'
 import { go, useApp, useAutoPrint } from '../ui/app-context'
 import { fmtDate, Head, Modal, Pill } from '../ui/kit'
 import { tx } from '../i18n'
 
-export const NOTE_TEXT: Record<Language, Record<string, string>> = {
-  es: { title: 'Albarán de entrega', date: 'Fecha de entrega', order: 'Pedido', ref: 'Su referencia', to: 'Entregar a', bill: 'Cliente', tel: 'Tel.', part: 'Entrega parcial', of: 'de', code: 'Referencia', prod: 'Producto', opts: 'Acabado', pkg: 'Bultos', qty: 'Cant.', from: 'Almacén', notes: 'Observaciones', floor: 'Planta', lift: 'Ascensor', assembly: 'Montaje', remove: 'Retirar muebles antiguos', yes: 'sí', no: 'no', confirm: 'El cliente declara haber recibido los productos indicados en buen estado.', remarks: 'Observaciones en la recepción', name: 'Nombre', sign: 'Firma del cliente', when: 'Fecha y hora', stop: 'Parada' },
-  nl: { title: 'Afleverbon', date: 'Leverdatum', order: 'Order', ref: 'Uw referentie', to: 'Afleveren bij', bill: 'Klant', tel: 'Tel.', part: 'Deellevering', of: 'van', code: 'Artikel', prod: 'Product', opts: 'Uitvoering', pkg: 'Colli', qty: 'Aantal', from: 'Magazijn', notes: 'Instructies', floor: 'Verdieping', lift: 'Lift', assembly: 'Montage', remove: 'Oude meubels meenemen', yes: 'ja', no: 'nee', confirm: 'De klant verklaart de genoemde producten in goede staat te hebben ontvangen.', remarks: 'Opmerkingen bij ontvangst', name: 'Naam', sign: 'Handtekening klant', when: 'Datum en tijd', stop: 'Stop' },
-  en: { title: 'Delivery note', date: 'Delivery date', order: 'Order', ref: 'Your reference', to: 'Deliver to', bill: 'Customer', tel: 'Tel.', part: 'Part delivery', of: 'of', code: 'Item', prod: 'Product', opts: 'Finish', pkg: 'Packages', qty: 'Qty', from: 'Warehouse', notes: 'Instructions', floor: 'Floor', lift: 'Lift', assembly: 'Assembly', remove: 'Remove old furniture', yes: 'yes', no: 'no', confirm: 'The customer confirms receipt of the listed products in good condition.', remarks: 'Remarks on receipt', name: 'Name', sign: 'Customer signature', when: 'Date and time', stop: 'Stop' },
-}
 
 export function DeliveryNote({ id, autoPrint = false }: { id: string; autoPrint?: boolean }) {
   const { s, run } = useApp()

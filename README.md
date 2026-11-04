@@ -70,3 +70,11 @@ Schermen praten alleen met `services` en `calc`, nooit rechtstreeks met de opsla
 - De app laadt alle tabellen in één keer. Dat past bij een winkel, maar vraagt om filters zodra er jaren aan data staan.
 - Adressen en rijtijden lopen nu via openbare diensten (Nominatim, OSRM) die niet voor productie bedoeld zijn. Vervang `src/data/geo.ts` door bijvoorbeeld Google Maps Platform voor live gebruik.
 - Creditfacturen, retouren en aanbetalingsfacturen ontbreken nog.
+
+## Mail van de getekende afleverbon
+
+De browserversie met voorbeeldgegevens verstuurt nooit mail. Voor echte mail op Supabase:
+
+1. `supabase functions deploy send-email`
+2. `supabase secrets set BREVO_API_KEY=...`
+3. Verifieer het winkeladres (Beheer) in Brevo als afzender.

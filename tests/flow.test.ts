@@ -1,5 +1,7 @@
 import { readdirSync, readFileSync } from 'node:fs'
 import { PGlite } from '@electric-sql/pglite'
+import { PDFDocument } from 'pdf-lib'
+import type { EmailAttachment } from '../src/data/types'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { loadSnapshot } from '../src/data/driver'
 import { LocalDriver } from '../src/data/localDriver'
@@ -7,7 +9,7 @@ import { TABLES } from '../src/data/types'
 import { archiveRows, openLinesOnTransport, linePurchaseStatus, linesToPurchase, documentLanguage, flowCounts, freeAt, transportLoad, invoiceBalance, onHandMap, orderStage, orderTab, reservedMap, stockKey, vatBreakdown } from '../src/domain/calc'
 import { renameOldSuppliers, restoreSuppliers, seedDemo } from '../src/domain/demo'
 import {
-  createDelivery, createInvoice, createOrder, createPurchaseOrder, invoiceProformas, lineFromProduct, markDelivered, assignShipmentsToTransport, cancelTransport, convertLinesToPurchaseOrders, createTransport, markReady, receiveGoods, rescheduleDelivery, rescheduleOrder, saveRouteOrder, saveSettings, setPurchaseLabel, signDelivery, splitLinesForStock, setDeliveryInTransit, setShipmentWarehouse, setTransportStatus, updateTransport, transferStock,
+  createDelivery, createInvoice, createOrder, createPurchaseOrder, invoiceProformas, lineFromProduct, markDelivered, assignShipmentsToTransport, cancelTransport, convertLinesToPurchaseOrders, createTransport, markReady, receiveGoods, rescheduleDelivery, rescheduleOrder, saveRouteOrder, saveSettings, mailSignedNote, setPurchaseLabel, signDelivery, splitLinesForStock, setDeliveryInTransit, setShipmentWarehouse, setTransportStatus, updateTransport, transferStock,
 } from '../src/domain/services'
 import { estimateMatrix, parseRouterTable } from '../src/data/geo'
 import { dropIndex, googleMapsRouteUrl, moveItem, optimizeRoute, tourCost } from '../src/domain/route'
@@ -202,7 +204,7 @@ describe('digitale afleverbon', () => {
     const id = await createOrder(db, { header: header(s.customers[0].id), lines: [lineFromProduct(product, { qty: 1, warehouse_id: s.warehouses[1].id })] })
     const line = (await loadSnapshot(db)).sales_order_lines.find((l) => l.sales_order_id === id)!
     const d = await createDelivery(db, { sales_order_id: id, method: 'eigen_team', planned_date: TODAY, carrier: '', notes: '', lines: [{ sales_order_line_id: line.id, qty: 1 }] })
-    const png = 'data:image/png;base64,AAAA'
+    const png = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=='
     await expect(signDelivery(db, d, { signature: png, signed_by: 'Klant', date: TODAY })).rejects.toThrow(/klaargezet/)
     await markReady(db, d, { approved_by: 'Magazijn', date: TODAY })
     await expect(signDelivery(db, d, { signature: '', signed_by: 'Klant', date: TODAY })).rejects.toThrow(/tekenen/)
@@ -212,6 +214,48 @@ describe('digitale afleverbon', () => {
     expect(after).toMatchObject({ status: 'delivered', signature_data: png, signed_by: 'Klant', signed_note_received: true })
     expect(after.proforma_number).toBeTruthy()
     await expect(signDelivery(db, d, { signature: png, signed_by: 'Klant', date: TODAY })).rejects.toThrow(/al afgerond/)
+  })
+})
+
+describe('mail van de getekende afleverbon', () => {
+  const png = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=='
+  const signed = async (email: string) => {
+    const s = await loadSnapshot(db)
+    await db.update('customers', s.customers[0].id, { email })
+    const product = s.products.find((p) => p.sku === 'LIG-AL-WT')!
+    const id = await createOrder(db, { header: header(s.customers[0].id), lines: [lineFromProduct(product, { qty: 1, warehouse_id: s.warehouses[1].id })] })
+    const line = (await loadSnapshot(db)).sales_order_lines.find((l) => l.sales_order_id === id)!
+    const d = await createDelivery(db, { sales_order_id: id, method: 'eigen_team', planned_date: TODAY, carrier: '', notes: '', lines: [{ sales_order_line_id: line.id, qty: 1 }] })
+    await markReady(db, d, { approved_by: 'Magazijn', date: TODAY })
+    return d
+  }
+  it('stuurt naar de klant met een bcc naar de winkel', async () => {
+    const sent: EmailAttachment[] = []
+    db.sendEmail = async (_id, a) => { sent.push(a); return 'sent' }
+    const d = await signed('klant@voorbeeld.test')
+    expect(await signDelivery(db, d, { signature: png, signed_by: 'Klant', date: TODAY })).toBe('sent')
+    const mail = (await loadSnapshot(db)).email_outbox.find((m) => m.delivery_id === d)!
+    expect(mail).toMatchObject({ to_email: 'klant@voorbeeld.test', bcc_email: 'winkel@voorbeeld.test', status: 'sent' })
+    const pdf = await PDFDocument.load(Buffer.from(sent[0].base64, 'base64'))
+    expect(pdf.getPageCount()).toBe(1)
+  })
+  it('verstuurt in de voorbeeldomgeving niets', async () => {
+    const d = await signed('klant@voorbeeld.test')
+    expect(await signDelivery(db, d, { signature: png, signed_by: 'Klant', date: TODAY })).toBe('demo')
+  })
+  it('meldt een ontbrekend adres en houdt de levering afgemeld', async () => {
+    const d = await signed('')
+    expect(await signDelivery(db, d, { signature: png, signed_by: 'Klant', date: TODAY })).toBe('no_recipient')
+    expect((await loadSnapshot(db)).deliveries.find((x) => x.id === d)!.status).toBe('delivered')
+  })
+  it('kan een mislukte mail opnieuw versturen', async () => {
+    db.sendEmail = async () => { throw new Error('storing') }
+    const d = await signed('klant@voorbeeld.test')
+    expect(await signDelivery(db, d, { signature: png, signed_by: 'Klant', date: TODAY })).toBe('failed')
+    expect((await loadSnapshot(db)).deliveries.find((x) => x.id === d)!.status).toBe('delivered')
+    db.sendEmail = async () => 'sent'
+    expect(await mailSignedNote(db, d)).toBe('sent')
+    expect((await loadSnapshot(db)).email_outbox.filter((m) => m.delivery_id === d)).toHaveLength(1)
   })
 })
 

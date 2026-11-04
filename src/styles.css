@@ -334,3 +334,4 @@ body.route-dragging, body.route-dragging * { cursor: grabbing !important; user-s
 
 /* Archief */
 .print-icons { display: flex; gap: 6px; flex-wrap: nowrap; }
+.mail-state { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; margin-top: 4px; }

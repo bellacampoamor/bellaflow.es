@@ -1,4 +1,4 @@
-import { TABLES, type Snapshot, type TableName } from './types'
+import { TABLES, type EmailAttachment, type Snapshot, type TableName } from './types'
 
 // De enige plek waar de app met opslag praat. Schermen en bedrijfslogica kennen alleen dit contract,
 // dus overstappen van browseropslag naar Supabase raakt geen enkel scherm.
@@ -9,6 +9,8 @@ export interface Driver {
   remove(table: TableName, id: string): Promise<void>
   /** Geeft bijvoorbeeld 'F-2026-0007'. */
   nextNumber(series: string, year: number): Promise<string>
+  /** Verstuurt een mail uit de wachtrij. 'demo' betekent dat deze opslag niet kan mailen. */
+  sendEmail(id: string, attachment: EmailAttachment): Promise<'sent' | 'demo'>
 }
 
 export async function loadSnapshot(db: Driver): Promise<Snapshot> {

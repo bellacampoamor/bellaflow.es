@@ -1,6 +1,6 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import type { Driver } from './driver'
-import type { Snapshot, TableName } from './types'
+import type { EmailAttachment, Snapshot, TableName } from './types'
 
 const PAGE = 1000
 
@@ -34,6 +34,13 @@ export class SupabaseDriver implements Driver {
   async remove(table: TableName, id: string) {
     const { error } = await this.sb.from(table).delete().eq('id', id)
     if (error) throw new Error(error.message)
+  }
+  async sendEmail(id: string, attachment: EmailAttachment) {
+    const { error: fileError } = await this.sb.from('email_attachments').upsert({ email_id: id, file_name: attachment.name, content_base64: attachment.base64 })
+    if (fileError) throw new Error(fileError.message)
+    const { error } = await this.sb.functions.invoke('send-email', { body: { id } })
+    if (error) throw new Error(error.message)
+    return 'sent' as const
   }
   async nextNumber(series: string, year: number) {
     const { data, error } = await this.sb.rpc('next_number', { p_series: series, p_year: year })

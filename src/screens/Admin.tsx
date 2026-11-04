@@ -87,6 +87,7 @@ export function Admin() {
         <p className="small muted" style={{ margin: '0 0 12px' }}>{tx("Bij Digitaal tekent de klant in de chauffeursapp en wordt de bezorging daarmee afgemeld. Dit geldt voor het eigen bezorgteam; bij een vervoerder blijft de bon op papier.")}</p>
         <div className="form-grid">
           <SelectField label={tx("Soort afleverbon")} value={co.delivery_note_mode ?? 'papier'} onChange={(v: Settings['delivery_note_mode']) => setCo({ ...co, delivery_note_mode: v })} options={[{ value: 'papier', label: tx("Papier, geprint") }, { value: 'digitaal', label: tx("Digitaal, in de chauffeursapp") }]} />
+          <TextField label={tx("Winkel e-mail")} type="email" value={co.shop_email ?? ''} onChange={(v) => setCo({ ...co, shop_email: v })} hint={tx("Krijgt een bcc van elke digitaal getekende afleverbon.")} />
         </div>
         <h2 style={{ margin: '22px 0 4px' }}>{tx("Taal van documenten")}</h2>
         <p className="small muted" style={{ margin: '0 0 12px' }}>{tx("Kies per document in welke taal het wordt afgedrukt. Productnamen blijven zoals ze zijn ingevoerd.")}</p>

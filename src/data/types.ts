@@ -5,7 +5,7 @@ export interface Settings {
   province: string; phone: string; email: string; iban: string
   payment_days: number; invoice_footer: string
   prefix_sales_order: string; prefix_purchase: string; prefix_receipt: string; prefix_delivery: string; prefix_invoice: string; prefix_transport: string; prefix_proforma: string
-  delivery_note_mode: 'papier' | 'digitaal'; language_delivery_note: DocumentLanguage; language_invoice: DocumentLanguage
+  delivery_note_mode: 'papier' | 'digitaal'; shop_email: string; language_delivery_note: DocumentLanguage; language_invoice: DocumentLanguage
 }
 export interface Warehouse {
   id: string; code: string; name: string; kind: 'winkel' | 'magazijn' | 'extern'
@@ -88,6 +88,12 @@ export interface Delivery {
   signed_note_received: boolean; route_position: number | null; proforma_number: string | null
   signature_data: string | null; signed_at: string | null
 }
+export type EmailStatus = 'pending' | 'sent' | 'failed' | 'no_recipient' | 'demo'
+export interface OutgoingEmail {
+  id: string; kind: 'getekende_afleverbon'; delivery_id: string; to_email: string; bcc_email: string
+  subject: string; body_text: string; status: EmailStatus; error: string; created_at: string; sent_at: string | null
+}
+export interface EmailAttachment { name: string; base64: string }
 export interface DeliveryLine {
   id: string; delivery_id: string; sales_order_line_id: string; warehouse_id: string; qty: number
 }
@@ -113,7 +119,7 @@ export interface Snapshot {
   transports: Transport[]; inbound_shipments: InboundShipment[]; inbound_shipment_lines: InboundShipmentLine[]
   goods_receipts: GoodsReceipt[]; goods_receipt_lines: GoodsReceiptLine[]; stock_movements: StockMovement[]
   deliveries: Delivery[]; delivery_lines: DeliveryLine[]; invoices: Invoice[]; invoice_lines: InvoiceLine[]
-  payments: Payment[]; number_series: NumberSeries[]
+  payments: Payment[]; number_series: NumberSeries[]; email_outbox: OutgoingEmail[]
 }
 export type TableName = keyof Snapshot
 
@@ -122,5 +128,5 @@ export const TABLES: TableName[] = [
   'settings', 'warehouses', 'suppliers', 'customers', 'salespeople', 'products', 'sales_orders', 'sales_order_lines',
   'order_events', 'purchase_orders', 'purchase_order_lines', 'transports', 'inbound_shipments', 'inbound_shipment_lines',
   'goods_receipts', 'goods_receipt_lines', 'stock_movements', 'deliveries', 'delivery_lines', 'invoices',
-  'invoice_lines', 'payments', 'number_series',
+  'invoice_lines', 'payments', 'number_series', 'email_outbox',
 ]

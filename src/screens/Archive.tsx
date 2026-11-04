@@ -1,14 +1,21 @@
 import { useState } from 'react'
 import { ClipboardCheck, Receipt } from 'lucide-react'
+import type { EmailStatus } from '../data/types'
 import { archiveRows } from '../domain/calc'
+import { mailSignedNote } from '../domain/services'
 import { useApp } from '../ui/app-context'
-import { Empty, fmtDate, Head, Pill, Tabs } from '../ui/kit'
+import { Empty, fmtDate, Head, Pill, Tabs, type Tone } from '../ui/kit'
 import { tx } from '../i18n'
 
 type Tab = 'compleet' | 'factureren'
 
+const MAIL: Record<EmailStatus, [string, Tone]> = {
+  pending: ['Mail wordt verstuurd', 'info'], sent: ['Gemaild', 'good'], failed: ['Mail mislukt', 'bad'],
+  no_recipient: ['Geen e-mailadres', 'bad'], demo: ['Voorbeeld: niet gemaild', ''],
+}
+
 export function Archive() {
-  const { s } = useApp()
+  const { s, run } = useApp()
   const [tab, setTab] = useState<Tab>('compleet')
   const [q, setQ] = useState('')
   const all = archiveRows(s)
@@ -28,12 +35,14 @@ export function Archive() {
           <thead><tr><th>{tx("Verkooporder")}</th><th>{tx("Orderdatum")}</th><th>{tx("Klant")}</th><th>{tx("Afleverbon")}</th><th>{tx("Afleverdatum")}</th><th>{tx("Proforma")}</th><th>{tx("Factuur")}</th><th>{tx("Factuurdatum")}</th><th>{tx("Printen")}</th></tr></thead>
           <tbody>{rows.map(({ delivery: d, order: o, invoice: i }) => {
             const hasNote = d.method !== 'meenemen'
+            const mail = s.email_outbox.find((m) => m.delivery_id === d.id)
             return (
               <tr key={d.id}>
                 <td><a className="rowlink" href={`#orders-${o.id}`}>{o.number}</a></td>
                 <td>{fmtDate(o.order_date)}</td>
                 <td>{customer(o.customer_id)}</td>
-                <td>{d.number}<div>{!hasNote ? <Pill>{tx("Klant haalt op")}</Pill> : d.signature_data ? <Pill tone="good">{tx("Digitaal getekend")}</Pill> : d.signed_note_received ? <Pill tone="good">{tx("Getekend retour")}</Pill> : <Pill tone="warn">{tx("Nog niet retour")}</Pill>}</div></td>
+                <td>{d.number}<div>{!hasNote ? <Pill>{tx("Klant haalt op")}</Pill> : d.signature_data ? <Pill tone="good">{tx("Digitaal getekend")}</Pill> : d.signed_note_received ? <Pill tone="good">{tx("Getekend retour")}</Pill> : <Pill tone="warn">{tx("Nog niet retour")}</Pill>}</div>
+                  {mail && <div className="mail-state"><Pill tone={MAIL[mail.status][1]}>{tx(MAIL[mail.status][0])}</Pill>{(mail.status === 'failed' || mail.status === 'no_recipient') && <button className="btn sm" title={mail.error} onClick={() => run((db) => mailSignedNote(db, d.id))}>{tx("Opnieuw mailen")}</button>}</div>}</td>
                 <td>{fmtDate(d.delivered_at)}</td>
                 <td>{d.proforma_number ?? <span className="zero">–</span>}</td>
                 <td>{i ? <a className="rowlink" href={`#facturatie-${i.id}`}>{i.number}</a> : <span className="zero">–</span>}</td>
