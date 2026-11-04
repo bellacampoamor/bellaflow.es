@@ -153,16 +153,22 @@ interface PoLine { key: number; product_id: string; qty: number; unit_cost: numb
 interface PoShip { key: number; expected_date: string; warehouse_id: string; carrier: string; pct: number; transport_id: string | null }
 let k = 1
 
-export function PurchaseForm({ transportId }: { transportId?: string } = {}) {
+export function PurchaseForm({ transportId, orderId }: { transportId?: string; orderId?: string } = {}) {
   const { s, run } = useApp()
   const today = todayISO()
   const suppliers = s.suppliers.filter((x) => x.is_active)
   const receivers = s.warehouses.filter((w) => w.is_active && w.receives_goods)
-  const [supplier, setSupplier] = useState('')
+  // Vanuit een verkooporder: wat nog ingekocht moet worden, per leverancier één inkooporder.
+  const fromOrder = orderId ? linesToPurchase(s).filter((l) => l.sales_order_id === orderId) : []
+  const productOf = (id: string) => s.products.find((p) => p.id === id)
+  const orderSupplier = fromOrder.map((l) => productOf(l.product_id)?.supplier_id).find(Boolean) ?? ''
+  const [supplier, setSupplier] = useState(orderSupplier)
   const [orderDate, setOrderDate] = useState(today)
   const [reference, setReference] = useState('')
   const [notes, setNotes] = useState('')
-  const [lines, setLines] = useState<PoLine[]>([])
+  const [lines, setLines] = useState<PoLine[]>(() => fromOrder
+    .filter((l) => !orderSupplier || productOf(l.product_id)?.supplier_id === orderSupplier)
+    .map((l) => ({ key: k++, product_id: l.product_id, qty: l.qty, unit_cost: productOf(l.product_id)?.purchase_price ?? 0, sales_order_line_id: l.id })))
   const lead = suppliers.find((x) => x.id === supplier)?.lead_time_days ?? 21
   const planned = s.transports.filter((t) => t.status === 'planned').sort((a, b) => a.departure_date.localeCompare(b.departure_date))
   // Standaard mee met de eerstvolgende vrachtwagen die nog moet vertrekken.
@@ -246,26 +252,31 @@ export function PurchaseForm({ transportId }: { transportId?: string } = {}) {
 
         <section className="panel">
           <div className="panel-head">
-            <h2>{tx("Zendingen")}</h2>
+            <h2>{tx("Transport en bestemming")}</h2>
             <div className="actions">
-              <button className="btn sm" onClick={() => applyPreset(1)}>{tx("Alles ineens")}</button>
-              <button className="btn sm" onClick={() => applyPreset(2)}>50 / 50</button>
-              <button className="btn sm" onClick={() => applyPreset(3)}>{tx("In 3 delen")}</button>
-              <button className="btn sm" onClick={() => setShips((v) => [...v, { key: k++, expected_date: addDays(orderDate, lead), warehouse_id: receivers[0]?.id ?? '', carrier: '', pct: 0, transport_id: null }])}><Plus size={14} />{tx("Zending")}</button>
+              {ships.length === 1 && <button className="btn sm" onClick={() => applyPreset(2)}>{tx("In delen laten komen")}</button>}
+              {ships.length > 1 && <>
+                <button className="btn sm" onClick={() => applyPreset(1)}>{tx("Alles ineens")}</button>
+                <button className="btn sm" onClick={() => applyPreset(2)}>50 / 50</button>
+                <button className="btn sm" onClick={() => applyPreset(3)}>{tx("In 3 delen")}</button>
+                <button className="btn sm" onClick={() => setShips((v) => [...v, { key: k++, expected_date: addDays(orderDate, lead), warehouse_id: receivers[0]?.id ?? '', carrier: '', pct: 0, transport_id: null }])}><Plus size={14} />{tx("Zending")}</button>
+              </>}
             </div>
           </div>
           <div className="stack">
             {ships.map((x, i) => (
               <div key={x.key} className="form-grid" style={{ alignItems: 'end' }}>
-                <TextField label={tx("Zending {0}: verwacht op", i + 1)} type="date" value={x.expected_date} onChange={(v) => patchShip(x.key, { expected_date: v })} />
-                <SelectField label={tx("Bestemming")} value={x.warehouse_id} onChange={(v) => patchShip(x.key, { warehouse_id: v })} options={receivers.map((w) => ({ value: w.id, label: w.name }))} />
                 <SelectField className="span-2" label={tx("Transport naar Spanje")} value={x.transport_id ?? ''} onChange={(v) => {
                   const t = planned.find((r) => r.id === v)
                   patchShip(x.key, { transport_id: t?.id ?? null, expected_date: t?.arrival_date ?? x.expected_date })
                 }} options={[{ value: '', label: tx("Nog niet gekoppeld") }, ...planned.map((t) => ({ value: t.id, label: tx("{0}, vertrek {1}, aankomst {2}", t.number, fmtDate(t.departure_date), fmtDate(t.arrival_date)) }))]} />
-                <NumberField label={tx("Deel van de bestelling (%)")} value={x.pct} min={0} onChange={(v) => patchShip(x.key, { pct: v })} />
-                {lines.length > 0 && <div className="small muted span-2">{lines.filter((l) => l.product_id).map((l) => tx("{0} × {1}", splitQty(l.qty, ships.map((y) => y.pct || 0.0001))[i], s.products.find((p) => p.id === l.product_id)?.name)).join(', ')}</div>}
-                {ships.length > 1 && <button className="btn sm" style={{ justifySelf: 'start' }} onClick={() => setShips((v) => v.filter((y) => y.key !== x.key))}>{tx("Zending verwijderen")}</button>}
+                <SelectField label={tx("Bestemming")} value={x.warehouse_id} onChange={(v) => patchShip(x.key, { warehouse_id: v })} options={receivers.map((w) => ({ value: w.id, label: w.name }))} />
+                {!x.transport_id && <TextField label={tx("Verwacht op")} type="date" value={x.expected_date} onChange={(v) => patchShip(x.key, { expected_date: v })} />}
+                {ships.length > 1 && <>
+                  <NumberField label={tx("Deel van de bestelling (%)")} value={x.pct} min={0} onChange={(v) => patchShip(x.key, { pct: v })} />
+                  {lines.length > 0 && <div className="small muted span-2">{lines.filter((l) => l.product_id).map((l) => tx("{0} × {1}", splitQty(l.qty, ships.map((y) => y.pct || 0.0001))[i], s.products.find((p) => p.id === l.product_id)?.name)).join(', ')}</div>}
+                  <button className="btn sm" style={{ justifySelf: 'start' }} onClick={() => setShips((v) => v.filter((y) => y.key !== x.key))}>{tx("Zending verwijderen")}</button>
+                </>}
               </div>
             ))}
             {Math.round(pctSum) !== 100 && <div className="note warn">{tx("De delen tellen op tot")} {pctSum}{tx("%. Dat moet 100% zijn.")}</div>}

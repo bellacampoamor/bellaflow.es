@@ -105,17 +105,25 @@ export function inboundByProduct(s: Snapshot) {
 }
 
 /** Klantorderregels op bestelling waarvoor nog geen inkoop is gemaakt. */
+/** Hoeveel van een klantorderregel is ingekocht en al binnen, en via welke inkooporders. */
+export function linePurchaseStatus(s: Snapshot, lineId: string) {
+  const pols = s.purchase_order_lines.filter((l) => l.sales_order_line_id === lineId && s.purchase_orders.find((p) => p.id === l.purchase_order_id)?.status === 'open')
+  const shipLines = s.inbound_shipment_lines.filter((l) => pols.some((p) => p.id === l.purchase_order_line_id))
+  return {
+    purchased: pols.reduce((n, l) => n + l.qty, 0),
+    received: s.goods_receipt_lines.filter((r) => shipLines.some((l) => l.id === r.shipment_line_id)).reduce((n, r) => n + r.qty_received, 0),
+    orders: s.purchase_orders.filter((p) => pols.some((l) => l.purchase_order_id === p.id)),
+    shipments: s.inbound_shipments.filter((x) => shipLines.some((l) => l.shipment_id === x.id)),
+  }
+}
+
+/** Klantorderregels op bestelling, met als aantal wat nog ingekocht moet worden. */
 export function linesToPurchase(s: Snapshot) {
-  const linked = new Set(
-    s.purchase_order_lines.filter((l) => {
-      const po = s.purchase_orders.find((p) => p.id === l.purchase_order_id)
-      return l.sales_order_line_id && po?.status === 'open'
-    }).map((l) => l.sales_order_line_id),
-  )
   const open = new Set(s.sales_orders.filter((o) => o.status === 'open').map((o) => o.id))
-  return s.sales_order_lines.filter(
-    (l) => l.source === 'bestelling' && !l.warehouse_id && open.has(l.sales_order_id) && !linked.has(l.id),
-  )
+  return s.sales_order_lines
+    .filter((l) => l.source === 'bestelling' && open.has(l.sales_order_id))
+    .map((l) => ({ ...l, qty: l.qty - linePurchaseStatus(s, l.id).purchased }))
+    .filter((l) => l.qty > 0)
 }
 
 /** Klantorders die op een zending wachten; nodig om te zien wie een verschuiving raakt. */
@@ -154,8 +162,9 @@ export function orderStage(s: Snapshot, o: SalesOrder): OrderStage {
   }
   if (shipped > 0) return 'deels_geleverd'
   if (planned >= total) return 'gepland'
-  if (lines.some((l) => !l.warehouse_id && plannedQty(s, l.id) < l.qty)) return 'wacht_op_goederen'
-  return 'te_plannen'
+  // Wat er al is kan alvast als deellevering; alleen als er niets te plannen valt wacht de order echt.
+  if (lines.some((l) => l.warehouse_id && plannedQty(s, l.id) < l.qty)) return 'te_plannen'
+  return 'wacht_op_goederen'
 }
 
 export function uninvoicedDeliveries(s: Snapshot, orderId: string): Delivery[] {

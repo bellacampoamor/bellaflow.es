@@ -4,10 +4,10 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { loadSnapshot } from '../src/data/driver'
 import { LocalDriver } from '../src/data/localDriver'
 import { TABLES } from '../src/data/types'
-import { flowCounts, freeAt, purchaseKind, transportLoad, invoiceBalance, onHandMap, orderStage, reservedMap, stockKey, vatBreakdown } from '../src/domain/calc'
+import { linePurchaseStatus, linesToPurchase, flowCounts, freeAt, purchaseKind, transportLoad, invoiceBalance, onHandMap, orderStage, reservedMap, stockKey, vatBreakdown } from '../src/domain/calc'
 import { seedDemo } from '../src/domain/demo'
 import {
-  createDelivery, createInvoice, createOrder, createPurchaseOrder, lineFromProduct, markDelivered, assignShipmentToTransport, cancelTransport, createTransport, markReady, receiveGoods, rescheduleDelivery, saveRouteOrder, saveSettings, setDeliveryInTransit, setShipmentWarehouse, setTransportStatus, updateTransport, splitQty, transferStock,
+  createDelivery, createInvoice, createOrder, createPurchaseOrder, lineFromProduct, markDelivered, assignShipmentToTransport, cancelTransport, createTransport, markReady, receiveGoods, rescheduleDelivery, saveRouteOrder, saveSettings, splitLinesForStock, setDeliveryInTransit, setShipmentWarehouse, setTransportStatus, updateTransport, splitQty, transferStock,
 } from '../src/domain/services'
 import { estimateMatrix, parseRouterTable } from '../src/data/geo'
 import { googleMapsRouteUrl, optimizeRoute, tourCost } from '../src/domain/route'
@@ -240,6 +240,29 @@ describe('transport en vulorders', () => {
     await expect(transferStock(db, { product_id: product.id, from_id: campoamor.id, to_id: showroom.id, qty: free + 1, note: '', date: TODAY })).rejects.toThrow(/gereserveerd/)
     await transferStock(db, { product_id: product.id, from_id: campoamor.id, to_id: showroom.id, qty: free, note: '', date: TODAY })
     expect(freeAt(await loadSnapshot(db), product.id, campoamor.id)).toBe(0)
+  })
+})
+
+describe('verkoop stuurt inkoop', () => {
+  it('splitst wat niet vrij is, houdt de rest in te kopen bij en maakt een deellevering mogelijk', async () => {
+    let s = await loadSnapshot(db)
+    const campoamor = s.warehouses[1]
+    const product = s.products.find((p) => p.sku === 'LIG-AL-WT')!
+    const free = freeAt(s, product.id, campoamor.id)
+    const input = [lineFromProduct(product, { qty: free + 4, warehouse_id: campoamor.id })]
+    const split = splitLinesForStock(s, input)
+    expect(split.map((l) => [l.qty, l.source, l.warehouse_id])).toEqual([[free, 'voorraad', campoamor.id], [4, 'bestelling', null]])
+    expect(splitLinesForStock(s, [lineFromProduct(product, { qty: 2, warehouse_id: s.warehouses[0].id })])[0]).toMatchObject({ source: 'bestelling', qty: 2 })
+    const orderId = await createOrder(db, { header: header(s.customers[0].id), lines: split })
+    s = await loadSnapshot(db)
+    expect(orderStage(s, s.sales_orders.find((o) => o.id === orderId)!)).toBe('te_plannen')
+    expect(freeAt(s, product.id, campoamor.id)).toBe(0)
+    const line = s.sales_order_lines.find((l) => l.sales_order_id === orderId && l.source === 'bestelling')!
+    // Deels ingekocht: de rest blijft op de lijst.
+    await createPurchaseOrder(db, { supplier_id: s.suppliers[0].id, order_date: TODAY, supplier_reference: '', notes: '', lines: [{ product_id: product.id, qty: 3, unit_cost: 1, sales_order_line_id: line.id }], shipments: [{ expected_date: TODAY, warehouse_id: campoamor.id, carrier: '', pct: 100 }] })
+    s = await loadSnapshot(db)
+    expect(linesToPurchase(s).find((l) => l.id === line.id)!.qty).toBe(1)
+    expect(linePurchaseStatus(s, line.id)).toMatchObject({ purchased: 3, received: 0 })
   })
 })
 

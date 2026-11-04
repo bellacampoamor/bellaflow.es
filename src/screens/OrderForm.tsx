@@ -2,7 +2,8 @@ import { useMemo, useState } from 'react'
 import { CreditCard, Plus, ShoppingCart, Store, Trash2 } from 'lucide-react'
 import type { Customer, Fulfilment, OrderType, Payment } from '../data/types'
 import { inboundByProduct, lineTotal, onHandMap, plannedQty, reservedMap, round2, stockKey, todayISO, vatBreakdown } from '../domain/calc'
-import { createOrder, lineFromProduct, saveRecord, updateOrder, type OrderHeader, type OrderLineInput } from '../domain/services'
+import { createOrder, lineFromProduct, saveRecord, splitLinesForStock, updateOrder, type OrderHeader, type OrderLineInput } from '../domain/services'
+import { loadSnapshot } from '../data/driver'
 import { go, useApp } from '../ui/app-context'
 import { AreaField, Check, Combo, Empty, eur, Field, Head, Modal, NumberField, SelectField, TextField } from '../ui/kit'
 import { tx } from '../i18n'
@@ -100,7 +101,8 @@ export function OrderForm({ id }: { id?: string }) {
     }
     let newId = ''
     const ok = await run(async (db) => {
-      newId = await createOrder(db, { header: h, lines: payload, deposit: deposit > 0 ? { amount: deposit, method: depositMethod, reference: depositRef } : undefined })
+      const finalLines = h.order_type === 'bestelling' ? splitLinesForStock(await loadSnapshot(db), payload) : payload
+      newId = await createOrder(db, { header: h, lines: finalLines, deposit: deposit > 0 ? { amount: deposit, method: depositMethod, reference: depositRef } : undefined })
     }, h.order_type === 'direct' && h.fulfilment === 'meenemen' ? tx("Order geregistreerd en meegegeven") : tx("Order aangemaakt"))
     if (ok) go(`orders-${newId}`)
   }
@@ -173,7 +175,8 @@ export function OrderForm({ id }: { id?: string }) {
                     </div>
                     <div className="panel-head" style={{ margin: '8px 0 0' }}>
                       <div className="small">
-                        {short && <span style={{ color: 'var(--bad)', fontWeight: 600 }}>{tx("Maar")} {free} {tx("vrij op dit magazijn")}{others.length ? tx(". Wel op {0}", others.map((w) => `${w.name} (${freeAt(l.product_id, w.id)})`).join(', ')) : ''}. </span>}
+                        {short && h.order_type === 'bestelling' && !existing && <span className="strong">{tx("Bij opslaan: {0} uit voorraad, {1} op bestelling", Math.max(0, free), l.qty - Math.max(0, free))}{others.length ? tx(". Wel op {0}", others.map((w) => `${w.name} (${freeAt(l.product_id, w.id)})`).join(', ')) : ''}. </span>}
+                        {short && (h.order_type === 'direct' || existing) && <span style={{ color: 'var(--bad)', fontWeight: 600 }}>{tx("Maar")} {free} {tx("vrij op dit magazijn")}{others.length ? tx(". Wel op {0}", others.map((w) => `${w.name} (${freeAt(l.product_id, w.id)})`).join(', ')) : ''}. </span>}
                         {l.source === 'bestelling' && l.product_id && <span className="muted">{tx("Komt op de lijst \"Nog in te kopen\"")}{inbound.get(l.product_id) ? tx(". Al {0} onderweg", inbound.get(l.product_id)) : ''}. </span>}
                       </div>
                       <div className="actions">

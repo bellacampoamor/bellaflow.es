@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { CalendarClock, Copy, Pencil, Plus, Truck } from 'lucide-react'
 import type { Delivery, Payment, SalesOrder } from '../data/types'
-import { depositAvailable, depositPaid, invoiceBalance, lineTotal, onHandMap, orderLines, orderOutstanding, orderStage, orderTotal, plannedQty, shippedQty, STAGE_LABEL, stockKey, todayISO, uninvoicedDeliveries, type OrderStage } from '../domain/calc'
+import { linePurchaseStatus, linesToPurchase, depositAvailable, depositPaid, invoiceBalance, lineTotal, onHandMap, orderLines, orderOutstanding, orderStage, orderTotal, plannedQty, shippedQty, STAGE_LABEL, stockKey, todayISO, uninvoicedDeliveries, type OrderStage } from '../domain/calc'
 import { addOrderPayment, cancelOrder, createDelivery, defaultMethod, rescheduleOrder, setLineWarehouse } from '../domain/services'
 import { go, useApp } from '../ui/app-context'
 import { Check, Empty, eur, fmtDate, Head, Modal, NumberField, Pill, SelectField, Tabs, TextField, type Tone } from '../ui/kit'
@@ -80,6 +80,8 @@ export function OrderDetail({ id }: { id: string }) {
     invoiced: shipped >= qty && !uninvoicedDeliveries(s, id).length, paid: outstanding <= 0,
   } as Record<string, boolean>
   const firstOpen = TRACK.findIndex((t) => !done[t.k])
+  const onOrder = lines.filter((l) => l.source === 'bestelling')
+  const toPurchase = linesToPurchase(s).filter((l) => l.sales_order_id === id).length
   const plannable = lines.filter((l) => l.warehouse_id && l.qty - plannedQty(s, l.id) > 0)
 
   return (
@@ -127,6 +129,32 @@ export function OrderDetail({ id }: { id: string }) {
               <tfoot><tr><td colSpan={7}>{tx("Totaal incl. IVA")}</td><td className="num">{eur(total)}</td></tr></tfoot>
             </table></div>
           </section>
+
+          {onOrder.length > 0 && (
+            <section className="panel">
+              <div className="panel-head">
+                <h2>{tx("Inkoop voor deze order")}</h2>
+                {open && toPurchase > 0 && <a className="btn sm primary" href={`#inkoop-nieuw-order-${id}`}><Plus size={14} />{tx("Inkooporder maken")}</a>}
+              </div>
+              <div className="table-wrap"><table>
+                <thead><tr><th>{tx("Product")}</th><th className="num">{tx("Op bestelling")}</th><th className="num">{tx("Ingekocht")}</th><th className="num">{tx("Binnen")}</th><th>{tx("Inkooporder")}</th><th>{tx("Verwacht")}</th></tr></thead>
+                <tbody>{onOrder.map((l) => {
+                  const st = linePurchaseStatus(s, l.id)
+                  const next = st.shipments.filter((x) => x.status === 'expected' || x.status === 'partial').sort((a, b) => a.expected_date.localeCompare(b.expected_date))[0]
+                  return (
+                    <tr key={l.id}>
+                      <td className="strong">{l.description}{l.options && <div className="muted small" style={{ fontWeight: 400 }}>{l.options}</div>}</td>
+                      <td className="num">{l.qty}</td>
+                      <td className="num" style={st.purchased < l.qty ? { color: 'var(--bad)', fontWeight: 600 } : undefined}>{st.purchased}</td>
+                      <td className="num">{st.received}</td>
+                      <td>{st.orders.length ? st.orders.map((p, i) => <span key={p.id}>{i > 0 && ', '}<a className="rowlink" href={`#inkoop-${p.id}`}>{p.number}</a></span>) : <Pill tone="warn">{tx("Nog in te kopen")}</Pill>}</td>
+                      <td>{next ? <>{fmtDate(next.expected_date)}{next.transport_id && <div className="muted small">{s.transports.find((t) => t.id === next.transport_id)?.number}</div>}</> : '–'}</td>
+                    </tr>
+                  )
+                })}</tbody>
+              </table></div>
+            </section>
+          )}
 
           <section className="panel">
             <div className="panel-head"><h2>{tx("Leveringen")}</h2>{open && plannable.length > 0 && <button className="btn sm" onClick={() => setModal('plan')}><Plus size={14} />{tx("Deellevering plannen")}</button>}</div>
@@ -248,7 +276,7 @@ export function RescheduleModal({ order, onClose }: { order: SalesOrder; onClose
 export function PlanDeliveryModal({ order, onClose }: { order: SalesOrder; onClose: () => void }) {
   const { s, run } = useApp()
   const lines = orderLines(s, order.id).filter((l) => l.qty - plannedQty(s, l.id) > 0)
-  const [qty, setQty] = useState<Record<string, number>>(() => Object.fromEntries(lines.map((l) => [l.id, l.warehouse_id ? l.qty - plannedQty(s, l.id) : 0])))
+  const [qty, setQty] = useState<Record<string, number>>(() => Object.fromEntries(lines.map((l) => [l.id, l.warehouse_id ? Math.min(l.qty - plannedQty(s, l.id), Math.max(0, onHandMap(s).get(stockKey(l.product_id, l.warehouse_id)) ?? 0)) : 0])))
   const [date, setDate] = useState(order.promised_date ?? order.requested_date ?? todayISO())
   const [method, setMethod] = useState<Delivery['method']>(defaultMethod(order.fulfilment))
   const [slot, setSlot] = useState('')

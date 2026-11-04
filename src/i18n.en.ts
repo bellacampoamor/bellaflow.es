@@ -700,4 +700,13 @@ export const en: Record<string, string> = {
   "Verkooporders": "Sales orders",
   "Goederenontvangsten": "Goods receipts",
   "Bijvoorbeeld {0}": "For example {0}",
+  "Bij opslaan: {0} uit voorraad, {1} op bestelling": "On saving: {0} from stock, {1} on order",
+  "Transport en bestemming": "Transport and destination",
+  "In delen laten komen": "Receive in parts",
+  "Verwacht op": "Expected on",
+  "Inkoop voor deze order": "Purchasing for this order",
+  "Inkooporder maken": "Create purchase order",
+  "Ingekocht": "Purchased",
+  "Binnen": "In",
+  "Nog in te kopen": "Still to purchase",
 }

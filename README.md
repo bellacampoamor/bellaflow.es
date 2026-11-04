@@ -45,6 +45,7 @@ Schermen praten alleen met `services` en `calc`, nooit rechtstreeks met de opsla
 
 - **Voorraad** is altijd de som van `stock_movements`. Er bestaat geen los voorraadgetal dat kan afwijken.
 - **Vrij** per locatie is aanwezig min gereserveerd. Elke open orderregel reserveert op zijn magazijn.
+- **Verkoop stuurt inkoop**: wat bij een bestelling niet vrij op voorraad is, wordt bij opslaan een regel op bestelling. De order toont wat nog ingekocht moet worden en maakt daar een inkooporder van. Wat er al is, kan als deellevering de deur uit.
 - **Op bestelling**: de orderregel heeft geen magazijn tot de goederen binnen zijn. De ontvangst koppelt dat automatisch.
 - **Prijzen** van verkoop zijn inclusief IVA, inkoopprijzen exclusief.
 - **Deelleveringen** worden bij afmelden direct gefactureerd. Hele leveringen volgen de instelling onder Facturatie.

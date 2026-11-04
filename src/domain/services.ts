@@ -545,6 +545,21 @@ export async function saveRecord<T extends TableName>(db: Driver, table: T, row:
   return id
 }
 
+/** Verkoop stuurt de inkoop: wat niet vrij op voorraad is, wordt een regel op bestelling. */
+export function splitLinesForStock(s: Snapshot, lines: OrderLineInput[]): OrderLineInput[] {
+  const used = new Map<string, number>()
+  return lines.flatMap((l) => {
+    if (l.source !== 'voorraad' || !l.warehouse_id) return [l]
+    const k = stockKey(l.product_id, l.warehouse_id)
+    const free = Math.max(0, freeAt(s, l.product_id, l.warehouse_id) - (used.get(k) ?? 0))
+    const fromStock = Math.min(free, l.qty)
+    used.set(k, (used.get(k) ?? 0) + fromStock)
+    if (fromStock === l.qty) return [l]
+    const onOrder: OrderLineInput = { ...l, qty: l.qty - fromStock, source: 'bestelling', warehouse_id: null }
+    return fromStock > 0 ? [{ ...l, qty: fromStock }, onOrder] : [onOrder]
+  })
+}
+
 export function lineFromProduct(p: Product, overrides: Partial<OrderLineInput> = {}): OrderLineInput {
   return {
     product_id: p.id, description: p.name, options: '', qty: 1, unit_price: p.sale_price, discount_pct: 0,
