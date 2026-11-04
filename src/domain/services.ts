@@ -6,7 +6,7 @@ import type {
   SalesOrderLine, Snapshot, StockMovement, TableName,
 } from '../data/types'
 import {
-  addDays, depositAvailable, invoicedDeliveryLineIds, lineTotal, onHandMap, orderLines, plannedQty, round2,
+  addDays, depositAvailable, invoicedDeliveryLineIds, invoicesOnDelivery, lineTotal, onHandMap, orderLines, plannedQty, round2,
   shipmentLineOpen, shippedQty, stockKey, todayISO, vatBreakdown,
 } from './calc'
 
@@ -354,7 +354,7 @@ export async function markDelivered(db: Driver, id: string, input: { date: strin
   })))
   await db.update('deliveries', id, { status: 'delivered', delivered_at: input.date, signed_by: input.signed_by })
   await db.insert('order_events', [event(d.sales_order_id, 'levering', `${d.number} geleverd.`)])
-  if (s.settings[0]?.invoice_mode === 'auto') {
+  if (invoicesOnDelivery(s, d)) {
     await createInvoice(db, { sales_order_id: d.sales_order_id, delivery_ids: [id], invoice_date: laterOf(input.date, latestInvoiceDate(s)), settle_deposit: true })
   }
 }

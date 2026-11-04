@@ -16,8 +16,8 @@ export function Invoices() {
   const mode = s.settings[0]?.invoice_mode ?? 'manual'
   return (
     <>
-      <Head title="Facturatie" sub="Per levering of per order factureren. Vooruitbetalingen worden verrekend.">
-        <SelectField label="Facturen maken" value={mode} onChange={(v) => run((db) => db.update('settings', 'default', { invoice_mode: v }), v === 'auto' ? 'Facturen worden nu automatisch gemaakt bij levering' : 'Facturen maak je nu zelf')} options={[{ value: 'manual', label: 'Handmatig' }, { value: 'auto', label: 'Automatisch bij levering' }]} />
+      <Head title="Facturatie" sub="Deelleveringen worden bij afmelden direct gefactureerd. Vooruitbetalingen worden verrekend.">
+        <SelectField label="Hele leveringen factureren" value={mode} onChange={(v) => run((db) => db.update('settings', 'default', { invoice_mode: v }), v === 'auto' ? 'Hele leveringen worden nu automatisch gefactureerd' : 'Hele leveringen factureer je nu zelf')} options={[{ value: 'manual', label: 'Handmatig' }, { value: 'auto', label: 'Automatisch bij levering' }]} />
       </Head>
       <div className="stack">
         <section className="panel">

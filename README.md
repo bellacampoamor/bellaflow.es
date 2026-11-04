@@ -47,6 +47,7 @@ Schermen praten alleen met `services` en `calc`, nooit rechtstreeks met de opsla
 - **Vrij** per locatie is aanwezig min gereserveerd. Elke open orderregel reserveert op zijn magazijn.
 - **Op bestelling**: de orderregel heeft geen magazijn tot de goederen binnen zijn. De ontvangst koppelt dat automatisch.
 - **Prijzen** van verkoop zijn inclusief IVA, inkoopprijzen exclusief.
+- **Deelleveringen** worden bij afmelden direct gefactureerd. Hele leveringen volgen de instelling onder Facturatie.
 - **Facturen** zijn onwijzigbaar en kunnen niet worden teruggedateerd. De database dwingt dat ook zelf af.
 - **Nummers** komen in Supabase uit `next_number()`, zodat twee gebruikers nooit hetzelfde nummer krijgen.
 

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { CalendarClock, Check as CheckIcon, Truck } from 'lucide-react'
 import type { Delivery } from '../data/types'
-import { onHandMap, stockKey, todayISO } from '../domain/calc'
+import { invoicesOnDelivery, isPartialDelivery, onHandMap, stockKey, todayISO } from '../domain/calc'
 import { cancelDelivery, markDelivered, rescheduleDelivery, setDeliveryInTransit } from '../domain/services'
 import { useApp } from '../ui/app-context'
 import { Check, Empty, fmtDate, fmtShort, Head, Modal, Pill, Tabs, TextField } from '../ui/kit'
@@ -80,7 +80,8 @@ function FinishModal({ d, onClose }: { d: Delivery; onClose: () => void }) {
   const today = todayISO()
   const [date, setDate] = useState(today)
   const [signed, setSigned] = useState('')
-  const auto = s.settings[0]?.invoice_mode === 'auto'
+  const auto = invoicesOnDelivery(s, d)
+  const partial = isPartialDelivery(s, d)
   return (
     <Modal title={`${d.number} afmelden`} onClose={onClose} footer={<>
       <button className="btn" onClick={onClose}>Annuleren</button>
@@ -90,7 +91,7 @@ function FinishModal({ d, onClose }: { d: Delivery; onClose: () => void }) {
         <TextField label="Geleverd op" type="date" value={date} onChange={setDate} />
         <TextField className="span-2" label="Getekend door" value={signed} onChange={setSigned} />
       </div>
-      <p className="small muted" style={{ margin: 0 }}>De voorraad wordt afgeboekt.{auto ? ' De factuur wordt automatisch gemaakt.' : ''}</p>
+      <p className="small muted" style={{ margin: 0 }}>De voorraad wordt afgeboekt.{partial ? ' De factuur voor deze deellevering wordt direct gemaakt.' : auto ? ' De factuur wordt automatisch gemaakt.' : ''}</p>
     </Modal>
   )
 }

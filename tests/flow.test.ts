@@ -87,9 +87,8 @@ describe('van inkoop tot factuur', () => {
     const d1 = await createDelivery(db, { sales_order_id: orderId, method: 'eigen_team', planned_date: TODAY, time_slot: '', carrier: '', notes: '', lines: [{ sales_order_line_id: line.id, qty: 3 }] })
     await markDelivered(db, d1, { date: TODAY, signed_by: 'X' })
     expect(await stockAt(north.id)).toBe(beforeNorth)
-    const i1 = await createInvoice(db, { sales_order_id: orderId, delivery_ids: [d1], invoice_date: TODAY, settle_deposit: true })
     s = await loadSnapshot(db)
-    const inv1 = s.invoices.find((i) => i.id === i1)!
+    const inv1 = s.invoices.find((i) => i.sales_order_id === orderId)!
     expect(inv1).toMatchObject({ kind: 'deelfactuur', total: 363, base_amount: 300, vat_amount: 63, deposit_settled: 363 })
     expect(invoiceBalance(s, inv1)).toBe(0)
 
@@ -109,9 +108,8 @@ describe('van inkoop tot factuur', () => {
     await transferStock(db, { product_id: product.id, from_id: south.id, to_id: north.id, qty: 1, note: '', date: TODAY })
     const d2 = await createDelivery(db, { sales_order_id: orderId, method: 'eigen_team', planned_date: TODAY, time_slot: '', carrier: '', notes: '', lines: [{ sales_order_line_id: line.id, qty: 7 }] })
     await markDelivered(db, d2, { date: TODAY, signed_by: 'X' })
-    const i2 = await createInvoice(db, { sales_order_id: orderId, delivery_ids: [d2], invoice_date: TODAY, settle_deposit: true })
     s = await loadSnapshot(db)
-    const inv2 = s.invoices.find((i) => i.id === i2)!
+    const inv2 = s.invoices.filter((i) => i.sales_order_id === orderId).find((i) => i.id !== inv1.id)!
     expect(inv2).toMatchObject({ kind: 'eindfactuur', total: 847, deposit_settled: 137 })
     expect(invoiceBalance(s, inv2)).toBe(710)
     expect(orderStage(s, s.sales_orders.find((o) => o.id === orderId)!)).toBe('gefactureerd')
@@ -127,6 +125,16 @@ describe('van inkoop tot factuur', () => {
     const line = after.sales_order_lines.find((l) => l.sales_order_id === id)!
     const d = await createDelivery(db, { sales_order_id: id, method: 'eigen_team', planned_date: TODAY, time_slot: '', carrier: '', notes: '', lines: [{ sales_order_line_id: line.id, qty: 1 }] })
     await expect(markDelivered(db, d, { date: TODAY, signed_by: '' })).rejects.toThrow(/Boek eerst voorraad/)
+  })
+
+  it('factureert een hele levering niet vanzelf bij handmatige instelling', async () => {
+    const s = await loadSnapshot(db)
+    const product = s.products.find((p) => p.sku === 'LIG-AL-WT')!
+    const id = await createOrder(db, { header: header(s.customers[0].id), lines: [lineFromProduct(product, { qty: 2, warehouse_id: s.warehouses[1].id })] })
+    const line = (await loadSnapshot(db)).sales_order_lines.find((l) => l.sales_order_id === id)!
+    const d = await createDelivery(db, { sales_order_id: id, method: 'eigen_team', planned_date: TODAY, time_slot: '', carrier: '', notes: '', lines: [{ sales_order_line_id: line.id, qty: 2 }] })
+    await markDelivered(db, d, { date: TODAY, signed_by: '' })
+    expect((await loadSnapshot(db)).invoices.filter((i) => i.sales_order_id === id)).toHaveLength(0)
   })
 
   it('factureert automatisch als dat is ingesteld', async () => {

@@ -166,6 +166,17 @@ export function uninvoicedDeliveries(s: Snapshot, orderId: string): Delivery[] {
   )
 }
 
+/** Deel van een order: dekt niet de hele order, of de order heeft meerdere leveringen. */
+export function isPartialDelivery(s: Snapshot, d: Delivery) {
+  const others = s.deliveries.some((x) => x.sales_order_id === d.sales_order_id && x.id !== d.id && x.status !== 'cancelled')
+  const qty = s.delivery_lines.filter((l) => l.delivery_id === d.id).reduce((n, l) => n + l.qty, 0)
+  return others || qty < orderLines(s, d.sales_order_id).reduce((n, l) => n + l.qty, 0)
+}
+
+/** Deelleveringen worden altijd direct gefactureerd; hele leveringen volgen de instelling. */
+export const invoicesOnDelivery = (s: Snapshot, d: Delivery) =>
+  isPartialDelivery(s, d) || s.settings[0]?.invoice_mode === 'auto'
+
 export function deliveryValue(s: Snapshot, deliveryId: string) {
   return round2(s.delivery_lines.filter((l) => l.delivery_id === deliveryId).reduce((n, dl) => {
     const l = s.sales_order_lines.find((x) => x.id === dl.sales_order_line_id) as SalesOrderLine
