@@ -239,8 +239,10 @@ td input.price { width: 104px; }
 .paper-top { display: flex; justify-content: space-between; gap: 22px; flex-wrap: wrap; margin-bottom: 26px; }
 .paper .totals .grand { color: #123f55; border-color: #b4c2c6; }
 @media print {
-  .demo-bar, .top, .ribbon-wrap, .head, .no-print { display: none !important; }
-  main { padding: 0; } .paper { border: 0; max-width: none; } body { background: #fff; }
+  /* Zonder paginamarge heeft de browser geen ruimte voor titel, url en paginanummer; de witruimte zit op het document zelf. */
+  @page { margin: 0; }
+  .demo-bar, .top, .ribbon-wrap, .head, .no-print, .toast { display: none !important; }
+  main { padding: 0; } .paper { border: 0; max-width: none; padding: 15mm; box-shadow: none; } body { background: #fff; }
 }
 @media (prefers-reduced-motion: no-preference) { .btn, .step { transition: background-color .12s; } }
 
