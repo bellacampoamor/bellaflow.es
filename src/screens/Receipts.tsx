@@ -4,7 +4,7 @@ import { openLinesOnTransport, shipmentLineOpen, todayISO } from '../domain/calc
 import { receiveGoods } from '../domain/services'
 import { tx } from '../i18n'
 import { go, useApp } from '../ui/app-context'
-import { AreaField, Empty, fmtDate, Head, Pill, TextField } from '../ui/kit'
+import { AreaField, Empty, fmtDate, Head, Pill } from '../ui/kit'
 
 function TransportPicker({ value }: { value: string }) {
   const { s } = useApp()
@@ -153,7 +153,7 @@ export function ReceiptForm({ transportId }: { transportId: string }) {
           <h2>{tx("Goederenontvangst")}</h2>
           <p className="muted small" style={{ marginTop: -6 }}>{tx("Vul per regel in wat er daadwerkelijk is ontvangen. Wat ontbreekt blijft open staan.")}</p>
           <div className="table-wrap"><table>
-            <thead><tr><th style={{ minWidth: 200 }}>{tx("Product")}</th><th>{tx("Inkooporder")}</th><th className="num">{tx("Besteld")}</th><th style={{ minWidth: 190 }}>{tx("Locatie")}</th><th>{tx("Ontvangen")}</th><th>{tx("Plek in magazijn")}</th><th></th></tr></thead>
+            <thead><tr><th style={{ minWidth: 200 }}>{tx("Product")}</th><th>{tx("Inkooporder")}</th><th className="num">{tx("Besteld")}</th><th style={{ minWidth: 190 }}>{tx("Locatie")}</th><th>{tx("Ontvangen/Geteld")}</th><th></th></tr></thead>
             <tbody>{rows.map((r, i) => {
               const { p, pol, po } = lineInfo(r.shipment_line_id)
               const first = rows.findIndex((y) => y.shipment_line_id === r.shipment_line_id) === i
@@ -165,8 +165,7 @@ export function ReceiptForm({ transportId }: { transportId: string }) {
                   <td className="muted">{first ? po.number : ''}</td>
                   <td className="num">{first ? shipmentLineOpen(s, r.shipment_line_id) : ''}</td>
                   <td><select aria-label={tx("Magazijn voor {0}", p.name)} value={r.warehouse_id} onChange={(e) => patch(r.key, { warehouse_id: e.target.value })}>{warehouses.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}</select></td>
-                  <td><input className="qty" aria-label={tx("Ontvangen {0}", p.name)} type="number" min={0} value={r.qty_received} onChange={(e) => patch(r.key, { qty_received: Number(e.target.value) })} /></td>
-                  <td><input aria-label={tx("Locatie {0}", p.name)} value={r.location_bin} placeholder={tx("Bijv. A-12")} onChange={(e) => patch(r.key, { location_bin: e.target.value })} /></td>
+                  <td><input className="qty" aria-label={tx("Ontvangen/Geteld {0}", p.name)} type="number" min={0} value={r.qty_received} onChange={(e) => patch(r.key, { qty_received: Number(e.target.value) })} /></td>
                   <td style={{ whiteSpace: 'nowrap' }}>
                     <button className="btn sm" onClick={() => split(r)}><Split size={14} />{tx("Verdelen")}</button>
                     {!first && <button className="btn icon" aria-label={tx("Rij verwijderen")} onClick={() => setRows((v) => v.filter((y) => y.key !== r.key))}><Trash2 size={16} /></button>}
