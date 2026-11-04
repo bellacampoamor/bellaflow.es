@@ -34,21 +34,21 @@ export class LocalDriver implements Driver {
   }
   clear() { this.data = emptySnapshot(); this.save() }
   async list<T extends TableName>(table: T) {
-    this.sync()
+    this.sync();
     return structuredClone(this.data[table]) as Snapshot[T]
   }
   async insert<T extends TableName>(table: T, rows: Snapshot[T][number][]) {
-    this.sync()
+    this.sync();
     (this.data[table] as unknown[]).push(...structuredClone(rows)); this.save()
   }
   async update<T extends TableName>(table: T, id: string, patch: Partial<Snapshot[T][number]>) {
-    this.sync()
+    this.sync();
     const row = (this.data[table] as { id: string }[]).find((r) => r.id === id)
     if (!row) throw new Error(`Record ${id} niet gevonden in ${table}`)
     Object.assign(row, patch); this.save()
   }
   async remove(table: TableName, id: string) {
-    this.sync()
+    this.sync();
     const rows = this.data[table] as { id: string }[]
     const i = rows.findIndex((r) => r.id === id)
     if (i >= 0) rows.splice(i, 1)
@@ -57,7 +57,7 @@ export class LocalDriver implements Driver {
   // Voorbeeldgegevens in de browser: er gaat nooit echte mail de deur uit.
   async sendEmail(_id: string, _attachment: EmailAttachment): Promise<'sent' | 'demo'> { return 'demo' }
   async nextNumber(series: string, year: number) {
-    this.sync()
+    this.sync();
     const id = `${series}-${year}`
     let row = this.data.number_series.find((r) => r.id === id)
     if (!row) { row = { id, last_number: 0 }; this.data.number_series.push(row) }
