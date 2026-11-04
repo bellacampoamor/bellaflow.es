@@ -7,7 +7,7 @@ import { loadSnapshot } from '../src/data/driver'
 import { LocalDriver } from '../src/data/localDriver'
 import { TABLES } from '../src/data/types'
 import { archiveRows, openLinesOnTransport, linePurchaseStatus, linesToPurchase, documentLanguage, flowCounts, freeAt, transportLoad, invoiceBalance, onHandMap, orderStage, orderTab, reservedMap, stockKey, vatBreakdown } from '../src/domain/calc'
-import { renameOldSuppliers, restoreSuppliers, seedDemo } from '../src/domain/demo'
+import { renameOldSuppliers, restoreSettings, restoreSuppliers, seedDemo } from '../src/domain/demo'
 import {
   createDelivery, createInvoice, createOrder, createPurchaseOrder, invoiceProformas, lineFromProduct, markDelivered, assignShipmentsToTransport, cancelTransport, convertLinesToPurchaseOrders, createTransport, markReady, receiveGoods, rescheduleDelivery, rescheduleOrder, saveRouteOrder, saveSettings, mailSignedNote, setPurchaseLabel, signDelivery, splitLinesForStock, setDeliveryInTransit, setShipmentWarehouse, setTransportStatus, updateTransport, transferStock,
 } from '../src/domain/services'
@@ -265,6 +265,17 @@ describe('artikelnummer', () => {
     const lines = s.invoice_lines.filter((l) => l.delivery_line_id)
     expect(lines.length).toBeGreaterThan(0)
     for (const l of lines) expect(l.article_number).toMatch(/\S/)
+  })
+})
+
+describe('herstellen van voorbeeldgegevens', () => {
+  it('houdt bedrijfsgegevens en instellingen vast', async () => {
+    await db.update('settings', 'default', { address: 'Calle Echt 1', tax_id: 'B12345678', delivery_note_mode: 'digitaal' })
+    const [saved] = await db.list('settings')
+    const fresh = new LocalDriver(false)
+    await seedDemo(fresh, TODAY)
+    await restoreSettings(fresh, saved)
+    expect((await fresh.list('settings'))[0]).toMatchObject({ address: 'Calle Echt 1', tax_id: 'B12345678', delivery_note_mode: 'digitaal' })
   })
 })
 

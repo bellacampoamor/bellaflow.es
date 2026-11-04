@@ -138,7 +138,7 @@ export const en: Record<string, string> = {
   "Alles": "All",
   "Alles ineens": "All at once",
   "Alles is gefactureerd en betaald.": "Everything is invoiced and paid.",
-  "Wat je hebt ingevoerd verdwijnt en de voorbeeldsituatie komt terug. Leveranciers blijven bewaard.": "What you entered is removed and the example data returns. Suppliers are kept.",
+  "Wat je hebt ingevoerd verdwijnt en de voorbeeldsituatie komt terug. Bedrijfsgegevens, instellingen en leveranciers blijven bewaard.": "What you entered disappears and the sample situation returns. Company details, settings and suppliers are kept.",
   "Annuleren": "Cancel",
   "Artikelnummer": "Item number",
   "BTW-nummer": "VAT number",

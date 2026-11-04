@@ -1,7 +1,7 @@
 // Voorbeeldgegevens. Alles is verzonnen en wordt opgebouwd met dezelfde functies als de echte app,
 // zodat de voorbeeldsituatie altijd klopt. Datums lopen mee met vandaag.
 import { newId, type Driver } from '../data/driver'
-import type { Customer, Product, Salesperson, Supplier, Warehouse } from '../data/types'
+import type { Customer, Product, Salesperson, Settings, Supplier, Warehouse } from '../data/types'
 import { addDays, openLinesOnTransport, todayISO } from './calc'
 import {
   closeShipment, createDelivery, createInvoice, createTransport, createOrder, createPurchaseOrder, lineFromProduct, markDelivered, markNotePrinted, markReady, payInvoice,
@@ -29,6 +29,13 @@ export async function renameOldSuppliers(db: Driver) {
 }
 
 /** Herstellen van de voorbeeldgegevens laat ingevoerde leveranciersgegevens staan. */
+/** Herstellen raakt de eigen bedrijfsgegevens en instellingen niet. Nieuwe velden houden hun standaardwaarde. */
+export async function restoreSettings(db: Driver, previous: Settings | undefined) {
+  if (!previous) return
+  const { id: _id, ...patch } = previous
+  await db.update('settings', 'default', patch)
+}
+
 export async function restoreSuppliers(db: Driver, previous: Supplier[]) {
   const current = await db.list('suppliers')
   for (const { id: _id, ...old } of previous) {
