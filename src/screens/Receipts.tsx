@@ -89,7 +89,7 @@ export function Receipts() {
           <h2>{tx("Eerdere ontvangsten")}</h2>
           {history.length === 0 && <Empty>{tx("Nog niets ontvangen.")}</Empty>}
           {history.length > 0 && <div className="table-wrap"><table>
-            <thead><tr><th>{tx("Nummer")}</th><th>{tx("Datum")}</th><th>{tx("Transport")}</th><th>{tx("Pakbon")}</th><th>{tx("Verdeling over locaties")}</th><th className="num">{tx("Ontvangen")}</th></tr></thead>
+            <thead><tr><th>{tx("Nummer")}</th><th>{tx("Datum")}</th><th>{tx("Transport")}</th><th>{tx("Verdeling over locaties")}</th><th className="num">{tx("Ontvangen")}</th></tr></thead>
             <tbody>{history.map((r) => {
               const lines = s.goods_receipt_lines.filter((l) => l.receipt_id === r.id)
               const perW = new Map<string, number>()
@@ -97,7 +97,7 @@ export function Receipts() {
               return (
                 <tr key={r.id}>
                   <td className="strong">{r.number}</td><td>{fmtDate(r.received_date)}</td>
-                  <td>{s.transports.find((t) => t.id === r.transport_id)?.number ?? '–'}</td><td className="muted">{r.delivery_note || '–'}</td>
+                  <td>{s.transports.find((t) => t.id === r.transport_id)?.number ?? '–'}</td>
                   <td className="small">{[...perW].filter(([, n]) => n > 0).map(([w, n]) => tx("{0} op {1}", n, s.warehouses.find((y) => y.id === w)?.name)).join(', ')}{r.notes && <div className="muted">{r.notes}</div>}</td>
                   <td className="num">{lines.reduce((n, l) => n + l.qty_received, 0)}</td>
                 </tr>
@@ -116,9 +116,6 @@ let k = 1
 export function ReceiptForm({ transportId }: { transportId: string }) {
   const { s, run } = useApp()
   const transport = s.transports.find((t) => t.id === transportId)
-  const [date, setDate] = useState(todayISO())
-  const [note, setNote] = useState('')
-  const [by, setBy] = useState('')
   const [notes, setNotes] = useState('')
   const [rows, setRows] = useState<Row[]>(() => openLinesOnTransport(s, transportId).map((l) => ({
     key: k++, shipment_line_id: l.id, warehouse_id: s.inbound_shipments.find((x) => x.id === l.shipment_id)?.warehouse_id ?? '', qty_received: shipmentLineOpen(s, l.id), qty_damaged: 0, location_bin: '',
@@ -142,7 +139,7 @@ export function ReceiptForm({ transportId }: { transportId: string }) {
   for (const r of rows) received.set(r.shipment_line_id, (received.get(r.shipment_line_id) ?? 0) + r.qty_received)
   const missing = [...received].reduce((n, [id, got]) => n + Math.max(0, shipmentLineOpen(s, id) - got), 0)
   const save = async () => {
-    const ok = await run((db) => receiveGoods(db, { transport_id: transportId, received_date: date, delivery_note: note, received_by: by, notes, rows: rows.map(({ key: _k, ...r }) => r) }), tx("Goederen ingeboekt, voorraad bijgewerkt"))
+    const ok = await run((db) => receiveGoods(db, { transport_id: transportId, received_date: todayISO(), delivery_note: '', received_by: '', notes, rows: rows.map(({ key: _k, ...r }) => r) }), tx("Goederen ingeboekt, voorraad bijgewerkt"))
     if (ok) go('ontvangst')
   }
   return (
@@ -153,15 +150,7 @@ export function ReceiptForm({ transportId }: { transportId: string }) {
       {rows.length === 0 && <div className="note">{tx("Alles op dit transport is al ontvangen.")}</div>}
       {rows.length > 0 && <div className="stack">
         <section className="panel">
-          <h2>{tx("Pakbon")}</h2>
-          <div className="form-grid">
-            <TextField label={tx("Ontvangstdatum")} type="date" value={date} onChange={setDate} />
-            <TextField label={tx("Pakbonnummer")} value={note} onChange={setNote} />
-            <TextField label={tx("Ontvangen door")} value={by} onChange={setBy} />
-          </div>
-        </section>
-        <section className="panel">
-          <h2>{tx("Wat is er binnengekomen?")}</h2>
+          <h2>{tx("Goederenontvangst")}</h2>
           <p className="muted small" style={{ marginTop: -6 }}>{tx("Vul per regel in wat er daadwerkelijk is ontvangen. Wat ontbreekt blijft open staan.")}</p>
           <div className="table-wrap"><table>
             <thead><tr><th style={{ minWidth: 200 }}>{tx("Product")}</th><th>{tx("Inkooporder")}</th><th className="num">{tx("Besteld")}</th><th style={{ minWidth: 190 }}>{tx("Locatie")}</th><th>{tx("Ontvangen")}</th><th>{tx("Plek in magazijn")}</th><th></th></tr></thead>
