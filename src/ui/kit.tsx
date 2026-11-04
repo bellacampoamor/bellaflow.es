@@ -132,7 +132,7 @@ export function Combo({ id, value, options, onChange, placeholder, footer }: { i
   )
 }
 
-export function Modal({ title, wide, onClose, children, footer }: { title: string; wide?: boolean; onClose: () => void; children: ReactNode; footer?: ReactNode }) {
+export function Modal({ title, wide, center, onClose, children, footer }: { title: string; wide?: boolean; center?: boolean; onClose: () => void; children: ReactNode; footer?: ReactNode }) {
   useEffect(() => {
     const k = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
     document.addEventListener('keydown', k)
@@ -140,7 +140,7 @@ export function Modal({ title, wide, onClose, children, footer }: { title: strin
   }, [onClose])
   return (
     <div className="overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose() }}>
-      <div className={`modal ${wide ? 'wide' : ''}`} role="dialog" aria-modal="true" aria-label={title}>
+      <div className={`modal ${wide ? 'wide' : ''} ${center ? 'center' : ''}`} role="dialog" aria-modal="true" aria-label={title}>
         <div className="panel-head" style={{ marginBottom: 0 }}>
           <h2>{title}</h2>
           <button className="btn icon" type="button" aria-label={tx("Sluiten")} onClick={onClose}><X size={18} /></button>

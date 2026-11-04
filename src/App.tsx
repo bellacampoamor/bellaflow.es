@@ -128,7 +128,7 @@ export function App({ onResetDemo, onSignOut }: { onResetDemo?: () => Promise<vo
         </div>
       </main>
       {support && (
-        <Modal title={tx("Contact en support")} onClose={() => setSupport(false)} footer={<button className="btn primary" onClick={() => setSupport(false)}>{tx("Sluiten")}</button>}>
+        <Modal center title={tx("Contact en support")} onClose={() => setSupport(false)} footer={<button className="btn primary" onClick={() => setSupport(false)}>{tx("Sluiten")}</button>}>
           <p style={{ margin: 0 }}>{tx("Bella Flow © {0} is gemaakt en uitgegeven door Rick van Hoeven. Alle rechten voorbehouden. Niets uit deze software mag zonder voorafgaande schriftelijke toestemming worden verveelvoudigd, verspreid of openbaar gemaakt.", new Date().getFullYear())}</p>
           <p style={{ margin: 0 }}>{tx("Voor verdere informatie neem contact op via")} <a href="mailto:support@bellaflow.com">support@bellaflow.com</a></p>
         </Modal>
