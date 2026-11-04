@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Plus } from 'lucide-react'
-import type { Customer, Product, Salesperson, Settings, Supplier, Warehouse } from '../data/types'
+import type { Customer, DocumentLanguage, Product, Salesperson, Settings, Supplier, Warehouse } from '../data/types'
 import { saveRecord, saveSettings, type PrefixField } from '../domain/services'
 import { useApp } from '../ui/app-context'
 import { AreaField, Check, eur, Head, Modal, NumberField, Pill, SelectField, Tabs, TextField } from '../ui/kit'
@@ -82,6 +82,13 @@ export function Admin() {
           <TextField className="span-2" label={tx("IBAN")} value={co.iban} onChange={(v) => setCo({ ...co, iban: v })} />
           <NumberField label={tx("Betaaltermijn (dagen)")} value={co.payment_days} min={0} step="1" onChange={(v) => setCo({ ...co, payment_days: v })} />
           <AreaField className="span-all" label={tx("Tekst onderaan de factuur")} value={co.invoice_footer} onChange={(v) => setCo({ ...co, invoice_footer: v })} />
+        </div>
+        <h2 style={{ margin: '22px 0 4px' }}>{tx("Taal van documenten")}</h2>
+        <p className="small muted" style={{ margin: '0 0 12px' }}>{tx("Kies per document in welke taal het wordt afgedrukt. Productnamen blijven zoals ze zijn ingevoerd.")}</p>
+        <div className="form-grid">
+          {([['language_delivery_note', tx("Afleverbon")], ['language_invoice', tx("Factuur")]] as const).map(([field, label]) => (
+            <SelectField key={field} label={label} value={co[field] ?? 'klant'} onChange={(v: DocumentLanguage) => setCo({ ...co, [field]: v })} options={[{ value: 'klant', label: tx("Taal van de klant") }, { value: 'es', label: tx("Spaans") }, { value: 'en', label: tx("Engels") }, { value: 'nl', label: tx("Nederlands") }]} />
+          ))}
         </div>
         <h2 style={{ margin: '22px 0 4px' }}>{tx("Documentnummers")}</h2>
         <p className="small muted" style={{ margin: '0 0 12px' }}>{tx("Nummers bestaan uit voorvoegsel, jaar en teller. Een nieuw voorvoegsel geldt voor nieuwe documenten en de teller loopt door. Bestaande documenten houden hun nummer.")}</p>

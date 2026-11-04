@@ -45,7 +45,7 @@ export async function seedDemo(db: Driver, today = todayISO()) {
     id: 'default', company_name: 'Bella Outdoor and Furnishing', tax_id: '(CIF invullen in Beheer)', address: '(adres invullen in Beheer)',
     postal_code: '', city: 'Campoamor', province: 'Alicante', phone: '', email: '', iban: '(IBAN invullen in Beheer)',
     payment_days: 14, invoice_footer: '',
-    prefix_sales_order: 'VO', prefix_purchase: 'IO', prefix_receipt: 'OV', prefix_delivery: 'LV', prefix_invoice: 'F', prefix_transport: 'TR', prefix_proforma: 'PF',
+    prefix_sales_order: 'VO', prefix_purchase: 'IO', prefix_receipt: 'OV', prefix_delivery: 'LV', prefix_invoice: 'F', prefix_transport: 'TR', prefix_proforma: 'PF', language_delivery_note: 'klant', language_invoice: 'klant',
   }])
 
   const wh = (code: string, name: string, kind: Warehouse['kind'], city: string, receives = true): Warehouse => ({

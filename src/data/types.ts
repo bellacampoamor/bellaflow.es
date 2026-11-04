@@ -5,6 +5,7 @@ export interface Settings {
   province: string; phone: string; email: string; iban: string
   payment_days: number; invoice_footer: string
   prefix_sales_order: string; prefix_purchase: string; prefix_receipt: string; prefix_delivery: string; prefix_invoice: string; prefix_transport: string; prefix_proforma: string
+  language_delivery_note: DocumentLanguage; language_invoice: DocumentLanguage
 }
 export interface Warehouse {
   id: string; code: string; name: string; kind: 'winkel' | 'magazijn' | 'extern'
@@ -18,6 +19,7 @@ export interface Supplier {
   notes: string; is_active: boolean
 }
 export type Language = 'es' | 'nl' | 'en'
+export type DocumentLanguage = Language | 'klant'
 export interface Customer {
   id: string; kind: 'particulier' | 'zakelijk'; name: string; company: string; tax_id: string
   email: string; phone: string; language: Language; address: string; postal_code: string

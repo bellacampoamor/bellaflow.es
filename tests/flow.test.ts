@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { loadSnapshot } from '../src/data/driver'
 import { LocalDriver } from '../src/data/localDriver'
 import { TABLES } from '../src/data/types'
-import { openLinesOnTransport, linePurchaseStatus, linesToPurchase, flowCounts, freeAt, transportLoad, invoiceBalance, onHandMap, orderStage, orderTab, reservedMap, stockKey, vatBreakdown } from '../src/domain/calc'
+import { openLinesOnTransport, linePurchaseStatus, linesToPurchase, documentLanguage, flowCounts, freeAt, transportLoad, invoiceBalance, onHandMap, orderStage, orderTab, reservedMap, stockKey, vatBreakdown } from '../src/domain/calc'
 import { renameOldSuppliers, restoreSuppliers, seedDemo } from '../src/domain/demo'
 import {
   createDelivery, createInvoice, createOrder, createPurchaseOrder, invoiceProformas, lineFromProduct, markDelivered, assignShipmentsToTransport, cancelTransport, convertLinesToPurchaseOrders, createTransport, markReady, receiveGoods, rescheduleDelivery, rescheduleOrder, saveRouteOrder, saveSettings, setPurchaseLabel, splitLinesForStock, setDeliveryInTransit, setShipmentWarehouse, setTransportStatus, updateTransport, transferStock,
@@ -177,6 +177,14 @@ describe('afgeleverde levering', () => {
     await deliver(d)
     await expect(setDeliveryInTransit(db, d)).rejects.toThrow()
     await expect(rescheduleDelivery(db, d, { new_date: '2026-12-01', reason: '', customer_notified: false })).rejects.toThrow()
+  })
+})
+
+describe('taal van documenten', () => {
+  it('volgt de keuze onder Beheer en anders de klant', () => {
+    expect(documentLanguage('klant', 'es')).toBe('es')
+    expect(documentLanguage(undefined, 'nl')).toBe('nl')
+    expect(documentLanguage('en', 'es')).toBe('en')
   })
 })
 

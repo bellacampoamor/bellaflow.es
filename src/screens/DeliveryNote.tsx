@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Printer } from 'lucide-react'
 import type { Language } from '../data/types'
+import { documentLanguage } from '../domain/calc'
 import { markNotePrinted } from '../domain/services'
 import { go, useApp } from '../ui/app-context'
 import { fmtDate, Head, Modal, Pill } from '../ui/kit'
@@ -20,7 +21,7 @@ export function DeliveryNote({ id }: { id: string }) {
   const o = s.sales_orders.find((x) => x.id === d.sales_order_id)!
   const c = s.customers.find((x) => x.id === o.customer_id)!
   const co = s.settings[0]
-  const t = T[c.language]
+  const t = T[documentLanguage(co.language_delivery_note, c.language)]
   const lines = s.delivery_lines.filter((l) => l.delivery_id === id).map((l) => {
     const sol = s.sales_order_lines.find((x) => x.id === l.sales_order_line_id)!
     return { ...l, sol, p: s.products.find((x) => x.id === sol.product_id)!, wh: s.warehouses.find((w) => w.id === l.warehouse_id)! }

@@ -1,6 +1,6 @@
 // Alles wat uit de gegevens afgeleid wordt: voorraad, orderstatus, bedragen. Geen opslag, geen UI.
 import type {
-  Delivery, InboundShipment, Invoice, SalesOrder, SalesOrderLine, Snapshot,
+  Delivery, DocumentLanguage, InboundShipment, Invoice, Language, SalesOrder, SalesOrderLine, Snapshot,
 } from '../data/types'
 
 export const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100
@@ -273,3 +273,7 @@ export function openLinesOnTransport(s: Snapshot, transportId: string) {
   const shipments = new Set(s.inbound_shipments.filter((x) => x.transport_id === transportId && shipmentIsOpen(x)).map((x) => x.id))
   return s.inbound_shipment_lines.filter((l) => shipments.has(l.shipment_id) && shipmentLineOpen(s, l.id) > 0)
 }
+
+/** Taal van een afgedrukt document: de keuze onder Beheer, of anders de taal van de klant. */
+export const documentLanguage = (setting: DocumentLanguage | undefined, customer: Language): Language =>
+  !setting || setting === 'klant' ? customer : setting

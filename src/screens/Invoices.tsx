@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { FileText } from 'lucide-react'
 import type { Language, Payment } from '../data/types'
-import { deliveryValue, depositAvailable, invoiceBalance, invoiceState, todayISO, uninvoicedDeliveries, vatBreakdown } from '../domain/calc'
+import { deliveryValue, depositAvailable, documentLanguage, invoiceBalance, invoiceState, todayISO, uninvoicedDeliveries, vatBreakdown } from '../domain/calc'
 import { ensureProformas, invoiceProformas, payInvoice } from '../domain/services'
 import { go, useApp } from '../ui/app-context'
 import { Empty, eur, fmtDate, Head, Modal, NumberField, Pill, SelectField, Tabs, TextField } from '../ui/kit'
@@ -114,7 +114,7 @@ export function InvoiceDetail({ id }: { id: string }) {
   const o = s.sales_orders.find((x) => x.id === inv.sales_order_id)!
   const lines = s.invoice_lines.filter((l) => l.invoice_id === id)
   const co = s.settings[0]
-  const t = T[inv.language]
+  const t = T[documentLanguage(co.language_invoice, inv.language)]
   const b = vatBreakdown(lines.map((l) => ({ total: l.line_total, vat_rate: l.vat_rate })))
   const paid = s.payments.filter((p) => p.invoice_id === id).reduce((n, p) => n + p.amount, 0)
   const balance = invoiceBalance(s, inv)
