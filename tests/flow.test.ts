@@ -7,7 +7,7 @@ import { TABLES } from '../src/data/types'
 import { openLinesOnTransport, linePurchaseStatus, linesToPurchase, documentLanguage, flowCounts, freeAt, transportLoad, invoiceBalance, onHandMap, orderStage, orderTab, reservedMap, stockKey, vatBreakdown } from '../src/domain/calc'
 import { renameOldSuppliers, restoreSuppliers, seedDemo } from '../src/domain/demo'
 import {
-  createDelivery, createInvoice, createOrder, createPurchaseOrder, invoiceProformas, lineFromProduct, markDelivered, assignShipmentsToTransport, cancelTransport, convertLinesToPurchaseOrders, createTransport, markReady, receiveGoods, rescheduleDelivery, rescheduleOrder, saveRouteOrder, saveSettings, setPurchaseLabel, splitLinesForStock, setDeliveryInTransit, setShipmentWarehouse, setTransportStatus, updateTransport, transferStock,
+  createDelivery, createInvoice, createOrder, createPurchaseOrder, invoiceProformas, lineFromProduct, markDelivered, assignShipmentsToTransport, cancelTransport, convertLinesToPurchaseOrders, createTransport, markReady, receiveGoods, rescheduleDelivery, rescheduleOrder, saveRouteOrder, saveSettings, setPurchaseLabel, signDelivery, splitLinesForStock, setDeliveryInTransit, setShipmentWarehouse, setTransportStatus, updateTransport, transferStock,
 } from '../src/domain/services'
 import { estimateMatrix, parseRouterTable } from '../src/data/geo'
 import { dropIndex, googleMapsRouteUrl, moveItem, optimizeRoute, tourCost } from '../src/domain/route'
@@ -177,6 +177,26 @@ describe('afgeleverde levering', () => {
     await deliver(d)
     await expect(setDeliveryInTransit(db, d)).rejects.toThrow()
     await expect(rescheduleDelivery(db, d, { new_date: '2026-12-01', reason: '', customer_notified: false })).rejects.toThrow()
+  })
+})
+
+describe('digitale afleverbon', () => {
+  it('slaat de handtekening op en meldt de levering af met een proforma', async () => {
+    const s = await loadSnapshot(db)
+    const product = s.products.find((p) => p.sku === 'LIG-AL-WT')!
+    const id = await createOrder(db, { header: header(s.customers[0].id), lines: [lineFromProduct(product, { qty: 1, warehouse_id: s.warehouses[1].id })] })
+    const line = (await loadSnapshot(db)).sales_order_lines.find((l) => l.sales_order_id === id)!
+    const d = await createDelivery(db, { sales_order_id: id, method: 'eigen_team', planned_date: TODAY, carrier: '', notes: '', lines: [{ sales_order_line_id: line.id, qty: 1 }] })
+    const png = 'data:image/png;base64,AAAA'
+    await expect(signDelivery(db, d, { signature: png, signed_by: 'Klant', date: TODAY })).rejects.toThrow(/klaargezet/)
+    await markReady(db, d, { approved_by: 'Magazijn', date: TODAY })
+    await expect(signDelivery(db, d, { signature: '', signed_by: 'Klant', date: TODAY })).rejects.toThrow(/tekenen/)
+    await expect(signDelivery(db, d, { signature: png, signed_by: ' ', date: TODAY })).rejects.toThrow(/ondertekend/)
+    await signDelivery(db, d, { signature: png, signed_by: 'Klant', date: TODAY })
+    const after = (await loadSnapshot(db)).deliveries.find((x) => x.id === d)!
+    expect(after).toMatchObject({ status: 'delivered', signature_data: png, signed_by: 'Klant', signed_note_received: true })
+    expect(after.proforma_number).toBeTruthy()
+    await expect(signDelivery(db, d, { signature: png, signed_by: 'Klant', date: TODAY })).rejects.toThrow(/al afgerond/)
   })
 })
 

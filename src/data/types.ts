@@ -5,7 +5,7 @@ export interface Settings {
   province: string; phone: string; email: string; iban: string
   payment_days: number; invoice_footer: string
   prefix_sales_order: string; prefix_purchase: string; prefix_receipt: string; prefix_delivery: string; prefix_invoice: string; prefix_transport: string; prefix_proforma: string
-  language_delivery_note: DocumentLanguage; language_invoice: DocumentLanguage
+  delivery_note_mode: 'papier' | 'digitaal'; language_delivery_note: DocumentLanguage; language_invoice: DocumentLanguage
 }
 export interface Warehouse {
   id: string; code: string; name: string; kind: 'winkel' | 'magazijn' | 'extern'
@@ -86,6 +86,7 @@ export interface Delivery {
   status: 'planned' | 'ready' | 'in_transit' | 'delivered' | 'cancelled'; delivered_at: string | null
   signed_by: string; notes: string; ready_at: string | null; approved_by: string; note_printed_at: string | null
   signed_note_received: boolean; route_position: number | null; proforma_number: string | null
+  signature_data: string | null; signed_at: string | null
 }
 export interface DeliveryLine {
   id: string; delivery_id: string; sales_order_line_id: string; warehouse_id: string; qty: number

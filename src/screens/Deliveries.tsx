@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { CalendarClock, ChevronDown, ChevronUp, ClipboardCheck, FileText, GripVertical, Map as MapIcon, PackageCheck, Route, Truck } from 'lucide-react'
+import { CalendarClock, ChevronDown, ChevronUp, ClipboardCheck, FileText, GripVertical, Map as MapIcon, PackageCheck, Route, Smartphone, Truck } from 'lucide-react'
 import { geocodeAddress, travelMatrix, type TravelMatrix } from '../data/geo'
 import type { Delivery, SalesOrder } from '../data/types'
 import { deliveryIsOpen, onHandMap, stockKey, todayISO } from '../domain/calc'
@@ -90,6 +90,9 @@ export function Deliveries() {
   }
   const hours = (m: number) => (m >= 60 ? tx("{0} u {1} min", Math.floor(m / 60), m % 60) : tx("{0} min", m))
 
+  const digital = s.settings[0]?.delivery_note_mode === 'digitaal'
+  const usesApp = (d: Delivery) => digital && d.method === 'eigen_team'
+
   const renderCard = (d: Delivery, position?: { day: string; index: number; ids: string[] }) => {
     const o = orderOf(d)
     const c = s.customers.find((x) => x.id === o.customer_id)!
@@ -101,7 +104,7 @@ export function Deliveries() {
         <div style={{ flex: '1 1 320px' }}>
           <div className="task-t">{d.number} <a className="small" href={`#orders-${o.id}`} style={{ fontWeight: 500 }}>{o.number}</a> {total > 1 && <Pill>{tx("Deellevering")} {d.sequence} {tx("van")} {total}</Pill>}{' '}
             {d.status === 'ready' && <Pill tone="good">{tx("Klaargezet")}</Pill>} {d.status === 'in_transit' && <Pill tone="info">{tx("Onderweg")}</Pill>}{' '}
-            {d.status !== 'planned' && needsNote && !d.note_printed_at && <Pill tone="warn">{tx("Bon nog niet afgedrukt")}</Pill>}
+            {d.status !== 'planned' && needsNote && !usesApp(d) && !d.note_printed_at && <Pill tone="warn">{tx("Bon nog niet afgedrukt")}</Pill>}
           </div>
           <div className="small">{c.company || c.name}{o.fulfilment !== 'meenemen' ? `, ${o.delivery_address}, ${o.delivery_city}` : ''}{o.delivery_phone ? `, ${o.delivery_phone}` : ''}</div>
           <div className="muted small">{[
@@ -128,7 +131,7 @@ export function Deliveries() {
           <button className="btn sm" onClick={() => setMove(d)}><CalendarClock size={14} />{tx("Verschuiven")}</button>
           {d.status !== 'planned' && needsNote && <a className="btn sm" href={`#levering-${d.id}`}><FileText size={14} />{tx("Afleverbon")}</a>}
           {d.status === 'planned' && needsNote && <button className="btn sm primary" onClick={() => setPrepare(d)}><ClipboardCheck size={14} />{tx("Klaarzetten")}</button>}
-          {d.status === 'ready' && needsNote && <button className="btn sm" onClick={() => run((db) => setDeliveryInTransit(db, d.id), tx("{0} is onderweg", d.number))}><Truck size={14} />{tx("Onderweg")}</button>}
+          {d.status === 'ready' && needsNote && !usesApp(d) && <button className="btn sm" onClick={() => run((db) => setDeliveryInTransit(db, d.id), tx("{0} is onderweg", d.number))}><Truck size={14} />{tx("Onderweg")}</button>}
           {(d.status !== 'planned' || !needsNote) && <button className="btn sm primary" onClick={() => setFinish(d)}><PackageCheck size={14} />{tx("Afmelden als geleverd")}</button>}
         </div>
       </div>
@@ -170,6 +173,7 @@ export function Deliveries() {
                     {sum && <div className="small">{sum.km} {tx("km,")} {hours(sum.min)} {tx("rijden")}{sum.source === 'schatting' ? tx(", geschat: de routeservice was niet bereikbaar") : ''}{tx(". Tijd bij de klant niet meegerekend.")}</div>}
                   </div>
                   <div className="btn-row">
+                    {digital && <a className="btn sm" href="#chauffeur"><Smartphone size={14} />{tx("Chauffeursapp")}</a>}
                     {originPoint && mapPoints.length > 0 && mapPoints.length <= MAPS_MAX_WAYPOINTS && <a className="btn sm" href={googleMapsRouteUrl(originPoint, mapPoints)} target="_blank" rel="noreferrer"><MapIcon size={14} />{tx("Open in Google Maps")}</a>}
                     <button className="btn sm primary" disabled={busy === day} onClick={() => calculate(day)}><Route size={14} />{busy === day ? tx("Route berekenen…") : tx("Beste route berekenen")}</button>
                   </div>
@@ -189,7 +193,7 @@ export function Deliveries() {
             const o = orderOf(d)
             const c = s.customers.find((x) => x.id === o.customer_id)!
             return <tr key={d.id}><td className="strong">{d.number}</td><td><a className="rowlink" href={`#orders-${o.id}`}>{o.number}</a></td><td>{c.company || c.name}</td><td>{fmtDate(d.delivered_at ?? d.planned_date)}</td><td className="muted">{d.signed_by || '–'}</td>
-              <td>{d.method !== 'meenemen' && d.status === 'delivered' ? <a className="small" href={`#levering-${d.id}`}>{d.signed_note_received ? tx("Getekend retour") : tx("Nog niet retour")}</a> : '–'}</td>
+              <td>{d.method !== 'meenemen' && d.status === 'delivered' ? <a className="small" href={`#levering-${d.id}`}>{d.signature_data ? tx("Digitaal getekend") : d.signed_note_received ? tx("Getekend retour") : tx("Nog niet retour")}</a> : '–'}</td>
               <td>{d.status === 'delivered' ? <Pill tone="good">{tx("Geleverd")}</Pill> : <Pill>{tx("Geannuleerd")}</Pill>}</td></tr>
           })}</tbody>
         </table></div>}
@@ -203,6 +207,7 @@ export function Deliveries() {
 
 function PrepareModal({ d, onClose }: { d: Delivery; onClose: () => void }) {
   const { s, run } = useApp()
+  const digital = s.settings[0]?.delivery_note_mode === 'digitaal' && d.method === 'eigen_team'
   const lines = s.delivery_lines.filter((l) => l.delivery_id === d.id)
   const hand = onHandMap(s)
   const [checked, setChecked] = useState<Record<string, boolean>>({})
@@ -212,8 +217,8 @@ function PrepareModal({ d, onClose }: { d: Delivery; onClose: () => void }) {
     <Modal title={tx("{0} klaarzetten", d.number)} onClose={onClose} footer={<>
       <button className="btn" onClick={onClose}>{tx("Annuleren")}</button>
       <button className="btn primary" disabled={!all} onClick={async () => {
-        if (await run((db) => markReady(db, d.id, { approved_by: approver, date: todayISO() }), tx("Akkoord. Druk nu de afleverbon af"))) { onClose(); go(`levering-${d.id}`) }
-      }}>{tx("Akkoord en naar afleverbon")}</button>
+        if (await run((db) => markReady(db, d.id, { approved_by: approver, date: todayISO() }), digital ? tx("Klaargezet. De bezorging staat klaar in de chauffeursapp") : tx("Akkoord. Druk nu de afleverbon af"))) { onClose(); if (!digital) go(`levering-${d.id}`) }
+      }}>{digital ? tx("Akkoord") : tx("Akkoord en naar afleverbon")}</button>
     </>}>
       <p className="small muted" style={{ margin: 0 }}>{tx("Vink af wat klaarstaat en is gecontroleerd.")}</p>
       <div className="stack" style={{ gap: 2 }}>{lines.map((l) => {

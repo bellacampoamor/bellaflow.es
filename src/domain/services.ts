@@ -418,7 +418,7 @@ export async function createDelivery(db: Driver, input: DeliveryInput) {
   const id = newId()
   const sequence = s.deliveries.filter((d) => d.sales_order_id === input.sales_order_id).length + 1
   const number = await nextDocumentNumber(db, 'LV', 'prefix_delivery', yearOf(input.planned_date))
-  await db.insert('deliveries', [{ id, number, sales_order_id: input.sales_order_id, sequence, method: input.method, planned_date: input.planned_date, carrier: input.carrier, status: 'planned', proforma_number: null, delivered_at: null, signed_by: '', notes: input.notes, ready_at: null, approved_by: '', note_printed_at: null, signed_note_received: false, route_position: null }])
+  await db.insert('deliveries', [{ id, number, sales_order_id: input.sales_order_id, sequence, method: input.method, planned_date: input.planned_date, carrier: input.carrier, status: 'planned', proforma_number: null, signature_data: null, signed_at: null, delivered_at: null, signed_by: '', notes: input.notes, ready_at: null, approved_by: '', note_printed_at: null, signed_note_received: false, route_position: null }])
   await db.insert('delivery_lines', lines.map((l) => ({ ...l, delivery_id: id })))
   return id
 }
@@ -504,6 +504,15 @@ export async function markDelivered(db: Driver, id: string, input: { date: strin
   })))
   await db.update('deliveries', id, { status: 'delivered', delivered_at: input.date, signed_by: input.signed_by, signed_note_received: input.signed_note_received ?? false, proforma_number: await nextDocumentNumber(db, 'PF', 'prefix_proforma', yearOf(input.date)) })
   await db.insert('order_events', [event(d.sales_order_id, 'levering', `${d.number} geleverd.`)])
+}
+
+/** Digitale afleverbon: de handtekening van de klant bevestigt de levering en meldt die meteen af. */
+export async function signDelivery(db: Driver, id: string, input: { signature: string; signed_by: string; date: string }) {
+  if (!input.signature.startsWith('data:image/')) fail(tx("Laat de klant eerst tekenen."))
+  const d = (await loadSnapshot(db)).deliveries.find((x) => x.id === id) ?? (fail(tx("Levering niet gevonden.")) as never)
+  if (d.status === 'planned') fail(tx("Deze levering is nog niet klaargezet."))
+  await markDelivered(db, id, { date: input.date, signed_by: input.signed_by, signed_note_received: true })
+  await db.update('deliveries', id, { signature_data: input.signature, signed_at: new Date().toISOString() })
 }
 
 /** Leveringen van voor de proforma krijgen alsnog een nummer, zodat ze aangevinkt kunnen worden. */

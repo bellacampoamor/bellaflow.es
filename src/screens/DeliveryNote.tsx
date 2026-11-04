@@ -7,7 +7,7 @@ import { go, useApp } from '../ui/app-context'
 import { fmtDate, Head, Modal, Pill } from '../ui/kit'
 import { tx } from '../i18n'
 
-const T: Record<Language, Record<string, string>> = {
+export const NOTE_TEXT: Record<Language, Record<string, string>> = {
   es: { title: 'Albarán de entrega', date: 'Fecha de entrega', order: 'Pedido', ref: 'Su referencia', to: 'Entregar a', bill: 'Cliente', tel: 'Tel.', part: 'Entrega parcial', of: 'de', code: 'Referencia', prod: 'Producto', opts: 'Acabado', pkg: 'Bultos', qty: 'Cant.', from: 'Almacén', notes: 'Observaciones', floor: 'Planta', lift: 'Ascensor', assembly: 'Montaje', remove: 'Retirar muebles antiguos', yes: 'sí', no: 'no', confirm: 'El cliente declara haber recibido los productos indicados en buen estado.', remarks: 'Observaciones en la recepción', name: 'Nombre', sign: 'Firma del cliente', when: 'Fecha y hora', stop: 'Parada' },
   nl: { title: 'Afleverbon', date: 'Leverdatum', order: 'Order', ref: 'Uw referentie', to: 'Afleveren bij', bill: 'Klant', tel: 'Tel.', part: 'Deellevering', of: 'van', code: 'Artikel', prod: 'Product', opts: 'Uitvoering', pkg: 'Colli', qty: 'Aantal', from: 'Magazijn', notes: 'Instructies', floor: 'Verdieping', lift: 'Lift', assembly: 'Montage', remove: 'Oude meubels meenemen', yes: 'ja', no: 'nee', confirm: 'De klant verklaart de genoemde producten in goede staat te hebben ontvangen.', remarks: 'Opmerkingen bij ontvangst', name: 'Naam', sign: 'Handtekening klant', when: 'Datum en tijd', stop: 'Stop' },
   en: { title: 'Delivery note', date: 'Delivery date', order: 'Order', ref: 'Your reference', to: 'Deliver to', bill: 'Customer', tel: 'Tel.', part: 'Part delivery', of: 'of', code: 'Item', prod: 'Product', opts: 'Finish', pkg: 'Packages', qty: 'Qty', from: 'Warehouse', notes: 'Instructions', floor: 'Floor', lift: 'Lift', assembly: 'Assembly', remove: 'Remove old furniture', yes: 'yes', no: 'no', confirm: 'The customer confirms receipt of the listed products in good condition.', remarks: 'Remarks on receipt', name: 'Name', sign: 'Customer signature', when: 'Date and time', stop: 'Stop' },
@@ -21,7 +21,7 @@ export function DeliveryNote({ id }: { id: string }) {
   const o = s.sales_orders.find((x) => x.id === d.sales_order_id)!
   const c = s.customers.find((x) => x.id === o.customer_id)!
   const co = s.settings[0]
-  const t = T[documentLanguage(co.language_delivery_note, c.language)]
+  const t = NOTE_TEXT[documentLanguage(co.language_delivery_note, c.language)]
   const lines = s.delivery_lines.filter((l) => l.delivery_id === id).map((l) => {
     const sol = s.sales_order_lines.find((x) => x.id === l.sales_order_line_id)!
     return { ...l, sol, p: s.products.find((x) => x.id === sol.product_id)!, wh: s.warehouses.find((w) => w.id === l.warehouse_id)! }
@@ -101,13 +101,20 @@ export function DeliveryNote({ id }: { id: string }) {
           {t.floor}: {o.floor || '–'}, {t.lift}: {o.has_elevator ? t.yes : t.no}, {t.assembly}: {o.needs_assembly ? t.yes : t.no}, {t.remove}: {o.remove_old_furniture ? t.yes : t.no}
           {(o.delivery_notes || d.notes) && <div style={{ marginTop: 4 }}>{t.notes}: {[o.delivery_notes, d.notes].filter(Boolean).join('. ')}</div>}
         </div>
-        <div className="note-sign">
+        {d.signature_data && (
+          <div className="note-signature">
+            <div className="pre">{t.confirm}</div>
+            <img src={d.signature_data} alt={tx("Handtekening van {0}", d.signed_by)} />
+            <div className="small">{t.name}: {d.signed_by}<br />{t.when}: {new Date(d.signed_at ?? d.delivered_at ?? d.planned_date).toLocaleString('nl-NL', { dateStyle: 'short', timeStyle: 'short' })}</div>
+          </div>
+        )}
+        {!d.signature_data && <div className="note-sign">
           <div className="pre" style={{ gridColumn: '1 / -1', minHeight: 0 }}>{t.confirm}</div>
           <div style={{ gridColumn: '1 / -1' }}>{t.remarks}</div>
           <div>{t.name}</div>
           <div>{t.when}</div>
           <div className="sig">{t.sign}</div>
-        </div>
+        </div>}
       </div>
     </>
   )

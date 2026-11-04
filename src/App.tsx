@@ -14,6 +14,7 @@ import { DeliveryNote } from './screens/DeliveryNote'
 import { InvoiceDetail, Invoices } from './screens/Invoices'
 import { Stock } from './screens/Stock'
 import { Admin } from './screens/Admin'
+import { Driver } from './screens/Driver'
 import { getLanguage, setLanguage, tx } from './i18n'
 
 // Twee gescheiden processen, elk met eigen menu-optie en eigen stappen.
@@ -72,6 +73,8 @@ export function App({ onResetDemo, onSignOut }: { onResetDemo?: () => Promise<vo
   const param = dash < 0 ? '' : hash.slice(dash + 1)
   const counts = flowCounts(s)
   const flow = flowOf(screen)
+
+  if (screen === 'chauffeur') return <Driver param={param} />
 
   return (
     <>

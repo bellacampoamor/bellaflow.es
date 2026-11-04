@@ -83,6 +83,11 @@ export function Admin() {
           <NumberField label={tx("Betaaltermijn (dagen)")} value={co.payment_days} min={0} step="1" onChange={(v) => setCo({ ...co, payment_days: v })} />
           <AreaField className="span-all" label={tx("Tekst onderaan de factuur")} value={co.invoice_footer} onChange={(v) => setCo({ ...co, invoice_footer: v })} />
         </div>
+        <h2 style={{ margin: '22px 0 4px' }}>{tx("Afleverbon")}</h2>
+        <p className="small muted" style={{ margin: '0 0 12px' }}>{tx("Bij Digitaal tekent de klant in de chauffeursapp en wordt de bezorging daarmee afgemeld. Dit geldt voor het eigen bezorgteam; bij een vervoerder blijft de bon op papier.")}</p>
+        <div className="form-grid">
+          <SelectField label={tx("Soort afleverbon")} value={co.delivery_note_mode ?? 'papier'} onChange={(v: Settings['delivery_note_mode']) => setCo({ ...co, delivery_note_mode: v })} options={[{ value: 'papier', label: tx("Papier, geprint") }, { value: 'digitaal', label: tx("Digitaal, in de chauffeursapp") }]} />
+        </div>
         <h2 style={{ margin: '22px 0 4px' }}>{tx("Taal van documenten")}</h2>
         <p className="small muted" style={{ margin: '0 0 12px' }}>{tx("Kies per document in welke taal het wordt afgedrukt. Productnamen blijven zoals ze zijn ingevoerd.")}</p>
         <div className="form-grid">
