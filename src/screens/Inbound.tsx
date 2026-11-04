@@ -58,7 +58,7 @@ export function Inbound() {
 
   return (
     <>
-      <Head title={tx("Transport naar Spanje")} sub={tx("Er wordt elke dag ingekocht en het transport rijdt ongeveer één keer per week. Koppel inkopen aan een vrachtwagen en vul hem af met vulorders voordat hij vertrekt.")}>
+      <Head title={tx("Gepland transport")} sub={tx("Er wordt elke dag ingekocht en het transport rijdt ongeveer één keer per week. Koppel inkopen aan een vrachtwagen en vul hem af met vulorders voordat hij vertrekt.")}>
         <button className="btn" onClick={newTransport}><Plus size={16} />{tx("Nieuw transport")}</button>
         <a className="btn primary" href={planned[0] ? `#inkoop-nieuw-${planned[0].id}` : '#inkoop-nieuw'}><Plus size={16} />{tx("Vulorder maken")}</a>
       </Head>

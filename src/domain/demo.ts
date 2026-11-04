@@ -216,6 +216,16 @@ export async function seedDemo(db: Driver, today = todayISO()) {
     shipments: [{ expected_date: d(-1), warehouse_id: shop.id, carrier: '', pct: 100, transport_id: trLate }],
   })
 
+  // De verkoop van vandaag: regels die nog doorgezet moeten worden naar inkoop, bij twee leveranciers.
+  await createOrder(db, {
+    header: header(c2, today, 'bestelling', 'bezorgen', { requested_date: d(21) }),
+    lines: [line(table, 1, null, { options: 'Blad 260 cm' }), line(sofa, 1, null, { options: 'Stof Sunbrella Canvas Natural' })],
+  })
+  await createOrder(db, {
+    header: header(c1, today, 'bestelling', 'bezorgen', { requested_date: d(25) }),
+    lines: [line(dining, 8, null, { options: 'Zitting rotan zwart' })],
+  })
+
   // Vulorders: voor de showroom op het volgende transport, en de inkoop van vandaag nog zonder transport.
   await createPurchaseOrder(db, {
     supplier_id: lounge.id, order_date: d(-2), supplier_reference: 'NZ-88402', notes: 'Showroom aanvullen',

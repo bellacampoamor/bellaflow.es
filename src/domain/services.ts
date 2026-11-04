@@ -7,7 +7,7 @@ import type {
   SalesOrderLine, Snapshot, StockMovement, TableName,
 } from '../data/types'
 import {
-  addDays, depositAvailable, freeAt, invoicedDeliveryLineIds, invoicesOnDelivery, lineTotal, onHandMap, orderLines, plannedQty, round2,
+  addDays, depositAvailable, freeAt, linesToPurchase, invoicedDeliveryLineIds, invoicesOnDelivery, lineTotal, onHandMap, orderLines, plannedQty, round2,
   shipmentLineOpen, shippedQty, stockKey, todayISO, vatBreakdown,
 } from './calc'
 
@@ -88,6 +88,36 @@ export async function createPurchaseOrder(db: Driver, input: PurchaseInput) {
     await db.insert('inbound_shipment_lines', shipLines.map((r) => ({ id: newId(), shipment_id: sid, purchase_order_line_id: r.pol, qty: r.qty })))
   }
   return id
+}
+
+export interface ConvertInput {
+  lines: { sales_order_line_id: string; supplier_id: string }[]
+  order_date: string; transport_id: string | null; warehouse_id: string; expected_date: string
+}
+
+/** Zet aangevinkte regels van verkooporders door: per leverancier één inkooporder. */
+export async function convertLinesToPurchaseOrders(db: Driver, input: ConvertInput) {
+  if (!input.lines.length) fail(tx("Vink minimaal één regel aan."))
+  if (input.lines.some((l) => !l.supplier_id)) fail(tx("Kies bij elke regel een leverancier."))
+  if (!input.warehouse_id) fail(tx("Kies een bestemming."))
+  const s = await loadSnapshot(db)
+  const open = linesToPurchase(s)
+  const rows = input.lines.map((l) => {
+    const line = open.find((x) => x.id === l.sales_order_line_id)
+    if (!line) fail(tx("Een van de regels is al ingekocht. Ververs het overzicht."))
+    return { line: line!, supplier_id: l.supplier_id }
+  })
+  const ids: string[] = []
+  for (const supplier_id of new Set(rows.map((r) => r.supplier_id))) {
+    ids.push(await createPurchaseOrder(db, {
+      supplier_id, order_date: input.order_date, supplier_reference: '', notes: '',
+      lines: rows.filter((r) => r.supplier_id === supplier_id).map(({ line }) => ({
+        product_id: line.product_id, qty: line.qty, unit_cost: s.products.find((p) => p.id === line.product_id)?.purchase_price ?? 0, sales_order_line_id: line.id,
+      })),
+      shipments: [{ expected_date: input.expected_date, warehouse_id: input.warehouse_id, carrier: '', pct: 100, transport_id: input.transport_id }],
+    }))
+  }
+  return ids
 }
 
 export async function rescheduleShipment(db: Driver, shipmentId: string, newDate: string, reason: string) {

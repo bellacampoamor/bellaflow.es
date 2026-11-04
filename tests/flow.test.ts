@@ -7,7 +7,7 @@ import { TABLES } from '../src/data/types'
 import { linePurchaseStatus, linesToPurchase, flowCounts, freeAt, purchaseKind, transportLoad, invoiceBalance, onHandMap, orderStage, reservedMap, stockKey, vatBreakdown } from '../src/domain/calc'
 import { seedDemo } from '../src/domain/demo'
 import {
-  createDelivery, createInvoice, createOrder, createPurchaseOrder, lineFromProduct, markDelivered, assignShipmentToTransport, cancelTransport, createTransport, markReady, receiveGoods, rescheduleDelivery, saveRouteOrder, saveSettings, splitLinesForStock, setDeliveryInTransit, setShipmentWarehouse, setTransportStatus, updateTransport, splitQty, transferStock,
+  createDelivery, createInvoice, createOrder, createPurchaseOrder, lineFromProduct, markDelivered, assignShipmentToTransport, cancelTransport, convertLinesToPurchaseOrders, createTransport, markReady, receiveGoods, rescheduleDelivery, saveRouteOrder, saveSettings, splitLinesForStock, setDeliveryInTransit, setShipmentWarehouse, setTransportStatus, updateTransport, splitQty, transferStock,
 } from '../src/domain/services'
 import { estimateMatrix, parseRouterTable } from '../src/data/geo'
 import { googleMapsRouteUrl, optimizeRoute, tourCost } from '../src/domain/route'
@@ -290,6 +290,26 @@ describe('meenemen per regel', () => {
     const s = await loadSnapshot(db)
     const product = s.products.find((p) => p.sku === 'LIG-AL-WT')!
     await expect(createOrder(db, { header: header(s.customers[0].id), lines: [lineFromProduct(product, { qty: 99, warehouse_id: s.warehouses[1].id, take_now: true })] })).rejects.toThrow(/om mee te nemen/)
+  })
+})
+
+describe('doorzetten naar inkoop', () => {
+  it('maakt per leverancier één inkooporder, gekoppeld aan de regels en het transport', async () => {
+    const s = await loadSnapshot(db)
+    const queue = linesToPurchase(s)
+    const suppliersIn = new Set(queue.map((l) => s.products.find((p) => p.id === l.product_id)!.supplier_id))
+    expect(suppliersIn.size).toBeGreaterThan(1)
+    const transport = s.transports.find((t) => t.status === 'planned')!
+    const ids = await convertLinesToPurchaseOrders(db, {
+      lines: queue.map((l) => ({ sales_order_line_id: l.id, supplier_id: s.products.find((p) => p.id === l.product_id)!.supplier_id! })),
+      order_date: TODAY, transport_id: transport.id, warehouse_id: s.warehouses[1].id, expected_date: TODAY,
+    })
+    expect(ids).toHaveLength(suppliersIn.size)
+    const after = await loadSnapshot(db)
+    expect(linesToPurchase(after)).toHaveLength(0)
+    for (const l of queue) expect(linePurchaseStatus(after, l.id).purchased).toBe(l.qty)
+    expect(after.inbound_shipments.filter((x) => ids.includes(x.purchase_order_id)).every((x) => x.transport_id === transport.id && x.expected_date === transport.arrival_date)).toBe(true)
+    await expect(convertLinesToPurchaseOrders(db, { lines: [{ sales_order_line_id: queue[0].id, supplier_id: s.suppliers[0].id }], order_date: TODAY, transport_id: null, warehouse_id: s.warehouses[1].id, expected_date: TODAY })).rejects.toThrow(/al ingekocht/)
   })
 })
 

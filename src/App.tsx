@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Languages, Moon, Sun, Boxes, ClipboardList, FileText, LayoutDashboard, PackageCheck, Settings2, ShoppingCart, Truck, Warehouse as WarehouseIcon } from 'lucide-react'
+import { Languages, Moon, Store, Sun, Boxes, ClipboardList, FileText, LayoutDashboard, PackageCheck, Settings2, ShoppingCart, Truck, Warehouse as WarehouseIcon } from 'lucide-react'
 import { flowCounts } from './domain/calc'
 import { useApp, useHash } from './ui/app-context'
 import { Logo, Modal } from './ui/kit'
@@ -16,14 +16,28 @@ import { Stock } from './screens/Stock'
 import { Admin } from './screens/Admin'
 import { getLanguage, setLanguage, tx } from './i18n'
 
-const STEPS = [
-  { key: 'inkoop', label: '1. Inkoop', sub: (n: number) => tx("{0} nog in te kopen", n), icon: ShoppingCart, tint: '' },
-  { key: 'inkomend', label: '2. Inkomend', sub: (n: number) => (n ? tx("{0} te laat", n) : tx("deelleveringen")), icon: Truck, tint: '' },
-  { key: 'ontvangst', label: '3. Ontvangst', sub: (n: number) => tx("{0} binnen 7 dagen", n), icon: PackageCheck, tint: 'sell' },
-  { key: 'orders', label: '4. Verkooporders', sub: (n: number) => tx("{0} te plannen", n), icon: ClipboardList, tint: 'sell' },
-  { key: 'levering', label: '5. Levering', sub: (n: number) => tx("{0} vandaag", n), icon: Truck, tint: 'ship' },
-  { key: 'facturatie', label: '6. Facturatie', sub: (n: number) => tx("{0} te factureren", n), icon: FileText, tint: 'bill' },
-] as const
+// Twee gescheiden processen, elk met eigen menu-optie en eigen stappen.
+const FLOWS = {
+  inkoop: {
+    label: 'Inkoop', icon: ShoppingCart, home: 'inkoop',
+    steps: [
+      { key: 'inkoop', label: '1. Inkooporders', sub: (n: number) => tx("{0} door te zetten", n), icon: ShoppingCart, tint: '' },
+      { key: 'inkomend', label: '2. Gepland transport', sub: (n: number) => (n ? tx("{0} te laat", n) : tx("op schema")), icon: Truck, tint: '' },
+      { key: 'ontvangst', label: '3. Ontvangst', sub: (n: number) => tx("{0} binnen 7 dagen", n), icon: PackageCheck, tint: '' },
+    ],
+  },
+  verkoop: {
+    label: 'Verkoop', icon: Store, home: 'orders',
+    steps: [
+      { key: 'orders', label: '4. Verkooporders', sub: (n: number) => tx("{0} te plannen", n), icon: ClipboardList, tint: 'sell' },
+      { key: 'levering', label: '5. Levering', sub: (n: number) => tx("{0} vandaag", n), icon: Truck, tint: 'ship' },
+      { key: 'facturatie', label: '6. Facturatie', sub: (n: number) => tx("{0} te factureren", n), icon: FileText, tint: 'bill' },
+    ],
+  },
+} as const
+type FlowKey = keyof typeof FLOWS
+const flowOf = (screen: string): FlowKey | null =>
+  (Object.keys(FLOWS) as FlowKey[]).find((k) => FLOWS[k].steps.some((st) => st.key === screen)) ?? null
 
 const THEME_KEY = 'bella-flow-theme'
 function useTheme() {
@@ -57,6 +71,7 @@ export function App({ onResetDemo, onSignOut }: { onResetDemo?: () => Promise<vo
   const screen = dash < 0 ? hash : hash.slice(0, dash)
   const param = dash < 0 ? '' : hash.slice(dash + 1)
   const counts = flowCounts(s)
+  const flow = flowOf(screen)
 
   return (
     <>
@@ -73,6 +88,10 @@ export function App({ onResetDemo, onSignOut }: { onResetDemo?: () => Promise<vo
           <a className="brand" href="#overzicht" aria-label={tx("Bella Flow, naar overzicht")}><Logo /></a>
           <nav className="util" aria-label={tx("Algemeen")}>
             <a href="#overzicht" className={screen === 'overzicht' ? 'on' : ''}><LayoutDashboard size={16} />{tx("Overzicht")}</a>
+            {(Object.keys(FLOWS) as FlowKey[]).map((k) => {
+              const F = FLOWS[k], Icon = F.icon
+              return <a key={k} href={`#${F.home}`} className={flow === k ? 'on flow-link' : 'flow-link'}><Icon size={16} />{tx(F.label)}</a>
+            })}
             <a href="#voorraad" className={screen === 'voorraad' ? 'on' : ''}><Boxes size={16} />{tx("Voorraad")}</a>
             <a href="#beheer" className={screen === 'beheer' ? 'on' : ''}><Settings2 size={16} />{tx("Beheer")}</a>
             <button className="btn-toggle" onClick={switchLanguage}><Languages size={16} />{language === 'nl' ? 'English' : 'Nederlands'}</button>
@@ -81,19 +100,21 @@ export function App({ onResetDemo, onSignOut }: { onResetDemo?: () => Promise<vo
           </nav>
         </div>
       </header>
-      <div className="ribbon-wrap wrap">
-        <nav className="inner ribbon" aria-label={tx("Processtappen")}>
-          {STEPS.map((st) => {
-            const Icon = st.icon
-            return (
-              <a key={st.key} href={`#${st.key}`} className={`step ${st.tint} ${screen === st.key ? 'on' : ''}`} aria-current={screen === st.key ? 'page' : undefined}>
-                <span className="ico"><Icon size={16} /></span>
-                <span className="t">{tx(st.label)}<small>{st.sub(counts[st.key])}</small></span>
-              </a>
-            )
-          })}
-        </nav>
-      </div>
+      {flow && (
+        <div className="ribbon-wrap wrap">
+          <nav className="inner ribbon" aria-label={tx(FLOWS[flow].label)}>
+            {FLOWS[flow].steps.map((st) => {
+              const Icon = st.icon
+              return (
+                <a key={st.key} href={`#${st.key}`} className={`step ${st.tint} ${screen === st.key ? 'on' : ''}`} aria-current={screen === st.key ? 'page' : undefined}>
+                  <span className="ico"><Icon size={16} /></span>
+                  <span className="t">{tx(st.label)}<small>{st.sub(counts[st.key])}</small></span>
+                </a>
+              )
+            })}
+          </nav>
+        </div>
+      )}
       <main className="wrap">
         <div className="inner">
           <Route screen={screen} param={param} />

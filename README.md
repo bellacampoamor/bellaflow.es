@@ -47,6 +47,8 @@ Schermen praten alleen met `services` en `calc`, nooit rechtstreeks met de opsla
 - **Vrij** per locatie is aanwezig min gereserveerd. Elke open orderregel reserveert op zijn magazijn.
 - **Afhandeling per regel**: elke regel van een verkooporder wordt direct meegenomen, later uit voorraad geleverd, of op bestelling ingekocht. Meegenomen regels worden meteen afgeboekt en als deellevering gefactureerd.
 - **Verkopers** staan onder Beheer; elke verkooporder moet er een hebben.
+- **Twee flows**: Inkoop (inkooporders, gepland transport, ontvangst) en Verkoop (verkooporders, levering, facturatie) hebben elk een eigen menu-optie en procesbalk.
+- **Doorzetten**: onder Inkoop staan alle regels op bestelling, gegroepeerd per verkooporder. Aangevinkte regels worden per leverancier één inkooporder.
 - **Verkoop stuurt inkoop**: wat bij een bestelling niet vrij op voorraad is, wordt bij opslaan een regel op bestelling. De order toont wat nog ingekocht moet worden en maakt daar een inkooporder van. Wat er al is, kan als deellevering de deur uit.
 - **Op bestelling**: de orderregel heeft geen magazijn tot de goederen binnen zijn. De ontvangst koppelt dat automatisch.
 - **Prijzen** van verkoop zijn inclusief IVA, inkoopprijzen exclusief.

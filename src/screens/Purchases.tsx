@@ -4,8 +4,9 @@ import { Plus, Trash2 } from 'lucide-react'
 import { addDays, linesToPurchase, purchaseKind, round2, shipmentLineOpen, todayISO } from '../domain/calc'
 import { assignShipmentToTransport, cancelPurchaseOrder, createPurchaseOrder, setShipmentWarehouse, splitQty } from '../domain/services'
 import { go, useApp } from '../ui/app-context'
-import { Combo, Empty, eur, fmtDate, Head, Modal, NumberField, Pill, SelectField, TextField, AreaField, type Tone } from '../ui/kit'
+import { Combo, Empty, eur, fmtDate, Head, Modal, NumberField, Pill, SelectField, Tabs, TextField, AreaField, type Tone } from '../ui/kit'
 import { tx } from '../i18n'
+import { PurchaseQueue } from './PurchaseQueue'
 
 export function poProgress(s: ReturnType<typeof useApp>['s'], poId: string) {
   const shipments = s.inbound_shipments.filter((x) => x.purchase_order_id === poId)
@@ -18,27 +19,17 @@ export function poProgress(s: ReturnType<typeof useApp>['s'], poId: string) {
 export function Purchases() {
   const { s } = useApp()
   const waiting = linesToPurchase(s)
+  const [tab, setTab] = useState<'queue' | 'orders'>(waiting.length ? 'queue' : 'orders')
   const rows = [...s.purchase_orders].sort((a, b) => b.order_date.localeCompare(a.order_date) || b.number.localeCompare(a.number))
   return (
     <>
-      <Head title={tx("Inkoop")} sub={tx("Bestellingen bij je leveranciers, met de zendingen waarin ze binnenkomen.")}>
+      <Head title={tx("Inkooporders")} sub={tx("Gedurende de dag ontstaan verkooporders. Zet de regels die ingekocht moeten worden door naar een inkooporder bij de leverancier.")}>
         <a className="btn primary" href="#inkoop-nieuw"><Plus size={16} />{tx("Nieuwe inkooporder")}</a>
       </Head>
+      <Tabs<'queue' | 'orders'> value={tab} onChange={setTab} tabs={[{ value: 'queue', label: tx("Door te zetten"), n: waiting.length }, { value: 'orders', label: tx("Inkooporders"), n: rows.length }]} />
       <div className="stack">
-        {waiting.length > 0 && (
-          <section className="panel">
-            <div className="panel-head"><h2>{tx("Nog in te kopen voor verkooporders")}</h2><a className="btn sm" href="#inkoop-nieuw">{tx("Neem over in inkooporder")}</a></div>
-            <div className="table-wrap"><table>
-              <thead><tr><th>{tx("Verkooporder")}</th><th>{tx("Klant")}</th><th>{tx("Product")}</th><th>{tx("Uitvoering")}</th><th className="num">{tx("Aantal")}</th></tr></thead>
-              <tbody>{waiting.map((l) => {
-                const o = s.sales_orders.find((x) => x.id === l.sales_order_id)!
-                return <tr key={l.id}><td><a className="rowlink" href={`#orders-${o.id}`}>{o.number}</a></td><td>{s.customers.find((c) => c.id === o.customer_id)?.name}</td><td>{l.description}</td><td className="muted">{l.options || '–'}</td><td className="num">{l.qty}</td></tr>
-              })}</tbody>
-            </table></div>
-          </section>
-        )}
-        <section className="panel">
-          <h2>{tx("Inkooporders")}</h2>
+        {tab === 'queue' && <PurchaseQueue onDone={() => setTab('orders')} />}
+        {tab === 'orders' && <section className="panel">
           {rows.length === 0 && <Empty>{tx("Nog geen inkooporders. Maak de eerste met de knop rechtsboven.")}</Empty>}
           <div className="table-wrap"><table>
             <thead><tr><th>{tx("Nummer")}</th><th>{tx("Leverancier")}</th><th>{tx("Besteld")}</th><th>{tx("Soort")}</th><th>{tx("Referentie")}</th><th>{tx("Zendingen")}</th><th className="num">{tx("Ontvangen")}</th><th className="num">{tx("Waarde")}</th><th>{tx("Status")}</th></tr></thead>
@@ -58,7 +49,7 @@ export function Purchases() {
               )
             })}</tbody>
           </table></div>
-        </section>
+        </section>}
       </div>
     </>
   )
