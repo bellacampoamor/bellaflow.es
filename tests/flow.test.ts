@@ -84,7 +84,7 @@ describe('van inkoop tot factuur', () => {
     expect(reservedMap(s).get(stockKey(product.id, north.id))).toBeGreaterThanOrEqual(10)
 
     // Deellevering 1: 3 stuks, wordt 363 op de factuur, deposit dekt alles.
-    const d1 = await createDelivery(db, { sales_order_id: orderId, method: 'eigen_team', planned_date: TODAY, time_slot: '', carrier: '', notes: '', lines: [{ sales_order_line_id: line.id, qty: 3 }] })
+    const d1 = await createDelivery(db, { sales_order_id: orderId, method: 'eigen_team', planned_date: TODAY, carrier: '', notes: '', lines: [{ sales_order_line_id: line.id, qty: 3 }] })
     await deliver(d1)
     expect(await stockAt(north.id)).toBe(beforeNorth)
     s = await loadSnapshot(db)
@@ -99,13 +99,13 @@ describe('van inkoop tot factuur', () => {
     await expect(createInvoice(db, { sales_order_id: orderId, delivery_ids: [d1], invoice_date: '2026-01-01', settle_deposit: true })).rejects.toThrow(/mag niet voor/)
 
     // Meer plannen dan er open staat kan niet.
-    await expect(createDelivery(db, { sales_order_id: orderId, method: 'eigen_team', planned_date: TODAY, time_slot: '', carrier: '', notes: '', lines: [{ sales_order_line_id: line.id, qty: 8 }] })).rejects.toThrow(/nog 7 open/)
+    await expect(createDelivery(db, { sales_order_id: orderId, method: 'eigen_team', planned_date: TODAY, carrier: '', notes: '', lines: [{ sales_order_line_id: line.id, qty: 8 }] })).rejects.toThrow(/nog 7 open/)
 
     // Rest leveren: voorraad moet er zijn, dus eerst overboeken en de tweede zending ontvangen.
     s = await loadSnapshot(db)
     await receiveGoods(db, { received_date: TODAY, delivery_note: 'PB2', received_by: '', notes: '', rows: [{ shipment_line_id: sl1.id, warehouse_id: north.id, qty_received: 6, qty_damaged: 0, location_bin: '' }] })
     await transferStock(db, { product_id: product.id, from_id: south.id, to_id: north.id, qty: 1, note: '', date: TODAY })
-    const d2 = await createDelivery(db, { sales_order_id: orderId, method: 'eigen_team', planned_date: TODAY, time_slot: '', carrier: '', notes: '', lines: [{ sales_order_line_id: line.id, qty: 7 }] })
+    const d2 = await createDelivery(db, { sales_order_id: orderId, method: 'eigen_team', planned_date: TODAY, carrier: '', notes: '', lines: [{ sales_order_line_id: line.id, qty: 7 }] })
     await deliver(d2)
     s = await loadSnapshot(db)
     const inv2 = s.invoices.filter((i) => i.sales_order_id === orderId).find((i) => i.id !== inv1.id)!
@@ -122,7 +122,7 @@ describe('van inkoop tot factuur', () => {
     const id = await createOrder(db, { header: header(s.customers[0].id), lines: [lineFromProduct(product, { qty: 1, warehouse_id: shop.id })] })
     const after = await loadSnapshot(db)
     const line = after.sales_order_lines.find((l) => l.sales_order_id === id)!
-    const d = await createDelivery(db, { sales_order_id: id, method: 'eigen_team', planned_date: TODAY, time_slot: '', carrier: '', notes: '', lines: [{ sales_order_line_id: line.id, qty: 1 }] })
+    const d = await createDelivery(db, { sales_order_id: id, method: 'eigen_team', planned_date: TODAY, carrier: '', notes: '', lines: [{ sales_order_line_id: line.id, qty: 1 }] })
     await expect(deliver(d)).rejects.toThrow(/Boek eerst voorraad/)
   })
 
@@ -131,7 +131,7 @@ describe('van inkoop tot factuur', () => {
     const product = s.products.find((p) => p.sku === 'LIG-AL-WT')!
     const id = await createOrder(db, { header: header(s.customers[0].id), lines: [lineFromProduct(product, { qty: 2, warehouse_id: s.warehouses[1].id })] })
     const line = (await loadSnapshot(db)).sales_order_lines.find((l) => l.sales_order_id === id)!
-    const d = await createDelivery(db, { sales_order_id: id, method: 'eigen_team', planned_date: TODAY, time_slot: '', carrier: '', notes: '', lines: [{ sales_order_line_id: line.id, qty: 2 }] })
+    const d = await createDelivery(db, { sales_order_id: id, method: 'eigen_team', planned_date: TODAY, carrier: '', notes: '', lines: [{ sales_order_line_id: line.id, qty: 2 }] })
     await deliver(d)
     expect((await loadSnapshot(db)).invoices.filter((i) => i.sales_order_id === id)).toHaveLength(0)
   })
@@ -174,7 +174,7 @@ describe('tabbladen verkooporders', () => {
     expect(await tab()).toBe('te_leveren')
     s = await loadSnapshot(db)
     const line = s.sales_order_lines.find((l) => l.sales_order_id === id)!
-    const plan = (qty: number) => createDelivery(db, { sales_order_id: id, method: 'eigen_team', planned_date: TODAY, time_slot: '', carrier: '', notes: '', lines: [{ sales_order_line_id: line.id, qty }] })
+    const plan = (qty: number) => createDelivery(db, { sales_order_id: id, method: 'eigen_team', planned_date: TODAY, carrier: '', notes: '', lines: [{ sales_order_line_id: line.id, qty }] })
     const first = await plan(1)
     expect(await tab()).toBe('te_leveren')
     await deliver(first)
@@ -192,7 +192,7 @@ describe('afleverbon', () => {
     const product = s.products.find((p) => p.sku === 'LIG-AL-WT')!
     const id = await createOrder(db, { header: header(s.customers[0].id), lines: [lineFromProduct(product, { qty: 1, warehouse_id: s.warehouses[1].id })] })
     const line = (await loadSnapshot(db)).sales_order_lines.find((l) => l.sales_order_id === id)!
-    return createDelivery(db, { sales_order_id: id, method: 'eigen_team', planned_date: TODAY, time_slot: '', carrier: '', notes: '', lines: [{ sales_order_line_id: line.id, qty: 1 }] })
+    return createDelivery(db, { sales_order_id: id, method: 'eigen_team', planned_date: TODAY, carrier: '', notes: '', lines: [{ sales_order_line_id: line.id, qty: 1 }] })
   }
   it('vraagt om klaarzetten, akkoord en handtekening', async () => {
     const d = await plannedDelivery()
@@ -383,7 +383,7 @@ describe('leverdatum bij deellevering', () => {
     const product = s.products.find((p) => p.sku === 'LIG-AL-WT')!
     const id = await createOrder(db, { header: header(s.customers[0].id), lines: [lineFromProduct(product, { qty: 2, warehouse_id: s.warehouses[1].id })] })
     const line = (await loadSnapshot(db)).sales_order_lines.find((l) => l.sales_order_id === id)!
-    const plan = (qty: number) => createDelivery(db, { sales_order_id: id, method: 'eigen_team', planned_date: TODAY, time_slot: '', carrier: '', notes: '', lines: [{ sales_order_line_id: line.id, qty }] })
+    const plan = (qty: number) => createDelivery(db, { sales_order_id: id, method: 'eigen_team', planned_date: TODAY, carrier: '', notes: '', lines: [{ sales_order_line_id: line.id, qty }] })
     const first = await plan(1), second = await plan(1)
     await deliver(first)
     await rescheduleOrder(db, id, { new_date: '2026-12-20', reason: '', customer_notified: false })

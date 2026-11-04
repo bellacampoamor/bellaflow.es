@@ -300,7 +300,6 @@ export function PlanDeliveryModal({ order, onClose }: { order: SalesOrder; onClo
   const [qty, setQty] = useState<Record<string, number>>(() => Object.fromEntries(lines.map((l) => [l.id, l.warehouse_id ? Math.min(l.qty - plannedQty(s, l.id), Math.max(0, onHandMap(s).get(stockKey(l.product_id, l.warehouse_id)) ?? 0)) : 0])))
   const [date, setDate] = useState(order.promised_date ?? order.requested_date ?? todayISO())
   const [method, setMethod] = useState<Delivery['method']>(defaultMethod(order.fulfilment))
-  const [slot, setSlot] = useState('')
   const [carrier, setCarrier] = useState('')
   const [notes, setNotes] = useState('')
   const hand = onHandMap(s)
@@ -309,13 +308,12 @@ export function PlanDeliveryModal({ order, onClose }: { order: SalesOrder; onClo
     <Modal wide title={isPartial ? tx("Deellevering plannen") : tx("Levering plannen")} onClose={onClose} footer={<>
       <button className="btn" onClick={onClose}>{tx("Annuleren")}</button>
       <button className="btn primary" onClick={async () => {
-        if (await run((db) => createDelivery(db, { sales_order_id: order.id, method, planned_date: date, time_slot: slot, carrier: method === 'vervoerder' ? carrier : '', notes, lines: Object.entries(qty).map(([sales_order_line_id, q]) => ({ sales_order_line_id, qty: q })) }), tx("Levering gepland"))) onClose()
+        if (await run((db) => createDelivery(db, { sales_order_id: order.id, method, planned_date: date, carrier: method === 'vervoerder' ? carrier : '', notes, lines: Object.entries(qty).map(([sales_order_line_id, q]) => ({ sales_order_line_id, qty: q })) }), tx("Levering gepland"))) onClose()
       }}>{tx("Levering plannen")}</button>
     </>}>
       <div className="form-grid">
         <TextField label={tx("Leverdatum")} type="date" value={date} onChange={setDate} />
         <SelectField label={tx("Wijze")} value={method} onChange={setMethod} options={[{ value: 'eigen_team', label: tx("Bezorgen door eigen team") }, { value: 'vervoerder', label: tx("Vervoerder") }, { value: 'meenemen', label: tx("Klant haalt op") }]} />
-        <TextField label={tx("Tijdvak")} value={slot} onChange={setSlot} placeholder="09:00-12:00" />
         {method === 'vervoerder' && <TextField label={tx("Vervoerder")} value={carrier} onChange={setCarrier} />}
       </div>
       <div className="table-wrap flush"><table>

@@ -80,7 +80,7 @@ export interface StockMovement {
 }
 export interface Delivery {
   id: string; number: string; sales_order_id: string; sequence: number
-  method: 'meenemen' | 'vervoerder' | 'eigen_team'; planned_date: string; time_slot: string; carrier: string
+  method: 'meenemen' | 'vervoerder' | 'eigen_team'; planned_date: string; carrier: string
   status: 'planned' | 'ready' | 'in_transit' | 'delivered' | 'cancelled'; delivered_at: string | null
   signed_by: string; notes: string; ready_at: string | null; approved_by: string; note_printed_at: string | null
   signed_note_received: boolean; route_position: number | null

@@ -74,7 +74,7 @@ export function Overview() {
           {deliveries.length === 0 && <Empty>{tx("Er staan geen leveringen gepland.")}</Empty>}
           {deliveries.map((d) => (
             <a className="task" key={d.id} href="#levering">
-              <div><div className="task-t">{d.number}, {custOf(d.sales_order_id)}</div><div className="muted small">{d.time_slot || tx("Geen tijdvak")}{d.sequence > 1 ? tx(", deellevering {0}", d.sequence) : ''}</div></div>
+              <div><div className="task-t">{d.number}, {custOf(d.sales_order_id)}</div>{d.sequence > 1 && <div className="muted small">{tx("Deellevering {0}", d.sequence)}</div>}</div>
               <Pill tone={d.planned_date < today ? 'bad' : d.planned_date === today ? 'warn' : ''}>{fmtShort(d.planned_date)}</Pill>
             </a>
           ))}

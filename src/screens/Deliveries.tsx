@@ -106,7 +106,7 @@ export function Deliveries() {
           <div className="small">{c.company || c.name}{o.fulfilment !== 'meenemen' ? `, ${o.delivery_address}, ${o.delivery_city}` : ''}{o.delivery_phone ? `, ${o.delivery_phone}` : ''}</div>
           <div className="muted small">{[
             d.method !== 'eigen_team' ? tx(METHOD[d.method]) + (d.carrier && d.carrier !== METHOD[d.method] ? ` (${d.carrier})` : '') : '',
-            d.time_slot, o.needs_assembly ? tx("montage") : '', o.floor, o.has_elevator ? tx("lift") : '',
+            o.needs_assembly ? tx("montage") : '', o.floor, o.has_elevator ? tx("lift") : '',
           ].filter(Boolean).join(', ')}</div>
           <div className="small" style={{ marginTop: 5 }}>{lines.map((l) => {
             const sol = s.sales_order_lines.find((x) => x.id === l.sales_order_line_id)!
@@ -160,7 +160,6 @@ export function Deliveries() {
           const others = planning.filter((d) => d.planned_date === day && d.method !== 'eigen_team').sort(byPosition)
           const sum = summary(day)
           const mapPoints = stops.map((d) => coords(orderOf(d))).filter(Boolean) as Point[]
-          const positioned = stops.some((d) => d.route_position != null)
           return (
             <section className="panel" key={day}>
               <div className="panel-head"><h2>{fmtShort(day)}</h2>{day < today ? <Pill tone="bad">{tx("Te laat")}</Pill> : day === today ? <Pill tone="warn">{tx("Vandaag")}</Pill> : null}</div>
@@ -169,7 +168,6 @@ export function Deliveries() {
                   <div>
                     <strong>{tx("Bezorgroute:")} {stops.length} {stops.length === 1 ? 'stop' : 'stops'}</strong>{tx(", heen en terug vanaf")} {origin?.name ?? tx("magazijn (nog in te stellen)")}
                     {sum && <div className="small">{sum.km} {tx("km,")} {hours(sum.min)} {tx("rijden")}{sum.source === 'schatting' ? tx(", geschat: de routeservice was niet bereikbaar") : ''}{tx(". Tijd bij de klant niet meegerekend.")}</div>}
-                    {positioned && stops.some((d) => d.time_slot) && <div className="small muted">{tx("De volgorde houdt geen rekening met tijdvakken.")}</div>}
                   </div>
                   <div className="btn-row">
                     {originPoint && mapPoints.length > 0 && mapPoints.length <= MAPS_MAX_WAYPOINTS && <a className="btn sm" href={googleMapsRouteUrl(originPoint, mapPoints)} target="_blank" rel="noreferrer"><MapIcon size={14} />{tx("Open in Google Maps")}</a>}

@@ -319,7 +319,7 @@ export async function createOrder(db: Driver, input: OrderInput, opts: { autoDel
   const taken = lines.filter((l) => l.take_now)
   if (taken.length) {
     const date = opts.autoDeliverDate ?? input.header.order_date
-    const did = await createDelivery(db, { sales_order_id: id, method: 'meenemen', planned_date: date, time_slot: '', carrier: '', notes: '', lines: taken.map((l) => ({ sales_order_line_id: l.id, qty: l.qty })) })
+    const did = await createDelivery(db, { sales_order_id: id, method: 'meenemen', planned_date: date, carrier: '', notes: '', lines: taken.map((l) => ({ sales_order_line_id: l.id, qty: l.qty })) })
     await markDelivered(db, did, { date, signed_by: input.header.delivery_name || '' })
   }
   return id
@@ -399,7 +399,7 @@ export async function addOrderPayment(db: Driver, input: { sales_order_id: strin
 // Levering aan klant -----------------------------------------------------------
 
 export interface DeliveryInput {
-  sales_order_id: string; method: Delivery['method']; planned_date: string; time_slot: string; carrier: string; notes: string
+  sales_order_id: string; method: Delivery['method']; planned_date: string; carrier: string; notes: string
   lines: { sales_order_line_id: string; qty: number }[]
 }
 
@@ -418,7 +418,7 @@ export async function createDelivery(db: Driver, input: DeliveryInput) {
   const id = newId()
   const sequence = s.deliveries.filter((d) => d.sales_order_id === input.sales_order_id).length + 1
   const number = await nextDocumentNumber(db, 'LV', 'prefix_delivery', yearOf(input.planned_date))
-  await db.insert('deliveries', [{ id, number, sales_order_id: input.sales_order_id, sequence, method: input.method, planned_date: input.planned_date, time_slot: input.time_slot, carrier: input.carrier, status: 'planned', delivered_at: null, signed_by: '', notes: input.notes, ready_at: null, approved_by: '', note_printed_at: null, signed_note_received: false, route_position: null }])
+  await db.insert('deliveries', [{ id, number, sales_order_id: input.sales_order_id, sequence, method: input.method, planned_date: input.planned_date, carrier: input.carrier, status: 'planned', delivered_at: null, signed_by: '', notes: input.notes, ready_at: null, approved_by: '', note_printed_at: null, signed_note_received: false, route_position: null }])
   await db.insert('delivery_lines', lines.map((l) => ({ ...l, delivery_id: id })))
   return id
 }

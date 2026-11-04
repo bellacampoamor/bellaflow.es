@@ -166,7 +166,7 @@ export async function seedDemo(db: Driver, today = todayISO()) {
     lines: [line(sofa, 1, north), line(chair, 2, north), line(coffee, 1, north)],
     deposit: { amount: 1000, method: 'pin', reference: '' },
   })
-  const dl1 = await createDelivery(db, { sales_order_id: o1, method: 'eigen_team', planned_date: d(-14), time_slot: '09:00-12:00', carrier: '', notes: '', lines: (await oLines(o1)).map((l) => ({ sales_order_line_id: l.id, qty: l.qty })) })
+  const dl1 = await createDelivery(db, { sales_order_id: o1, method: 'eigen_team', planned_date: d(-14), carrier: '', notes: '', lines: (await oLines(o1)).map((l) => ({ sales_order_line_id: l.id, qty: l.qty })) })
   await markReady(db, dl1, { approved_by: 'Magazijn', date: d(-15) })
   await markDelivered(db, dl1, { date: d(-14), signed_by: 'M. de Vries', signed_note_received: true })
   const inv1 = await createInvoice(db, { sales_order_id: o1, delivery_ids: [dl1], invoice_date: d(-14), settle_deposit: true })
@@ -187,10 +187,10 @@ export async function seedDemo(db: Driver, today = todayISO()) {
     deposit: { amount: 1500, method: 'overboeking', reference: 'Aanbetaling 118' },
   })
   const o2l = await oLines(o2)
-  const dl2 = await createDelivery(db, { sales_order_id: o2, method: 'eigen_team', planned_date: d(-3), time_slot: '08:00-11:00', carrier: '', notes: '', lines: o2l.map((l) => ({ sales_order_line_id: l.id, qty: Math.ceil(l.qty / 2) })) })
+  const dl2 = await createDelivery(db, { sales_order_id: o2, method: 'eigen_team', planned_date: d(-3), carrier: '', notes: '', lines: o2l.map((l) => ({ sales_order_line_id: l.id, qty: Math.ceil(l.qty / 2) })) })
   await markReady(db, dl2, { approved_by: 'Magazijn', date: d(-4) })
   await markDelivered(db, dl2, { date: d(-3), signed_by: 'Receptie Mirador', signed_note_received: true })
-  const dl3 = await createDelivery(db, { sales_order_id: o2, method: 'eigen_team', planned_date: today, time_slot: '13:00-16:00', carrier: '', notes: '', lines: o2l.map((l) => ({ sales_order_line_id: l.id, qty: Math.floor(l.qty / 2) })) })
+  const dl3 = await createDelivery(db, { sales_order_id: o2, method: 'eigen_team', planned_date: today, carrier: '', notes: '', lines: o2l.map((l) => ({ sales_order_line_id: l.id, qty: Math.floor(l.qty / 2) })) })
 
   await markReady(db, dl3, { approved_by: 'Magazijn', date: today })
   await markNotePrinted(db, dl3)
@@ -198,7 +198,7 @@ export async function seedDemo(db: Driver, today = todayISO()) {
   // Vier bezorgingen voor morgen, nog niet op rijvolgorde gezet.
   for (const [c, p, qty] of [[c5, coffee, 1], [c1, chair, 2], [c6, chair, 2], [c3, coffee, 1]] as const) {
     const id = await createOrder(db, { header: header(c, d(-1), 'bestelling', 'bezorgen', { promised_date: d(1) }), lines: [line(p, qty, north)] })
-    await createDelivery(db, { sales_order_id: id, method: 'eigen_team', planned_date: d(1), time_slot: '', carrier: '', notes: '', lines: (await oLines(id)).map((l) => ({ sales_order_line_id: l.id, qty: l.qty })) })
+    await createDelivery(db, { sales_order_id: id, method: 'eigen_team', planned_date: d(1), carrier: '', notes: '', lines: (await oLines(id)).map((l) => ({ sales_order_line_id: l.id, qty: l.qty })) })
   }
 
   // Te plannen uit voorraad, op twee locaties.
