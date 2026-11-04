@@ -168,7 +168,7 @@ export function OrderDetail({ id }: { id: string }) {
           )}
 
           <section className="panel">
-            <div className="panel-head"><h2>{tx("Leveringen")}</h2>{open && plannable.length > 0 && <button className="btn sm" onClick={() => setModal('plan')}><Plus size={14} />{tx("Deellevering plannen")}</button>}</div>
+            <div className="panel-head"><h2>{tx("Leveringen")}</h2></div>
             {deliveries.length === 0 && <Empty>{plannable.length ? tx("Nog niets gepland. Plan alles ineens of in delen.") : tx("Plannen kan zodra de goederen binnen zijn.")}</Empty>}
             {deliveries.map((d) => (
               <a key={d.id} href={d.status === 'planned' || d.status === 'cancelled' || d.method === 'meenemen' ? '#levering' : `#levering-${d.id}`} className="task">
