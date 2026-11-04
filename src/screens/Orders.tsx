@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { CalendarClock, Copy, Pencil, Plus, Truck } from 'lucide-react'
 import type { Delivery, Payment, SalesOrder } from '../data/types'
-import { linePurchaseStatus, linesToPurchase, depositAvailable, depositPaid, invoiceBalance, lineTotal, onHandMap, orderLines, orderOutstanding, orderStage, orderTotal, plannedQty, shippedQty, STAGE_LABEL, stockKey, todayISO, uninvoicedDeliveries, type OrderStage } from '../domain/calc'
+import { linePurchaseStatus, linesToPurchase, depositAvailable, depositPaid, invoiceBalance, lineTotal, onHandMap, orderLines, orderOutstanding, orderStage, orderTab, orderTotal, plannedQty, shippedQty, STAGE_LABEL, stockKey, todayISO, uninvoicedDeliveries, type OrderStage, type OrderTab } from '../domain/calc'
 import { addOrderPayment, cancelOrder, createDelivery, defaultMethod, rescheduleOrder, setLineWarehouse } from '../domain/services'
 import { go, useApp } from '../ui/app-context'
 import { Check, Empty, eur, fmtDate, Head, Modal, NumberField, Pill, SelectField, Tabs, TextField, type Tone } from '../ui/kit'
@@ -11,17 +11,16 @@ export const stageTone: Record<OrderStage, Tone> = {
   geannuleerd: '', wacht_op_goederen: 'warn', te_plannen: 'sell', gepland: 'info', deels_geleverd: 'warn', te_factureren: 'bill', gefactureerd: 'good',
 }
 
-type Filter = 'alle' | 'verwerken' | 'lopend' | 'klaar'
+type Filter = 'alle' | OrderTab
 
 export function Orders() {
   const { s } = useApp()
-  const [filter, setFilter] = useState<Filter>('verwerken')
+  const [filter, setFilter] = useState<Filter>('te_leveren')
   const [q, setQ] = useState('')
-  const rows = useMemo(() => [...s.sales_orders].sort((a, b) => b.order_date.localeCompare(a.order_date) || b.number.localeCompare(a.number)).map((o) => ({ o, stage: orderStage(s, o), cust: s.customers.find((c) => c.id === o.customer_id) })), [s])
-  const groups: Record<Filter, OrderStage[]> = { alle: [], verwerken: ['te_plannen', 'wacht_op_goederen'], lopend: ['gepland', 'deels_geleverd', 'te_factureren'], klaar: ['gefactureerd', 'geannuleerd'] }
-  const inGroup = (f: Filter, st: OrderStage) => f === 'alle' || groups[f].includes(st)
+  const rows = useMemo(() => [...s.sales_orders].sort((a, b) => b.order_date.localeCompare(a.order_date) || b.number.localeCompare(a.number)).map((o) => ({ o, stage: orderStage(s, o), tab: orderTab(s, o), cust: s.customers.find((c) => c.id === o.customer_id) })), [s])
+  const inGroup = (f: Filter, tab: OrderTab | null) => f === 'alle' || f === tab
   const t = q.trim().toLowerCase()
-  const shown = rows.filter((r) => inGroup(filter, r.stage) && (!t || `${r.o.number} ${r.cust?.name} ${r.cust?.company} ${r.o.customer_reference}`.toLowerCase().includes(t)))
+  const shown = rows.filter((r) => inGroup(filter, r.tab) && (!t || `${r.o.number} ${r.cust?.name} ${r.cust?.company} ${r.o.customer_reference}`.toLowerCase().includes(t)))
   return (
     <>
       <Head title={tx("Verkooporders")} sub={tx("Verkoop in de winkel en online. Hier bepaal je leverdata en plan je deelleveringen.")}>
@@ -29,7 +28,7 @@ export function Orders() {
       </Head>
       <section className="panel">
         <div className="panel-head" style={{ alignItems: 'flex-end' }}>
-          <Tabs<Filter> value={filter} onChange={setFilter} tabs={(['verwerken', 'lopend', 'klaar', 'alle'] as Filter[]).map((f) => ({ value: f, label: { verwerken: tx("Te verwerken"), lopend: tx("Lopend"), klaar: tx("Afgerond"), alle: tx("Alles") }[f], n: rows.filter((r) => inGroup(f, r.stage)).length }))} />
+          <Tabs<Filter> value={filter} onChange={setFilter} tabs={(['te_leveren', 'ingepland', 'afgeleverd', 'alle'] as Filter[]).map((f) => ({ value: f, label: { te_leveren: tx("Nog te leveren"), ingepland: tx("Ingepland"), afgeleverd: tx("Afgeleverd"), alle: tx("Alles") }[f], n: rows.filter((r) => inGroup(f, r.tab)).length }))} />
           <input style={{ maxWidth: 280, marginBottom: 14 }} aria-label={tx("Verkooporders zoeken")} placeholder={tx("Zoek op nummer of klant")} value={q} onChange={(e) => setQ(e.target.value)} />
         </div>
         {shown.length === 0 && <Empty>{tx("Geen verkooporders in dit overzicht.")}</Empty>}

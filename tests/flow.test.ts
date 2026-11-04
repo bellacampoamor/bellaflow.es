@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { loadSnapshot } from '../src/data/driver'
 import { LocalDriver } from '../src/data/localDriver'
 import { TABLES } from '../src/data/types'
-import { openLinesOnTransport, linePurchaseStatus, linesToPurchase, flowCounts, freeAt, transportLoad, invoiceBalance, onHandMap, orderStage, reservedMap, stockKey, vatBreakdown } from '../src/domain/calc'
+import { openLinesOnTransport, linePurchaseStatus, linesToPurchase, flowCounts, freeAt, transportLoad, invoiceBalance, onHandMap, orderStage, orderTab, reservedMap, stockKey, vatBreakdown } from '../src/domain/calc'
 import { renameOldSuppliers, restoreSuppliers, seedDemo } from '../src/domain/demo'
 import {
   createDelivery, createInvoice, createOrder, createPurchaseOrder, lineFromProduct, markDelivered, assignShipmentsToTransport, cancelTransport, convertLinesToPurchaseOrders, createTransport, markReady, receiveGoods, rescheduleDelivery, rescheduleOrder, saveRouteOrder, saveSettings, setPurchaseLabel, splitLinesForStock, setDeliveryInTransit, setShipmentWarehouse, setTransportStatus, updateTransport, transferStock,
@@ -150,6 +150,27 @@ describe('van inkoop tot factuur', () => {
     for (const v of onHandMap(s).values()) expect(v).toBeGreaterThanOrEqual(0)
     const c = flowCounts(s, TODAY)
     for (const key of ['inkoop', 'inkomend', 'ontvangst', 'orders', 'levering', 'facturatie'] as const) expect(c[key], key).toBeGreaterThan(0)
+  })
+})
+
+describe('tabbladen verkooporders', () => {
+  it('deelt in op nog te leveren, ingepland en afgeleverd', async () => {
+    let s = await loadSnapshot(db)
+    const product = s.products.find((p) => p.sku === 'LIG-AL-WT')!
+    const id = await createOrder(db, { header: header(s.customers[0].id), lines: [lineFromProduct(product, { qty: 2, warehouse_id: s.warehouses[1].id })] })
+    const tab = async () => { s = await loadSnapshot(db); return orderTab(s, s.sales_orders.find((o) => o.id === id)!) }
+    expect(await tab()).toBe('te_leveren')
+    s = await loadSnapshot(db)
+    const line = s.sales_order_lines.find((l) => l.sales_order_id === id)!
+    const plan = (qty: number) => createDelivery(db, { sales_order_id: id, method: 'eigen_team', planned_date: TODAY, time_slot: '', carrier: '', notes: '', lines: [{ sales_order_line_id: line.id, qty }] })
+    const first = await plan(1)
+    expect(await tab()).toBe('te_leveren')
+    await deliver(first)
+    expect(await tab()).toBe('te_leveren')
+    const rest = await plan(1)
+    expect(await tab()).toBe('ingepland')
+    await deliver(rest)
+    expect(await tab()).toBe('afgeleverd')
   })
 })
 

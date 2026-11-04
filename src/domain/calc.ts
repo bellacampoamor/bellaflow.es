@@ -167,6 +167,21 @@ export function orderStage(s: Snapshot, o: SalesOrder): OrderStage {
   return 'wacht_op_goederen'
 }
 
+export type OrderTab = 'te_leveren' | 'ingepland' | 'afgeleverd'
+
+/** Tabblad op Verkooporders. Geannuleerde verkooporders staan alleen onder Alles. */
+export function orderTab(s: Snapshot, o: SalesOrder): OrderTab | null {
+  const stage = orderStage(s, o)
+  if (stage === 'geannuleerd') return null
+  if (stage === 'te_factureren' || stage === 'gefactureerd') return 'afgeleverd'
+  if (stage === 'gepland') return 'ingepland'
+  if (stage === 'deels_geleverd') {
+    const lines = orderLines(s, o.id)
+    return lines.every((l) => plannedQty(s, l.id) >= l.qty) ? 'ingepland' : 'te_leveren'
+  }
+  return 'te_leveren'
+}
+
 export function uninvoicedDeliveries(s: Snapshot, orderId: string): Delivery[] {
   const billed = invoicedDeliveryLineIds(s)
   return s.deliveries.filter(
