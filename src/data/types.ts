@@ -48,9 +48,10 @@ export interface OrderEvent {
   id: string; sales_order_id: string; kind: string; message: string; old_date: string | null
   new_date: string | null; customer_notified: boolean; created_at: string
 }
+export type PurchaseLabel = 'showroom' | 'magazijn' | 'verkoop'
 export interface PurchaseOrder {
   id: string; number: string; supplier_id: string; order_date: string; supplier_reference: string
-  notes: string; status: 'open' | 'cancelled'
+  notes: string; status: 'open' | 'cancelled'; label: PurchaseLabel
 }
 export interface PurchaseOrderLine {
   id: string; purchase_order_id: string; product_id: string; qty: number; unit_cost: number

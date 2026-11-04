@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react'
 import { Plus, Trash2 } from 'lucide-react'
-import { linesToPurchase, purchaseKind, round2, shipmentIsOpen, todayISO } from '../domain/calc'
+import { linesToPurchase, round2, shipmentIsOpen, todayISO } from '../domain/calc'
 import { assignShipmentsToTransport, cancelPurchaseOrder, createPurchaseOrder, setShipmentWarehouse } from '../domain/services'
+import type { PurchaseLabel } from '../data/types'
 import { tx } from '../i18n'
 import { go, useApp } from '../ui/app-context'
 import { AreaField, Combo, Empty, eur, fmtDate, Head, Modal, Pill, SelectField, Tabs, TextField, type Tone } from '../ui/kit'
@@ -30,7 +31,7 @@ export function Purchases() {
       {tab === 'orders' && <section className="panel">
         {rows.length === 0 && <Empty>{tx("Nog geen inkooporders. Maak de eerste met de knop rechtsboven.")}</Empty>}
         <div className="table-wrap"><table>
-          <thead><tr><th>{tx("Nummer")}</th><th>{tx("Leverancier")}</th><th>{tx("Besteld")}</th><th>{tx("Soort")}</th><th>{tx("Referentie")}</th><th className="num">{tx("Op transport")}</th><th className="num">{tx("Waarde")}</th><th>{tx("Status")}</th></tr></thead>
+          <thead><tr><th>{tx("Nummer")}</th><th>{tx("Leverancier")}</th><th>{tx("Besteld")}</th><th>{tx("Label")}</th><th>{tx("Referentie")}</th><th className="num">{tx("Op transport")}</th><th className="num">{tx("Waarde")}</th><th>{tx("Status")}</th></tr></thead>
           <tbody>{rows.map((po) => {
             const { total, planned, received } = poProgress(s, po.id)
             const value = round2(s.purchase_order_lines.filter((l) => l.purchase_order_id === po.id).reduce((n, l) => n + l.qty * l.unit_cost, 0))
@@ -39,7 +40,7 @@ export function Purchases() {
               <tr key={po.id} className="click" onClick={() => go(`inkoop-${po.id}`)}>
                 <td><a className="rowlink" href={`#inkoop-${po.id}`}>{po.number}</a></td>
                 <td>{s.suppliers.find((x) => x.id === po.supplier_id)?.name}</td>
-                <td>{fmtDate(po.order_date)}</td><td><KindPill kind={purchaseKind(s, po.id)} /></td><td className="muted">{po.supplier_reference || '–'}</td>
+                <td>{fmtDate(po.order_date)}</td><td><LabelPill label={po.label} /></td><td className="muted">{po.supplier_reference || '–'}</td>
                 <td className="num">{tx("{0} van {1} regels", planned, total)}</td><td className="num">{eur(value)}</td>
                 <td><Pill tone={tone}>{label}</Pill></td>
               </tr>
@@ -51,10 +52,9 @@ export function Purchases() {
   )
 }
 
-export function KindPill({ kind }: { kind: 'vulorder' | 'klantorder' | 'gemengd' }) {
-  const map: Record<string, [string, Tone]> = { vulorder: [tx("Vulorder"), 'info'], klantorder: [tx("Voor verkooporder"), 'sell'], gemengd: [tx("Gemengd"), ''] }
-  return <Pill tone={map[kind][1]}>{map[kind][0]}</Pill>
-}
+const LABELS: Record<PurchaseLabel, [string, Tone]> = { showroom: ['Showroom', 'info'], magazijn: ['Magazijn', ''], verkoop: ['Verkoop', 'sell'] }
+// Testgegevens uit een oudere versie hebben nog geen label.
+export const LabelPill = ({ label = 'magazijn' }: { label?: PurchaseLabel }) => <Pill tone={LABELS[label][1]}>{tx(LABELS[label][0])}</Pill>
 
 export function PurchaseDetail({ id }: { id: string }) {
   const { s, run } = useApp()
@@ -68,7 +68,7 @@ export function PurchaseDetail({ id }: { id: string }) {
   const hasReceipts = lines.some((l) => s.goods_receipt_lines.some((r) => r.shipment_line_id === s.inbound_shipment_lines.find((x) => x.purchase_order_line_id === l.id)?.id))
   return (
     <>
-      <Head title={<>{po.number} <KindPill kind={purchaseKind(s, po.id)} /></>} sub={tx("{0}, besteld op {1}{2}", supplier?.name, fmtDate(po.order_date), po.supplier_reference ? tx(", referentie {0}", po.supplier_reference) : '')} back={{ href: '#inkoop', label: tx("Inkooporders") }}>
+      <Head title={<>{po.number} <LabelPill label={po.label} /></>} sub={tx("{0}, besteld op {1}{2}", supplier?.name, fmtDate(po.order_date), po.supplier_reference ? tx(", referentie {0}", po.supplier_reference) : '')} back={{ href: '#inkoop', label: tx("Inkooporders") }}>
         {po.status === 'open' && !hasReceipts && <button className="btn danger" onClick={() => setConfirm(true)}>{tx("Inkooporder annuleren")}</button>}
       </Head>
       <div className="stack">
@@ -119,11 +119,10 @@ export function PurchaseDetail({ id }: { id: string }) {
 interface PoLine { key: number; product_id: string; qty: number; unit_cost: number; sales_order_line_id: string | null }
 let k = 1
 
-export function PurchaseForm({ transportId, orderId }: { transportId?: string; orderId?: string } = {}) {
+export function PurchaseForm({ orderId }: { orderId?: string } = {}) {
   const { s, run } = useApp()
   const suppliers = s.suppliers.filter((x) => x.is_active)
   const receivers = s.warehouses.filter((w) => w.is_active && w.receives_goods)
-  const transport = s.transports.find((t) => t.id === transportId && t.status === 'planned')
   // Vanuit een verkooporder: wat nog ingekocht moet worden, per leverancier één inkooporder.
   const fromOrder = orderId ? linesToPurchase(s).filter((l) => l.sales_order_id === orderId) : []
   const productOf = (id: string) => s.products.find((p) => p.id === id)
@@ -132,17 +131,20 @@ export function PurchaseForm({ transportId, orderId }: { transportId?: string; o
   const [orderDate, setOrderDate] = useState(todayISO())
   const [reference, setReference] = useState('')
   const [notes, setNotes] = useState('')
-  const [warehouse, setWarehouse] = useState(receivers.find((w) => (orderId ? w.is_route_origin : w.kind === 'winkel'))?.id ?? receivers[0]?.id ?? '')
+  const [label, setLabel] = useState<'showroom' | 'magazijn'>('magazijn')
+  const defaultFor = (l: 'showroom' | 'magazijn') => receivers.find((w) => (l === 'showroom' ? w.kind === 'winkel' : w.is_route_origin))?.id ?? receivers[0]?.id ?? ''
+  const [warehouse, setWarehouse] = useState(defaultFor('magazijn'))
   const [lines, setLines] = useState<PoLine[]>(() => fromOrder
     .filter((l) => !orderSupplier || productOf(l.product_id)?.supplier_id === orderSupplier)
     .map((l) => ({ key: k++, product_id: l.product_id, qty: l.qty, unit_cost: productOf(l.product_id)?.purchase_price ?? 0, sales_order_line_id: l.id })))
   const products = useMemo(() => s.products.filter((p) => p.is_active && (!supplier || p.supplier_id === supplier || !p.supplier_id)).map((p) => ({ value: p.id, label: p.name, sub: tx("{0}, inkoop {1}", p.sku, eur(p.purchase_price)), search: p.sku })), [s.products, supplier])
   const patchLine = (key: number, patch: Partial<PoLine>) => setLines((v) => v.map((l) => l.key === key ? { ...l, ...patch } : l))
   const total = round2(lines.reduce((n, l) => n + l.qty * l.unit_cost, 0))
+  const isSale = lines.some((l) => l.sales_order_line_id)
   const save = async () => {
     let id = ''
     const ok = await run(async (db) => {
-      id = await createPurchaseOrder(db, { supplier_id: supplier, order_date: orderDate, supplier_reference: reference, notes, warehouse_id: warehouse, transport_id: transport?.id ?? null, lines: lines.map(({ key: _k, ...l }) => l) })
+      id = await createPurchaseOrder(db, { supplier_id: supplier, order_date: orderDate, supplier_reference: reference, notes, warehouse_id: warehouse, label: isSale ? 'verkoop' : label, lines: lines.map(({ key: _k, ...l }) => l) })
     }, tx("Inkooporder aangemaakt"))
     if (ok) go(`inkoop-${id}`)
   }
@@ -156,9 +158,11 @@ export function PurchaseForm({ transportId, orderId }: { transportId?: string; o
             <SelectField className="span-2" label={tx("Leverancier")} value={supplier} onChange={setSupplier} placeholder={tx("Kies een leverancier")} options={suppliers.map((x) => ({ value: x.id, label: `${x.name} (${x.country})` }))} />
             <TextField label={tx("Besteldatum")} type="date" value={orderDate} onChange={setOrderDate} />
             <TextField label={tx("Referentie leverancier")} value={reference} onChange={setReference} placeholder={tx("Ordernummer bij leverancier")} />
+            {isSale
+              ? <div className="field"><span className="lbl">{tx("Label")}</span><div style={{ minHeight: 38, display: 'flex', alignItems: 'center' }}><LabelPill label="verkoop" /></div></div>
+              : <SelectField label={tx("Label")} value={label} onChange={(v) => { setLabel(v); setWarehouse(defaultFor(v)) }} options={[{ value: 'magazijn', label: tx("Magazijn") }, { value: 'showroom', label: tx("Showroom") }]} />}
             <SelectField className="span-2" label={tx("Bestemming")} value={warehouse} onChange={setWarehouse} options={receivers.map((w) => ({ value: w.id, label: w.name }))} hint={tx("Later per regel aan te passen.")} />
           </div>
-          {transport && <div className="note" style={{ marginTop: 12 }}>{tx("Deze inkooporder komt direct op {0}, vertrek {1}.", transport.number, fmtDate(transport.departure_date))}</div>}
         </section>
         <section className="panel">
           <div className="panel-head"><h2>{tx("Producten")}</h2><button className="btn sm" onClick={() => setLines((v) => [...v, { key: k++, product_id: '', qty: 1, unit_cost: 0, sales_order_line_id: null }])}><Plus size={14} />{tx("Regel toevoegen")}</button></div>

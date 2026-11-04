@@ -3,7 +3,7 @@ import { tx } from '../i18n'
 // zodat een geweigerde actie niets half achterlaat.
 import { loadSnapshot, newId, type Driver } from '../data/driver'
 import type {
-  Delivery, Fulfilment, InboundShipment, InvoiceLine, OrderType, Payment, Product, SalesOrder, Settings,
+  Delivery, Fulfilment, InboundShipment, InvoiceLine, OrderType, Payment, Product, PurchaseLabel, SalesOrder, Settings,
   SalesOrderLine, Snapshot, StockMovement, TableName,
 } from '../data/types'
 import {
@@ -43,7 +43,7 @@ export async function saveSettings(db: Driver, patch: Partial<Settings>) {
 export interface PurchaseInput {
   supplier_id: string; order_date: string; supplier_reference: string; notes: string
   /** Bestemming en eventueel al bekend transport; per regel te overschrijven. */
-  warehouse_id: string; transport_id?: string | null
+  warehouse_id: string; transport_id?: string | null; label?: PurchaseLabel
   lines: { product_id: string; qty: number; unit_cost: number; sales_order_line_id: string | null; warehouse_id?: string; transport_id?: string | null }[]
 }
 
@@ -54,9 +54,12 @@ export async function createPurchaseOrder(db: Driver, input: PurchaseInput) {
   if (!input.warehouse_id) fail(tx("Kies een bestemming."))
   const transports = await db.list('transports')
   const supplier = (await db.list('suppliers')).find((x) => x.id === input.supplier_id)
+  // Regels voor een klant maken het altijd een verkoop-inkoop; anders volgt het label de keuze of de bestemming.
+  const destination = (await db.list('warehouses')).find((w) => w.id === input.warehouse_id)
+  const label: PurchaseLabel = input.lines.some((l) => l.sales_order_line_id) ? 'verkoop' : input.label ?? (destination?.kind === 'winkel' ? 'showroom' : 'magazijn')
   const id = newId()
   const number = await nextDocumentNumber(db, 'IO', 'prefix_purchase', yearOf(input.order_date))
-  await db.insert('purchase_orders', [{ id, number, supplier_id: input.supplier_id, order_date: input.order_date, supplier_reference: input.supplier_reference, notes: input.notes, status: 'open' }])
+  await db.insert('purchase_orders', [{ id, number, supplier_id: input.supplier_id, order_date: input.order_date, supplier_reference: input.supplier_reference, notes: input.notes, status: 'open', label }])
   let sequence = 0
   for (const { warehouse_id, transport_id, ...line } of input.lines) {
     sequence += 1

@@ -218,7 +218,7 @@ export async function seedDemo(db: Driver, today = todayISO()) {
     lines: [line(dining, 8, null, { options: 'Zitting rotan zwart' })],
   })
 
-  // Vulorders: voor de showroom op het volgende transport, en de inkoop van vandaag nog zonder transport.
+  // Inkoop voor showroom en magazijn: op het volgende transport, en de inkoop van vandaag nog zonder transport.
   await createPurchaseOrder(db, {
     supplier_id: lounge.id, order_date: d(-2), supplier_reference: 'NZ-88402', notes: 'Showroom aanvullen',
     lines: [{ product_id: parasol.id, qty: 6, unit_cost: parasol.purchase_price, sales_order_line_id: null }, { product_id: bed.id, qty: 10, unit_cost: bed.purchase_price, sales_order_line_id: null }],

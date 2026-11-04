@@ -260,12 +260,6 @@ export function transportLoad(s: Snapshot, transportId: string) {
   return { ...out, m3: Math.round(out.m3 * 10) / 10 }
 }
 
-/** Vulorder: voor voorraad of showroom. Klantorder: elke regel hoort bij een klant. */
-export function purchaseKind(s: Snapshot, poId: string): 'vulorder' | 'klantorder' | 'gemengd' {
-  const lines = s.purchase_order_lines.filter((l) => l.purchase_order_id === poId)
-  const linked = lines.filter((l) => l.sales_order_line_id).length
-  return linked === 0 ? 'vulorder' : linked === lines.length ? 'klantorder' : 'gemengd'
-}
 
 export const freeAt = (s: Snapshot, productId: string, warehouseId: string) =>
   (onHandMap(s).get(stockKey(productId, warehouseId)) ?? 0) - (reservedMap(s).get(stockKey(productId, warehouseId)) ?? 0)

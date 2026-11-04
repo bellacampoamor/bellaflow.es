@@ -6,7 +6,7 @@ import { assignShipmentsToTransport, cancelTransport, closeShipment, createTrans
 import { tx } from '../i18n'
 import { useApp } from '../ui/app-context'
 import { AreaField, Empty, fmtDate, fmtShort, Head, Modal, NumberField, Pill, Tabs, TextField, type Tone } from '../ui/kit'
-import { KindPill } from './Purchases'
+import { LabelPill } from './Purchases'
 
 const DEFAULT_CAPACITY = 90
 const TRANSPORT_STATE: Record<Transport['status'], [string, Tone]> = { planned: ['Laden', 'sell'], departed: ['Onderweg', 'info'], arrived: ['Aangekomen', 'good'], cancelled: ['Geannuleerd', ''] }
@@ -68,8 +68,7 @@ export function Inbound() {
   return (
     <>
       <Head title={tx("Gepland transport")} sub={tx("Zodra de transportlijst uit Nederland bekend is, koppel je de inkoopregels aan het transport. De verkooporder toont dan wanneer het product wordt verwacht.")}>
-        <button className="btn" onClick={newTransport}><Plus size={16} />{tx("Nieuw transport")}</button>
-        <a className="btn primary" href={planned[0] ? `#inkoop-nieuw-${planned[0].id}` : '#inkoop-nieuw'}><Plus size={16} />{tx("Vulorder maken")}</a>
+        <button className="btn primary" onClick={newTransport}><Plus size={16} />{tx("Nieuw transport")}</button>
       </Head>
       <Tabs<'plan' | 'done'> value={tab} onChange={setTab} tabs={[{ value: 'plan', label: tx("Inplannen"), n: unassigned.length }, { value: 'done', label: tx("Afgerond"), n: done.length }]} />
 
@@ -86,7 +85,7 @@ export function Inbound() {
                   <tr key={x.id}>
                     <td><input type="checkbox" aria-label={tx("{0} aanvinken", i.product?.name)} checked={picked.has(x.id)} onChange={(e) => setPicked((v) => { const n = new Set(v); if (e.target.checked) n.add(x.id); else n.delete(x.id); return n })} /></td>
                     <td><a className="rowlink" href={`#inkoop-${i.po.id}`}>{i.po.number}</a></td><td>{i.supplier}</td><td className="strong">{i.product?.name}</td><td className="num">{i.qty}</td><td className="num">{round1(shipmentLoad(s, x.id).m3)}</td>
-                    <td>{i.salesOrder ? <a className="rowlink" href={`#orders-${i.salesOrder.id}`}>{i.salesOrder.number}</a> : <KindPill kind="vulorder" />}</td>
+                    <td>{i.salesOrder ? <a className="rowlink" href={`#orders-${i.salesOrder.id}`}>{i.salesOrder.number}</a> : <LabelPill label={i.po.label} />}</td>
                     <td>{destination(x, tx("Bestemming voor {0}", i.product?.name))}</td>
                   </tr>
                 )
@@ -121,7 +120,6 @@ export function Inbound() {
                 </div>
                 <div className="btn-row">
                   <button className="btn sm" onClick={() => setEdit({ id: t.id, departure_date: t.departure_date, arrival_date: t.arrival_date, carrier: t.carrier, reference: t.reference, capacity_m3: t.capacity_m3, notes: t.notes })}>{tx("Wijzigen")}</button>
-                  {t.status === 'planned' && <a className="btn sm" href={`#inkoop-nieuw-${t.id}`}><Plus size={14} />{tx("Vulorder")}</a>}
                   {t.status === 'planned' && <button className="btn sm primary" disabled={!lines.length} onClick={() => run((db) => setTransportStatus(db, t.id, 'departed'), tx("{0} is vertrokken", t.number))}>{tx("Vertrokken")}</button>}
                   {t.status === 'departed' && <a className="btn sm primary" href={`#ontvangst-${t.id}`}>{tx("Ontvangen")}</a>}
                   {t.status === 'planned' && <button className="btn sm" onClick={() => run((db) => cancelTransport(db, t.id), tx("Transport geannuleerd"))}>{tx("Annuleren")}</button>}
@@ -131,7 +129,7 @@ export function Inbound() {
                 <FillBar used={load.m3} capacity={t.capacity_m3} />
                 <div className="small muted">{tx("{0} colli, {1} kg", load.colli, Math.round(load.kg))}{perWarehouse.length > 0 && <>. {perWarehouse.map((r) => tx("{0} m³ naar {1}", round1(r.m3), r.w.name)).join(', ')}</>}</div>
               </div>
-              {lines.length === 0 && <Empty>{tx("Nog leeg. Koppel een inkoop of maak een vulorder.")}</Empty>}
+              {lines.length === 0 && <Empty>{tx("Nog leeg. Koppel hierboven de inkoopregels.")}</Empty>}
               {lines.length > 0 && <div className="table-wrap"><table>
                 <thead><tr><th>{tx("Inkooporder")}</th><th>{tx("Leverancier")}</th><th>{tx("Product")}</th><th className="num">{tx("Aantal")}</th><th className="num">m³</th><th>{tx("Voor")}</th><th style={{ minWidth: 180 }}>{tx("Bestemming")}</th><th></th></tr></thead>
                 <tbody>{lines.map((x) => {
@@ -140,7 +138,7 @@ export function Inbound() {
                   return (
                     <tr key={x.id}>
                       <td><a className="rowlink" href={`#inkoop-${i.po.id}`}>{i.po.number}</a></td><td>{i.supplier}</td><td className="strong">{i.product?.name}</td><td className="num">{i.qty}</td><td className="num">{round1(shipmentLoad(s, x.id).m3)}</td>
-                      <td>{i.salesOrder ? <a className="rowlink" href={`#orders-${i.salesOrder.id}`}>{i.salesOrder.number}</a> : <KindPill kind="vulorder" />}</td>
+                      <td>{i.salesOrder ? <a className="rowlink" href={`#orders-${i.salesOrder.id}`}>{i.salesOrder.number}</a> : <LabelPill label={i.po.label} />}</td>
                       <td>{isOpen ? destination(x, tx("Bestemming voor {0}", i.product?.name)) : <>{s.warehouses.find((w) => w.id === x.warehouse_id)?.name} <Pill tone="good">{tx("Ontvangen")}</Pill></>}</td>
                       <td className="num">
                         {t.status === 'planned' && <button className="btn sm" onClick={() => run((db) => assignShipmentsToTransport(db, [x.id], null), tx("Regel losgekoppeld"))}>{tx("Loskoppelen")}</button>}

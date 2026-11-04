@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { loadSnapshot } from '../src/data/driver'
 import { LocalDriver } from '../src/data/localDriver'
 import { TABLES } from '../src/data/types'
-import { openLinesOnTransport, linePurchaseStatus, linesToPurchase, flowCounts, freeAt, purchaseKind, transportLoad, invoiceBalance, onHandMap, orderStage, reservedMap, stockKey, vatBreakdown } from '../src/domain/calc'
+import { openLinesOnTransport, linePurchaseStatus, linesToPurchase, flowCounts, freeAt, transportLoad, invoiceBalance, onHandMap, orderStage, reservedMap, stockKey, vatBreakdown } from '../src/domain/calc'
 import { seedDemo } from '../src/domain/demo'
 import {
   createDelivery, createInvoice, createOrder, createPurchaseOrder, lineFromProduct, markDelivered, assignShipmentsToTransport, cancelTransport, convertLinesToPurchaseOrders, createTransport, markReady, receiveGoods, rescheduleDelivery, saveRouteOrder, saveSettings, splitLinesForStock, setDeliveryInTransit, setShipmentWarehouse, setTransportStatus, updateTransport, transferStock,
@@ -181,7 +181,7 @@ describe('afleverbon', () => {
   })
 })
 
-describe('transport en vulorders', () => {
+describe('transport en labels', () => {
   const setup = async () => {
     const s = await loadSnapshot(db)
     const [showroom, campoamor] = s.warehouses
@@ -199,7 +199,7 @@ describe('transport en vulorders', () => {
     const { shipment, transport, product, po } = await setup()
     expect(shipment.expected_date).toBe('2026-11-13')
     const s = await loadSnapshot(db)
-    expect(purchaseKind(s, po)).toBe('vulorder')
+    expect(s.purchase_orders.find((p) => p.id === po)!.label).toBe('magazijn')
     expect(transportLoad(s, transport).m3).toBeCloseTo(5 * product.volume_m3, 1)
   })
   it('schuift zendingen mee met het transport en blokkeert na vertrek', async () => {
@@ -307,6 +307,20 @@ describe('doorzetten naar inkoop', () => {
     expect(linked.inbound_shipments.find((x) => x.id === rows[0].id)).toMatchObject({ transport_id: transport.id, expected_date: transport.arrival_date })
     expect(linked.inbound_shipments.find((x) => x.id === rows[1].id)!.transport_id).toBeNull()
     await expect(convertLinesToPurchaseOrders(db, { lines: [{ sales_order_line_id: queue[0].id, supplier_id: s.suppliers[0].id }], order_date: TODAY, warehouse_id: s.warehouses[1].id })).rejects.toThrow(/al ingekocht/)
+  })
+})
+
+describe('label van een inkooporder', () => {
+  it('volgt de keuze, en regels voor een klant maken het verkoop', async () => {
+    const s = await loadSnapshot(db)
+    const base = { supplier_id: s.suppliers[0].id, order_date: TODAY, supplier_reference: '', notes: '', warehouse_id: s.warehouses[1].id }
+    const line = { product_id: s.products[0].id, qty: 1, unit_cost: 1, sales_order_line_id: null }
+    const a = await createPurchaseOrder(db, { ...base, label: 'showroom', lines: [line] })
+    const b = await createPurchaseOrder(db, { ...base, lines: [line] })
+    const c = await createPurchaseOrder(db, { ...base, label: 'magazijn', lines: [{ ...line, sales_order_line_id: s.sales_order_lines[0].id }] })
+    const after = await loadSnapshot(db)
+    const label = (id: string) => after.purchase_orders.find((p) => p.id === id)!.label
+    expect([label(a), label(b), label(c)]).toEqual(['showroom', 'magazijn', 'verkoop'])
   })
 })
 
