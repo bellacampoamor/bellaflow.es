@@ -32,6 +32,8 @@ export const en: Record<string, string> = {
   "Afdrukken of PDF": "Print or PDF",
   "Afgedrukt": "Printed",
   "Afgerond": "Completed",
+  "Alle afgeleverde leveringen met hun afleverbonnen en facturen.": "All delivered deliveries with their delivery notes and invoices.",
+  "Nog niet compleet": "Not yet complete",
   "Afleverbon {0} bekijken": "View delivery note {0}",
   "{0} is afgeleverd en de bon is gemaild": "{0} has been delivered and the note has been emailed",
   "{0} is afgeleverd. Voorbeeldgegevens: er is niets gemaild": "{0} has been delivered. Sample data: nothing was emailed",

@@ -24,10 +24,10 @@ export function Archive() {
   const rows = all.filter((r) => (tab === 'alles' || (tab === 'compleet') === r.complete) && (!t || `${r.order.number} ${customer(r.order.customer_id)} ${r.delivery.number} ${r.delivery.proforma_number ?? ''} ${r.invoice?.number ?? ''}`.toLowerCase().includes(t)))
   return (
     <>
-      <Head title={tx("Archief")} sub={tx("Volledig geleverde verkooporders met hun afleverbonnen en facturen.")} />
+      <Head title={tx("Archief")} sub={tx("Alle afgeleverde leveringen met hun afleverbonnen en facturen.")} />
       <section className="panel">
         <div className="panel-head" style={{ alignItems: 'flex-end' }}>
-          <Tabs<Tab> value={tab} onChange={setTab} tabs={[{ value: 'alles', label: tx("Alles"), n: all.length }, { value: 'compleet', label: tx("Compleet afgewerkt"), n: all.filter((r) => r.complete).length }, { value: 'factureren', label: tx("Geleverd, nog te factureren"), n: all.filter((r) => !r.complete).length }]} />
+          <Tabs<Tab> value={tab} onChange={setTab} tabs={[{ value: 'alles', label: tx("Alles"), n: all.length }, { value: 'compleet', label: tx("Compleet afgewerkt"), n: all.filter((r) => r.complete).length }, { value: 'factureren', label: tx("Nog niet compleet"), n: all.filter((r) => !r.complete).length }]} />
           <input id="archief-zoek" style={{ maxWidth: 280, marginBottom: 14 }} aria-label={tx("Archief doorzoeken")} placeholder={tx("Zoek op nummer of klant")} value={q} onChange={(e) => setQ(e.target.value)} />
         </div>
         {rows.length === 0 && <Empty>{tx("Geen verkooporders in dit overzicht.")}</Empty>}

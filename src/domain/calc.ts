@@ -282,13 +282,12 @@ export interface ArchiveRow {
   delivery: Delivery; order: SalesOrder; invoice: Invoice | null; complete: boolean
 }
 
-/** Leveringen van volledig geleverde verkooporders. Compleet betekent dat ook alles gefactureerd is. */
+/** Alle afgeleverde leveringen, ook van deels geleverde verkooporders. Compleet betekent dat de hele verkooporder geleverd en gefactureerd is. */
 export function archiveRows(s: Snapshot): ArchiveRow[] {
   const invoiceOfLine = new Map(s.invoice_lines.map((l) => [l.delivery_line_id, l.invoice_id]))
   return s.sales_orders.flatMap((order) => {
     if (order.status === 'cancelled') return []
     const stage = orderStage(s, order)
-    if (stage !== 'te_factureren' && stage !== 'gefactureerd') return []
     return s.deliveries.filter((d) => d.sales_order_id === order.id && d.status === 'delivered').map((delivery) => {
       const line = s.delivery_lines.find((l) => l.delivery_id === delivery.id && invoiceOfLine.has(l.id))
       return { delivery, order, invoice: (line && s.invoices.find((i) => i.id === invoiceOfLine.get(line.id))) || null, complete: stage === 'gefactureerd' }

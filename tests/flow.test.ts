@@ -187,7 +187,7 @@ describe('archief', () => {
     let s = await loadSnapshot(db)
     const lucia = s.sales_orders.find((o) => o.number === 'VO-2026-0002')!
     expect(archiveRows(s).find((r) => r.order.id === lucia.id)).toMatchObject({ complete: false, invoice: null })
-    expect(archiveRows(s).some((r) => r.order.number === 'VO-2026-0003')).toBe(false)
+    expect(archiveRows(s).find((r) => r.order.number === 'VO-2026-0003')).toMatchObject({ complete: false })
     const row = archiveRows(s).find((r) => r.order.id === lucia.id)!
     const [inv] = await invoiceProformas(db, { delivery_ids: [row.delivery.id], invoice_date: TODAY })
     s = await loadSnapshot(db)
