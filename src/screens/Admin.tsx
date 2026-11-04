@@ -12,7 +12,7 @@ type Tab = 'magazijnen' | 'producten' | 'leveranciers' | 'klanten' | 'bedrijf'
 const NEW = {
   warehouse: { code: '', name: '', kind: 'magazijn', address: '', postal_code: '', city: '', phone: '', contact_name: '', receives_goods: true, ships_goods: true, is_active: true, latitude: null, longitude: null, is_route_origin: false } as Omit<Warehouse, 'id'>,
   product: { sku: '', name: '', collection: '', category: '', material: '', color: '', dimensions: '', weight_kg: 0, colli: 1, purchase_price: 0, sale_price: 0, vat_rate: 21, supplier_id: null, min_stock: 0, is_active: true, volume_m3: 0 } as Omit<Product, 'id'>,
-  supplier: { name: '', vat_number: '', contact_name: '', email: '', phone: '', address: '', city: '', country: 'Nederland', lead_time_days: 21, payment_terms: '', notes: '', is_active: true } as Omit<Supplier, 'id'>,
+  supplier: { name: '', vat_number: '', contact_name: '', email: '', phone: '', address: '', postal_code: '', city: '', country: 'Nederland', lead_time_days: 21, payment_terms: '', notes: '', is_active: true } as Omit<Supplier, 'id'>,
   customer: { kind: 'particulier', name: '', company: '', tax_id: '', email: '', phone: '', language: 'es', address: '', postal_code: '', city: '', province: 'Alicante', country: 'España', notes: '' } as Omit<Customer, 'id'>,
 }
 
@@ -53,8 +53,8 @@ export function Admin() {
       </table></div></section>}
 
       {tab === 'leveranciers' && <section className="panel"><div className="table-wrap"><table>
-        <thead><tr><th>{tx("Naam")}</th><th>{tx("Plaats")}</th><th>{tx("Land")}</th><th>{tx("Contact")}</th><th className="num">{tx("Levertijd")}</th></tr></thead>
-        <tbody>{s.suppliers.map((x) => <tr key={x.id} className="click" onClick={() => setSu(x)}><td className="strong">{x.name}</td><td>{x.city}</td><td>{x.country}</td><td className="muted">{x.contact_name || x.email || '–'}</td><td className="num">{x.lead_time_days} {tx("dagen")}</td></tr>)}</tbody>
+        <thead><tr><th>{tx("Naam")}</th><th>{tx("Postcode")}</th><th>{tx("Plaats")}</th><th>{tx("Land")}</th><th>{tx("Contact")}</th><th className="num">{tx("Levertijd")}</th></tr></thead>
+        <tbody>{s.suppliers.map((x) => <tr key={x.id} className="click" onClick={() => setSu(x)}><td className="strong">{x.name}</td><td className="muted">{x.postal_code || '–'}</td><td>{x.city}</td><td>{x.country}</td><td className="muted">{x.contact_name || x.email || '–'}</td><td className="num">{x.lead_time_days} {tx("dagen")}</td></tr>)}</tbody>
       </table></div></section>}
 
       {tab === 'klanten' && <section className="panel"><div className="table-wrap"><table>
@@ -146,6 +146,7 @@ export function Admin() {
           <TextField label={tx("E-mail")} value={su.email} onChange={(v) => setSu({ ...su, email: v })} />
           <TextField label={tx("Telefoon")} value={su.phone} onChange={(v) => setSu({ ...su, phone: v })} />
           <TextField className="span-2" label={tx("Adres")} value={su.address} onChange={(v) => setSu({ ...su, address: v })} />
+          <TextField label={tx("Postcode")} value={su.postal_code} onChange={(v) => setSu({ ...su, postal_code: v })} />
           <TextField label={tx("Plaats")} value={su.city} onChange={(v) => setSu({ ...su, city: v })} />
           <TextField label={tx("Land")} value={su.country} onChange={(v) => setSu({ ...su, country: v })} />
           <NumberField label={tx("Levertijd (dagen)")} value={su.lead_time_days} step="1" min={0} onChange={(v) => setSu({ ...su, lead_time_days: v })} />

@@ -35,7 +35,7 @@ export async function seedDemo(db: Driver, today = todayISO()) {
   await db.insert('warehouses', [shop, north, south])
 
   const sup = (name: string, city: string, lead: number): Supplier => ({
-    id: newId(), name, vat_number: '', contact_name: '', email: '', phone: '', address: '', city, country: 'Nederland',
+    id: newId(), name, vat_number: '', contact_name: '', email: '', phone: '', address: '', postal_code: '', city, country: 'Nederland',
     lead_time_days: lead, payment_terms: '30 dagen', notes: '', is_active: true,
   })
   const oak = sup('Eikenhoeve Meubelmakers', 'Apeldoorn', 28)

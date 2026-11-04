@@ -14,7 +14,7 @@ export interface Warehouse {
 }
 export interface Supplier {
   id: string; name: string; vat_number: string; contact_name: string; email: string; phone: string
-  address: string; city: string; country: string; lead_time_days: number; payment_terms: string
+  address: string; postal_code: string; city: string; country: string; lead_time_days: number; payment_terms: string
   notes: string; is_active: boolean
 }
 export type Language = 'es' | 'nl' | 'en'
