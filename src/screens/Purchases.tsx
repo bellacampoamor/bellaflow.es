@@ -27,9 +27,9 @@ export function Purchases() {
       <div className="stack">
         {waiting.length > 0 && (
           <section className="panel">
-            <div className="panel-head"><h2>{tx("Nog in te kopen voor klantorders")}</h2><a className="btn sm" href="#inkoop-nieuw">{tx("Neem over in inkooporder")}</a></div>
+            <div className="panel-head"><h2>{tx("Nog in te kopen voor verkooporders")}</h2><a className="btn sm" href="#inkoop-nieuw">{tx("Neem over in inkooporder")}</a></div>
             <div className="table-wrap"><table>
-              <thead><tr><th>{tx("Order")}</th><th>{tx("Klant")}</th><th>{tx("Product")}</th><th>{tx("Uitvoering")}</th><th className="num">{tx("Aantal")}</th></tr></thead>
+              <thead><tr><th>{tx("Verkooporder")}</th><th>{tx("Klant")}</th><th>{tx("Product")}</th><th>{tx("Uitvoering")}</th><th className="num">{tx("Aantal")}</th></tr></thead>
               <tbody>{waiting.map((l) => {
                 const o = s.sales_orders.find((x) => x.id === l.sales_order_id)!
                 return <tr key={l.id}><td><a className="rowlink" href={`#orders-${o.id}`}>{o.number}</a></td><td>{s.customers.find((c) => c.id === o.customer_id)?.name}</td><td>{l.description}</td><td className="muted">{l.options || '–'}</td><td className="num">{l.qty}</td></tr>
@@ -85,7 +85,7 @@ export function PurchaseDetail({ id }: { id: string }) {
         <section className="panel">
           <h2>{tx("Bestelde producten")}</h2>
           <div className="table-wrap"><table>
-            <thead><tr><th>{tx("Product")}</th><th>{tx("Voor order")}</th><th className="num">{tx("Aantal")}</th><th className="num">{tx("Inkoopprijs")}</th><th className="num">{tx("Totaal")}</th></tr></thead>
+            <thead><tr><th>{tx("Product")}</th><th>{tx("Voor verkooporder")}</th><th className="num">{tx("Aantal")}</th><th className="num">{tx("Inkoopprijs")}</th><th className="num">{tx("Totaal")}</th></tr></thead>
             <tbody>{lines.map((l) => {
               const sol = s.sales_order_lines.find((x) => x.id === l.sales_order_line_id)
               const so = sol && s.sales_orders.find((o) => o.id === sol.sales_order_id)
@@ -132,14 +132,14 @@ export function PurchaseDetail({ id }: { id: string }) {
         <Modal title={tx("{0} annuleren?", po.number)} onClose={() => setConfirm(false)} footer={<>
           <button className="btn" onClick={() => setConfirm(false)}>{tx("Terug")}</button>
           <button className="btn danger" onClick={async () => { await run((db) => cancelPurchaseOrder(db, id), tx("Inkooporder geannuleerd")); setConfirm(false) }}>{tx("Inkooporder annuleren")}</button>
-        </>}><p style={{ margin: 0 }}>{tx("De zendingen vervallen. Klantorders die hierop wachten, verschijnen weer bij \"Nog in te kopen\".")}</p></Modal>
+        </>}><p style={{ margin: 0 }}>{tx("De zendingen vervallen. Verkooporders die hierop wachten, verschijnen weer bij \"Nog in te kopen\".")}</p></Modal>
       )}
     </>
   )
 }
 
 export function KindPill({ kind }: { kind: 'vulorder' | 'klantorder' | 'gemengd' }) {
-  const map: Record<string, [string, Tone]> = { vulorder: [tx("Vulorder"), 'info'], klantorder: [tx("Klantorder"), 'sell'], gemengd: [tx("Gemengd"), ''] }
+  const map: Record<string, [string, Tone]> = { vulorder: [tx("Vulorder"), 'info'], klantorder: [tx("Voor verkooporder"), 'sell'], gemengd: [tx("Gemengd"), ''] }
   return <Pill tone={map[kind][1]}>{map[kind][0]}</Pill>
 }
 
@@ -207,7 +207,7 @@ export function PurchaseForm({ transportId, orderId }: { transportId?: string; o
       <Head title={tx("Nieuwe inkooporder")} back={{ href: '#inkoop', label: tx("Inkoop") }} />
       <div className="stack">
         <section className="panel">
-          <h2>{tx("Bestelling")}</h2>
+          <h2>{tx("Inkooporder")}</h2>
           <div className="form-grid">
             <SelectField className="span-2" label={tx("Leverancier")} value={supplier} onChange={setSupplier} placeholder={tx("Kies een leverancier")} options={suppliers.map((x) => ({ value: x.id, label: `${x.name} (${x.country})` }))} />
             <TextField label={tx("Besteldatum")} type="date" value={orderDate} onChange={setOrderDate} />
@@ -217,7 +217,7 @@ export function PurchaseForm({ transportId, orderId }: { transportId?: string; o
 
         {waiting.length > 0 && (
           <section className="panel">
-            <h2>{tx("Nog in te kopen voor klantorders")}</h2>
+            <h2>{tx("Nog in te kopen voor verkooporders")}</h2>
             <div className="actions">{waiting.map((l) => (
               <button key={l.id} className="btn sm" onClick={() => addWaiting(l.id)}>
                 <Plus size={14} />{l.qty} {tx("×")} {l.description} ({s.sales_orders.find((o) => o.id === l.sales_order_id)?.number})
@@ -231,7 +231,7 @@ export function PurchaseForm({ transportId, orderId }: { transportId?: string; o
           {lines.length === 0 && <Empty>{tx("Voeg het eerste product toe.")}</Empty>}
           {lines.length > 0 && (
             <div className="table-wrap" style={{ minHeight: 120 }}><table>
-              <thead><tr><th style={{ minWidth: 260 }}>{tx("Product")}</th><th>{tx("Voor order")}</th><th className="num">{tx("Aantal")}</th><th className="num">{tx("Inkoopprijs")}</th><th className="num">{tx("Totaal")}</th><th></th></tr></thead>
+              <thead><tr><th style={{ minWidth: 260 }}>{tx("Product")}</th><th>{tx("Voor verkooporder")}</th><th className="num">{tx("Aantal")}</th><th className="num">{tx("Inkoopprijs")}</th><th className="num">{tx("Totaal")}</th><th></th></tr></thead>
               <tbody>{lines.map((l) => {
                 const so = l.sales_order_line_id && s.sales_orders.find((o) => o.id === s.sales_order_lines.find((x) => x.id === l.sales_order_line_id)?.sales_order_id)
                 return (

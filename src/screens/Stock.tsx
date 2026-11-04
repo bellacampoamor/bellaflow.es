@@ -34,7 +34,7 @@ export function Stock() {
 
   return (
     <>
-      <Head title={tx("Voorraad")} sub={tx("Per product en per locatie: wat er ligt en wat daarvan vrij is. Vrij is aanwezig minus gereserveerd voor orders.")}>
+      <Head title={tx("Voorraad")} sub={tx("Per product en per locatie: wat er ligt en wat daarvan vrij is. Vrij is aanwezig minus gereserveerd voor verkooporders.")}>
         <button className="btn" onClick={() => openModal('correct')}><SlidersHorizontal size={16} />{tx("Correctie")}</button>
         <button className="btn primary" onClick={() => openModal('transfer')}><ArrowLeftRight size={16} />{tx("Overboeken")}</button>
       </Head>

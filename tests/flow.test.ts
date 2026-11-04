@@ -16,10 +16,11 @@ import { toSeedSql } from '../scripts/seed-sql'
 
 const TODAY = '2026-11-04'
 let db: LocalDriver
-beforeEach(async () => { db = new LocalDriver(false); await seedDemo(db, TODAY) })
+let sellerId = ''
+beforeEach(async () => { db = new LocalDriver(false); await seedDemo(db, TODAY); sellerId = db.data.salespeople[0].id })
 
 const header = (customer_id: string, over = {}) => ({
-  customer_id, order_date: TODAY, channel: 'winkel' as const, salesperson: '', customer_reference: '', order_type: 'bestelling' as const,
+  customer_id, order_date: TODAY, channel: 'winkel' as const, salesperson_id: sellerId, customer_reference: '', order_type: 'bestelling' as const,
   fulfilment: 'bezorgen' as const, requested_date: null, promised_date: null, delivery_name: 'X', delivery_phone: '', delivery_address: 'Calle 1',
   delivery_postal_code: '', delivery_city: '', delivery_latitude: null, delivery_longitude: null, floor: '', has_elevator: false, needs_assembly: false, remove_old_furniture: false, delivery_notes: '', notes: '', ...over,
 })
@@ -150,7 +151,7 @@ describe('van inkoop tot factuur', () => {
     const s = await loadSnapshot(db)
     const product = s.products.find((p) => p.sku === 'LIG-AL-WT')!
     const count = s.invoices.length
-    await createOrder(db, { header: header(s.customers[0].id, { order_type: 'direct', fulfilment: 'meenemen' }), lines: [lineFromProduct(product, { qty: 1, warehouse_id: s.warehouses[1].id })] })
+    await createOrder(db, { header: header(s.customers[0].id, { order_type: 'direct', fulfilment: 'meenemen' }), lines: [lineFromProduct(product, { qty: 1, take_now: true, warehouse_id: s.warehouses[1].id })] })
     expect((await loadSnapshot(db)).invoices.length).toBe(count + 1)
   })
 
@@ -263,6 +264,40 @@ describe('verkoop stuurt inkoop', () => {
     s = await loadSnapshot(db)
     expect(linesToPurchase(s).find((l) => l.id === line.id)!.qty).toBe(1)
     expect(linePurchaseStatus(s, line.id)).toMatchObject({ purchased: 3, received: 0 })
+  })
+})
+
+describe('meenemen per regel', () => {
+  it('geeft een regel direct mee, factureert dat deel en houdt de rest open', async () => {
+    const s = await loadSnapshot(db)
+    const campoamor = s.warehouses[1]
+    const taken = s.products.find((p) => p.sku === 'LIG-AL-WT')!
+    const later = s.products.find((p) => p.sku === 'KST-EK-180')!
+    const before = onHandMap(s).get(stockKey(taken.id, campoamor.id))!
+    const id = await createOrder(db, { header: header(s.customers[0].id), lines: [
+      lineFromProduct(taken, { qty: 2, warehouse_id: campoamor.id, take_now: true, unit_price: 121 }),
+      lineFromProduct(later, { qty: 1, source: 'bestelling' }),
+    ] })
+    const after = await loadSnapshot(db)
+    const order = after.sales_orders.find((o) => o.id === id)!
+    expect(order.order_type).toBe('bestelling')
+    expect(onHandMap(after).get(stockKey(taken.id, campoamor.id))).toBe(before - 2)
+    expect(after.invoices.filter((i) => i.sales_order_id === id)).toMatchObject([{ kind: 'deelfactuur', total: 242 }])
+    expect(orderStage(after, order)).toBe('deels_geleverd')
+    expect(linesToPurchase(after).some((l) => l.sales_order_id === id && l.product_id === later.id)).toBe(true)
+  })
+  it('weigert meenemen als er niet genoeg vrij is', async () => {
+    const s = await loadSnapshot(db)
+    const product = s.products.find((p) => p.sku === 'LIG-AL-WT')!
+    await expect(createOrder(db, { header: header(s.customers[0].id), lines: [lineFromProduct(product, { qty: 99, warehouse_id: s.warehouses[1].id, take_now: true })] })).rejects.toThrow(/om mee te nemen/)
+  })
+})
+
+describe('verkoper', () => {
+  it('is verplicht op een verkooporder', async () => {
+    const s = await loadSnapshot(db)
+    const product = s.products.find((p) => p.sku === 'LIG-AL-WT')!
+    await expect(createOrder(db, { header: header(s.customers[0].id, { salesperson_id: '' }), lines: [lineFromProduct(product, { qty: 1, warehouse_id: s.warehouses[1].id })] })).rejects.toThrow(/verkoper/)
   })
 })
 

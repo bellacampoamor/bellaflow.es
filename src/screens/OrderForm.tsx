@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
-import { CreditCard, Plus, ShoppingCart, Store, Trash2 } from 'lucide-react'
-import type { Customer, Fulfilment, OrderType, Payment } from '../data/types'
+import { CreditCard, Plus, Trash2 } from 'lucide-react'
+import type { Customer, Fulfilment, Payment } from '../data/types'
 import { inboundByProduct, lineTotal, onHandMap, plannedQty, reservedMap, round2, stockKey, todayISO, vatBreakdown } from '../domain/calc'
 import { createOrder, lineFromProduct, saveRecord, splitLinesForStock, updateOrder, type OrderHeader, type OrderLineInput } from '../domain/services'
 import { loadSnapshot } from '../data/driver'
@@ -38,7 +38,7 @@ export function OrderForm({ id }: { id?: string }) {
   const existing = id ? s.sales_orders.find((o) => o.id === id) : undefined
 
   const [h, setH] = useState<OrderHeader>(() => existing ? (({ id: _i, number: _n, status: _s, ...rest }) => rest)(existing) : {
-    customer_id: '', order_date: today, channel: 'winkel', salesperson: '', customer_reference: '', order_type: 'direct', fulfilment: 'meenemen',
+    customer_id: '', order_date: today, channel: 'winkel', salesperson_id: '', customer_reference: '', order_type: 'bestelling', fulfilment: 'bezorgen',
     requested_date: null, promised_date: null, delivery_name: '', delivery_phone: '', delivery_address: '', delivery_postal_code: '', delivery_city: '', delivery_latitude: null, delivery_longitude: null,
     floor: '', has_elevator: false, needs_assembly: false, remove_old_furniture: false, delivery_notes: '', notes: '',
   })
@@ -48,6 +48,7 @@ export function OrderForm({ id }: { id?: string }) {
   const [depositRef, setDepositRef] = useState('')
   const [newCust, setNewCust] = useState<Omit<Customer, 'id'> | null>(null)
 
+  const sellers = s.salespeople.filter((x) => x.is_active || x.id === h.salesperson_id)
   const set = (p: Partial<OrderHeader>) => setH((v) => ({ ...v, ...p }))
   const stock = onHandMap(s), reserved = reservedMap(s), inbound = inboundByProduct(s)
   const warehouses = s.warehouses.filter((w) => w.is_active)
@@ -77,12 +78,14 @@ export function OrderForm({ id }: { id?: string }) {
     const p = s.products.find((x) => x.id === pid)!
     const cur = lines.find((l) => l.key === key)!
     const wid = bestWarehouse(pid, cur.qty)
-    const onOrder = !wid && h.order_type === 'bestelling'
-    patch(key, { product_id: pid, description: p.name, unit_price: p.sale_price, vat_rate: p.vat_rate, source: onOrder ? 'bestelling' : 'voorraad', warehouse_id: onOrder ? null : wid ?? warehouses[0]?.id ?? null })
+    const onOrder = !wid
+    patch(key, { product_id: pid, description: p.name, unit_price: p.sale_price, vat_rate: p.vat_rate, source: onOrder ? 'bestelling' : 'voorraad', take_now: false, warehouse_id: onOrder ? null : wid })
   }
-  const setType = (t: OrderType) => {
-    set({ order_type: t, fulfilment: t === 'direct' ? h.fulfilment : h.fulfilment === 'meenemen' ? 'bezorgen' : h.fulfilment })
-    if (t === 'direct') setLines((v) => v.map((l) => l.source === 'bestelling' ? { ...l, source: 'voorraad', warehouse_id: l.warehouse_id ?? bestWarehouse(l.product_id, l.qty) ?? warehouses[0]?.id ?? null } : l))
+  const setHandling = (l: Line, v: 'meenemen' | 'voorraad' | 'bestelling') => {
+    if (v === 'bestelling') return patch(l.key, { source: 'bestelling', take_now: false, warehouse_id: null })
+    const showroom = warehouses.find((w) => w.kind === 'winkel' && freeAt(l.product_id, w.id) >= l.qty)
+    const wid = l.warehouse_id ?? (v === 'meenemen' ? showroom?.id : null) ?? bestWarehouse(l.product_id, l.qty) ?? warehouses[0]?.id ?? null
+    patch(l.key, { source: 'voorraad', take_now: v === 'meenemen', warehouse_id: wid })
   }
   const setFulfilment = (f: Fulfilment) => set({ fulfilment: f })
 
@@ -96,14 +99,14 @@ export function OrderForm({ id }: { id?: string }) {
   const save = async () => {
     const payload = lines.map(({ key: _k, ...l }) => (id ? l : (({ id: _i, ...r }) => r)(l as Line & { id?: string })) as OrderLineInput)
     if (existing) {
-      if (await run((db) => updateOrder(db, id!, { header: h, lines: payload }), tx("Order opgeslagen"))) go(`orders-${id}`)
+      if (await run((db) => updateOrder(db, id!, { header: h, lines: payload }), tx("Verkooporder opgeslagen"))) go(`orders-${id}`)
       return
     }
     let newId = ''
     const ok = await run(async (db) => {
-      const finalLines = h.order_type === 'bestelling' ? splitLinesForStock(await loadSnapshot(db), payload) : payload
+      const finalLines = splitLinesForStock(await loadSnapshot(db), payload)
       newId = await createOrder(db, { header: h, lines: finalLines, deposit: deposit > 0 ? { amount: deposit, method: depositMethod, reference: depositRef } : undefined })
-    }, h.order_type === 'direct' && h.fulfilment === 'meenemen' ? tx("Order geregistreerd en meegegeven") : tx("Order aangemaakt"))
+    }, allTaken ? tx("Verkooporder geregistreerd en meegegeven") : someTaken ? tx("Verkooporder aangemaakt, meegenomen artikelen afgeboekt") : tx("Verkooporder aangemaakt"))
     if (ok) go(`orders-${newId}`)
   }
   const saveCustomer = async () => {
@@ -116,12 +119,14 @@ export function OrderForm({ id }: { id?: string }) {
     }
   }
 
-  const needsAddress = h.fulfilment !== 'meenemen'
+  const allTaken = lines.length > 0 && lines.every((l) => l.take_now)
+  const someTaken = lines.some((l) => l.take_now)
+  const needsAddress = !allTaken && h.fulfilment !== 'meenemen'
   const customer = s.customers.find((c) => c.id === h.customer_id)
 
   return (
     <>
-      <Head title={existing ? tx("{0} wijzigen", existing.number) : tx("Nieuwe order")} back={existing ? { href: `#orders-${id}`, label: existing.number } : { href: '#orders', label: tx("Orders") }} />
+      <Head title={existing ? tx("{0} wijzigen", existing.number) : tx("Nieuwe verkooporder")} back={existing ? { href: `#orders-${id}`, label: existing.number } : { href: '#orders', label: tx("Verkooporders") }} />
       <div className="cols">
         <div className="stack">
           <section className="panel">
@@ -131,21 +136,9 @@ export function OrderForm({ id }: { id?: string }) {
               <div className="field" style={{ justifyContent: 'flex-end' }}><button className="btn" type="button" onClick={() => setNewCust({ ...emptyCustomer })}><Plus size={16} />{tx("Nieuwe klant")}</button></div>
               {customer && <div className="span-all small muted">{[customer.phone, customer.email, customer.address, customer.postal_code, customer.city].filter(Boolean).join(', ')}</div>}
               <SelectField label={tx("Verkocht via")} value={h.channel} onChange={(v) => set({ channel: v })} options={[{ value: 'winkel', label: tx("Winkel") }, { value: 'online', label: tx("Online") }, { value: 'telefoon', label: tx("Telefoon of e-mail") }, { value: 'beurs', label: tx("Beurs") }]} />
-              <TextField label={tx("Verkoper")} value={h.salesperson} onChange={(v) => set({ salesperson: v })} />
-              <TextField label={tx("Orderdatum")} type="date" value={h.order_date} onChange={(v) => set({ order_date: v })} />
+              <SelectField label={tx("Verkoper (verplicht)")} value={h.salesperson_id} placeholder={tx("Kies een verkoper")} hint={sellers.length ? undefined : tx("Voeg eerst verkopers toe onder Beheer.")} onChange={(v) => set({ salesperson_id: v })} options={sellers.map((x) => ({ value: x.id, label: x.name }))} />
+              <TextField label={tx("Verkoopdatum")} type="date" value={h.order_date} onChange={(v) => set({ order_date: v })} />
               <TextField label={tx("Referentie klant")} value={h.customer_reference} onChange={(v) => set({ customer_reference: v })} />
-            </div>
-          </section>
-
-          <section className="panel">
-            <h2>{tx("Soort verkoop")}</h2>
-            <div className="choice">
-              <button type="button" className={h.order_type === 'direct' ? 'on' : ''} onClick={() => setType('direct')} disabled={!!existing}>
-                <Store size={20} /><span><strong>{tx("Optie A: directe levering")}</strong><small>{tx("Uit voorraad. Meenemen of direct verzenden.")}</small></span>
-              </button>
-              <button type="button" className={h.order_type === 'bestelling' ? 'on' : ''} onClick={() => setType('bestelling')} disabled={!!existing}>
-                <ShoppingCart size={20} /><span><strong>{tx("Optie B: bestelling")}</strong><small>{tx("Op voorraad of op bestelling, met of zonder vooruitbetaling.")}</small></span>
-              </button>
             </div>
           </section>
 
@@ -166,17 +159,18 @@ export function OrderForm({ id }: { id?: string }) {
                       <NumberField label={tx("Aantal")} value={l.qty} min={Math.max(1, locked)} step="1" hint={locked ? tx("{0} staat op een levering", locked) : undefined} onChange={(v) => patch(l.key, { qty: v })} />
                       <NumberField label={tx("Prijs incl. IVA")} value={l.unit_price} step="0.01" min={0} onChange={(v) => patch(l.key, { unit_price: v })} />
                       <NumberField label={tx("Korting %")} value={l.discount_pct} step="0.5" min={0} onChange={(v) => patch(l.key, { discount_pct: v })} />
-                      {h.order_type === 'bestelling' && (
-                        <SelectField label={tx("Herkomst")} value={l.source} onChange={(v) => patch(l.key, { source: v, warehouse_id: v === 'bestelling' ? null : l.warehouse_id ?? bestWarehouse(l.product_id, l.qty) ?? warehouses[0]?.id ?? null })} options={[{ value: 'voorraad', label: tx("Uit voorraad") }, { value: 'bestelling', label: tx("Op bestelling") }]} />
-                      )}
+                      <SelectField className="span-2" label={tx("Afhandeling")} value={l.take_now ? 'meenemen' : l.source} onChange={(v) => setHandling(l, v as 'meenemen' | 'voorraad' | 'bestelling')} options={[
+                        ...(existing && !l.take_now ? [] : [{ value: 'meenemen', label: tx("Klant neemt direct mee") }]),
+                        ...(l.take_now && existing ? [] : [{ value: 'voorraad', label: tx("Uit voorraad, later leveren") }, { value: 'bestelling', label: tx("Op bestelling") }]),
+                      ]} />
                       {l.source === 'voorraad' && (
                         <SelectField className="span-2" label={tx("Uit magazijn")} value={l.warehouse_id} onChange={(v) => patch(l.key, { warehouse_id: v })} options={warehouses.map((w) => ({ value: w.id, label: tx("{0} ({1} vrij)", w.name, l.product_id ? freeFor(l, w.id) : 0) }))} />
                       )}
                     </div>
                     <div className="panel-head" style={{ margin: '8px 0 0' }}>
                       <div className="small">
-                        {short && h.order_type === 'bestelling' && !existing && <span className="strong">{tx("Bij opslaan: {0} uit voorraad, {1} op bestelling", Math.max(0, free), l.qty - Math.max(0, free))}{others.length ? tx(". Wel op {0}", others.map((w) => `${w.name} (${freeAt(l.product_id, w.id)})`).join(', ')) : ''}. </span>}
-                        {short && (h.order_type === 'direct' || existing) && <span style={{ color: 'var(--bad)', fontWeight: 600 }}>{tx("Maar")} {free} {tx("vrij op dit magazijn")}{others.length ? tx(". Wel op {0}", others.map((w) => `${w.name} (${freeAt(l.product_id, w.id)})`).join(', ')) : ''}. </span>}
+                        {short && !l.take_now && !existing && <span className="strong">{tx("Bij opslaan: {0} uit voorraad, {1} op bestelling", Math.max(0, free), l.qty - Math.max(0, free))}{others.length ? tx(". Wel op {0}", others.map((w) => `${w.name} (${freeAt(l.product_id, w.id)})`).join(', ')) : ''}. </span>}
+                        {short && (l.take_now || existing) && <span style={{ color: 'var(--bad)', fontWeight: 600 }}>{tx("Maar")} {free} {tx("vrij op dit magazijn")}{others.length ? tx(". Wel op {0}", others.map((w) => `${w.name} (${freeAt(l.product_id, w.id)})`).join(', ')) : ''}. </span>}
                         {l.source === 'bestelling' && l.product_id && <span className="muted">{tx("Komt op de lijst \"Nog in te kopen\"")}{inbound.get(l.product_id) ? tx(". Al {0} onderweg", inbound.get(l.product_id)) : ''}. </span>}
                       </div>
                       <div className="actions">
@@ -190,14 +184,14 @@ export function OrderForm({ id }: { id?: string }) {
             </div>
           </section>
 
-          <section className="panel">
+          {allTaken ? <section className="panel"><h2>{tx("Levering")}</h2><p className="muted" style={{ margin: 0 }}>{tx("De klant neemt alles direct mee. Er is geen levering nodig.")}</p></section> : <section className="panel">
             <h2>{tx("Levering")}</h2>
             <div className="form-grid">
               <SelectField className="span-2" label={tx("Afleverwijze")} value={h.fulfilment} onChange={setFulfilment} options={[
-                ...(h.order_type === 'direct' || h.fulfilment === 'meenemen' ? [{ value: 'meenemen' as const, label: tx("Klant neemt mee") }] : [{ value: 'meenemen' as const, label: tx("Klant haalt op") }]),
+                { value: 'meenemen' as const, label: tx("Klant haalt later op") },
                 { value: 'bezorgen', label: tx("Bezorgen door eigen team") }, { value: 'verzenden', label: tx("Verzenden met vervoerder") },
               ]} />
-              {!(h.order_type === 'direct' && h.fulfilment === 'meenemen') && <>
+              {<>
                 <TextField label={tx("Gewenste leverdatum")} type="date" value={h.requested_date} onChange={(v) => set({ requested_date: v || null })} />
                 <TextField label={tx("Beloofde leverdatum")} type="date" value={h.promised_date} onChange={(v) => set({ promised_date: v || null })} />
               </>}
@@ -216,7 +210,7 @@ export function OrderForm({ id }: { id?: string }) {
                 <AreaField className="span-all" label={tx("Instructies voor de bezorgers")} value={h.delivery_notes} onChange={(v) => set({ delivery_notes: v })} />
               </>}
             </div>
-          </section>
+          </section>}
           <section className="panel"><AreaField label={tx("Interne notitie")} value={h.notes} onChange={(v) => set({ notes: v })} /></section>
         </div>
 
@@ -247,7 +241,7 @@ export function OrderForm({ id }: { id?: string }) {
               </div>
             </section>
           )}
-          <button className="btn primary" type="button" onClick={save}>{existing ? tx("Wijzigingen opslaan") : h.order_type === 'direct' && h.fulfilment === 'meenemen' ? tx("Order afronden en meegeven") : tx("Order aanmaken")}</button>
+          <button className="btn primary" type="button" onClick={save}>{existing ? tx("Wijzigingen opslaan") : allTaken ? tx("Verkooporder afronden en meegeven") : tx("Verkooporder aanmaken")}</button>
           <a className="btn" href={existing ? `#orders-${id}` : '#orders'}>{tx("Annuleren")}</a>
         </div>
       </div>

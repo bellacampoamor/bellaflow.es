@@ -142,10 +142,10 @@ export function Deliveries() {
 
   return (
     <>
-      <Head title={tx("Levering aan klant")} sub={tx("Plan per dag de beste rijroute, zet de order klaar en druk de afleverbon af. De klant tekent bij aflevering voor ontvangst.")} />
+      <Head title={tx("Levering aan klant")} sub={tx("Plan per dag de beste rijroute, zet de verkooporder klaar en druk de afleverbon af. De klant tekent bij aflevering voor ontvangst.")} />
       <Tabs value={tab} onChange={setTab} tabs={[{ value: 'planning', label: tx("Planning"), n: planning.length }, { value: 'done', label: tx("Afgerond"), n: done.length }]} />
       {tab === 'planning' && <div className="stack">
-        {days.length === 0 && <section className="panel"><Empty>{tx("Er staat niets gepland. Plan een levering vanuit een order.")}</Empty></section>}
+        {days.length === 0 && <section className="panel"><Empty>{tx("Er staat niets gepland. Plan een levering vanuit een verkooporder.")}</Empty></section>}
         {days.map((day) => {
           const stops = dayStops(day)
           const others = planning.filter((d) => d.planned_date === day && d.method !== 'eigen_team').sort(byPosition)
@@ -177,7 +177,7 @@ export function Deliveries() {
       {tab === 'done' && <section className="panel">
         {done.length === 0 && <Empty>{tx("Nog geen afgeronde leveringen.")}</Empty>}
         {done.length > 0 && <div className="table-wrap"><table>
-          <thead><tr><th>{tx("Levering")}</th><th>{tx("Order")}</th><th>{tx("Klant")}</th><th>{tx("Datum")}</th><th>{tx("Getekend door")}</th><th>{tx("Bon")}</th><th>{tx("Status")}</th></tr></thead>
+          <thead><tr><th>{tx("Levering")}</th><th>{tx("Verkooporder")}</th><th>{tx("Klant")}</th><th>{tx("Datum")}</th><th>{tx("Getekend door")}</th><th>{tx("Bon")}</th><th>{tx("Status")}</th></tr></thead>
           <tbody>{done.map((d) => {
             const o = orderOf(d)
             const c = s.customers.find((x) => x.id === o.customer_id)!

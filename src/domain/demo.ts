@@ -1,7 +1,7 @@
 // Voorbeeldgegevens. Alles is verzonnen en wordt opgebouwd met dezelfde functies als de echte app,
 // zodat de voorbeeldsituatie altijd klopt. Datums lopen mee met vandaag.
 import { newId, type Driver } from '../data/driver'
-import type { Customer, Product, Supplier, Warehouse } from '../data/types'
+import type { Customer, Product, Salesperson, Supplier, Warehouse } from '../data/types'
 import { addDays, todayISO } from './calc'
 import {
   createDelivery, createInvoice, createTransport, createOrder, createPurchaseOrder, lineFromProduct, markDelivered, markNotePrinted, markReady, payInvoice,
@@ -131,8 +131,12 @@ export async function seedDemo(db: Driver, today = todayISO()) {
     })
   }
 
+  const sellerA: Salesperson = { id: newId(), name: 'Voorbeeldverkoper Showroom', email: '', phone: '', is_active: true }
+  const sellerB: Salesperson = { id: newId(), name: 'Voorbeeldverkoper Online', email: '', phone: '', is_active: true }
+  await db.insert('salespeople', [sellerA, sellerB])
+
   const header = (c: Customer, date: string, type: OrderHeader['order_type'], fulfilment: OrderHeader['fulfilment'], over: Partial<OrderHeader> = {}): OrderHeader => ({
-    customer_id: c.id, order_date: date, channel: 'winkel', salesperson: 'Winkelteam', customer_reference: '', order_type: type, fulfilment,
+    customer_id: c.id, order_date: date, channel: 'winkel', salesperson_id: sellerA.id, customer_reference: '', order_type: type, fulfilment,
     requested_date: null, promised_date: null, delivery_name: c.name, delivery_phone: c.phone, delivery_address: fulfilment === 'meenemen' ? '' : c.address,
     delivery_postal_code: fulfilment === 'meenemen' ? '' : c.postal_code, delivery_city: fulfilment === 'meenemen' ? '' : c.city, delivery_latitude: fulfilment === 'meenemen' ? null : COORDS[c.city]?.[0] ?? null, delivery_longitude: fulfilment === 'meenemen' ? null : COORDS[c.city]?.[1] ?? null, floor: '', has_elevator: false,
     needs_assembly: false, remove_old_furniture: false, delivery_notes: '', notes: '', ...over,
@@ -157,7 +161,7 @@ export async function seedDemo(db: Driver, today = todayISO()) {
   // Meenemen uit de winkel.
   await createOrder(db, {
     header: header(c6, d(-6), 'direct', 'meenemen'),
-    lines: [line(bed, 2, shop)],
+    lines: [line(bed, 2, shop, { take_now: true })],
     deposit: { amount: 730, method: 'pin', reference: '' },
   })
 

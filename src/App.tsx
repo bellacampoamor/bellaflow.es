@@ -20,7 +20,7 @@ const STEPS = [
   { key: 'inkoop', label: '1. Inkoop', sub: (n: number) => tx("{0} nog in te kopen", n), icon: ShoppingCart, tint: '' },
   { key: 'inkomend', label: '2. Inkomend', sub: (n: number) => (n ? tx("{0} te laat", n) : tx("deelleveringen")), icon: Truck, tint: '' },
   { key: 'ontvangst', label: '3. Ontvangst', sub: (n: number) => tx("{0} binnen 7 dagen", n), icon: PackageCheck, tint: 'sell' },
-  { key: 'orders', label: '4. Orders', sub: (n: number) => tx("{0} te plannen", n), icon: ClipboardList, tint: 'sell' },
+  { key: 'orders', label: '4. Verkooporders', sub: (n: number) => tx("{0} te plannen", n), icon: ClipboardList, tint: 'sell' },
   { key: 'levering', label: '5. Levering', sub: (n: number) => tx("{0} vandaag", n), icon: Truck, tint: 'ship' },
   { key: 'facturatie', label: '6. Facturatie', sub: (n: number) => tx("{0} te factureren", n), icon: FileText, tint: 'bill' },
 ] as const

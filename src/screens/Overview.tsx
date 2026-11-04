@@ -28,11 +28,11 @@ export function Overview() {
     <>
       <Head title={tx("Overzicht")} sub={tx("Wat er vandaag speelt, {0}.", fmtShort(today))}>
         <a className="btn" href="#inkoop-nieuw"><Plus size={16} />{tx("Inkooporder")}</a>
-        <a className="btn primary" href="#orders-nieuw"><Plus size={16} />{tx("Nieuwe order")}</a>
+        <a className="btn primary" href="#orders-nieuw"><Plus size={16} />{tx("Nieuwe verkooporder")}</a>
       </Head>
 
       <div className="figures">
-        <div><b>{s.sales_orders.filter((o) => o.status === 'open' && orderStage(s, o) !== 'gefactureerd').length}</b><span className="muted small">{tx("Lopende orders")}</span></div>
+        <div><b>{s.sales_orders.filter((o) => o.status === 'open' && orderStage(s, o) !== 'gefactureerd').length}</b><span className="muted small">{tx("Lopende verkooporders")}</span></div>
         <div><b>{inbound.length}</b><span className="muted small">{tx("Zendingen binnen 14 dagen")}</span></div>
         <div><b>{eur(receivable)}</b><span className="muted small">{tx("Open op facturen")}</span></div>
         <div><b>{eur(deposits)}</b><span className="muted small">{tx("Vooruitbetaald, nog te verrekenen")}</span></div>
@@ -56,8 +56,8 @@ export function Overview() {
         </section>
 
         <section className="panel">
-          <div className="panel-head"><h2>{tx("Orders die aandacht vragen")}</h2><a className="small" href="#orders">{tx("Alle orders")}</a></div>
-          {orders.length === 0 && <Empty>{tx("Alle orders zijn ingepland.")}</Empty>}
+          <div className="panel-head"><h2>{tx("Verkooporders die aandacht vragen")}</h2><a className="small" href="#orders">{tx("Alle verkooporders")}</a></div>
+          {orders.length === 0 && <Empty>{tx("Alle verkooporders zijn ingepland.")}</Empty>}
           {orders.map((o) => {
             const st = orderStage(s, o)
             return (

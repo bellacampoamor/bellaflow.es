@@ -24,17 +24,17 @@ export function Orders() {
   const shown = rows.filter((r) => inGroup(filter, r.stage) && (!t || `${r.o.number} ${r.cust?.name} ${r.cust?.company} ${r.o.customer_reference}`.toLowerCase().includes(t)))
   return (
     <>
-      <Head title={tx("Orders")} sub={tx("Verkoop in de winkel en online. Hier bepaal je leverdata en plan je deelleveringen.")}>
-        <a className="btn primary" href="#orders-nieuw"><Plus size={16} />{tx("Nieuwe order")}</a>
+      <Head title={tx("Verkooporders")} sub={tx("Verkoop in de winkel en online. Hier bepaal je leverdata en plan je deelleveringen.")}>
+        <a className="btn primary" href="#orders-nieuw"><Plus size={16} />{tx("Nieuwe verkooporder")}</a>
       </Head>
       <section className="panel">
         <div className="panel-head" style={{ alignItems: 'flex-end' }}>
           <Tabs<Filter> value={filter} onChange={setFilter} tabs={(['verwerken', 'lopend', 'klaar', 'alle'] as Filter[]).map((f) => ({ value: f, label: { verwerken: tx("Te verwerken"), lopend: tx("Lopend"), klaar: tx("Afgerond"), alle: tx("Alles") }[f], n: rows.filter((r) => inGroup(f, r.stage)).length }))} />
-          <input style={{ maxWidth: 280, marginBottom: 14 }} aria-label={tx("Orders zoeken")} placeholder={tx("Zoek op nummer of klant")} value={q} onChange={(e) => setQ(e.target.value)} />
+          <input style={{ maxWidth: 280, marginBottom: 14 }} aria-label={tx("Verkooporders zoeken")} placeholder={tx("Zoek op nummer of klant")} value={q} onChange={(e) => setQ(e.target.value)} />
         </div>
-        {shown.length === 0 && <Empty>{tx("Geen orders in dit overzicht.")}</Empty>}
+        {shown.length === 0 && <Empty>{tx("Geen verkooporders in dit overzicht.")}</Empty>}
         {shown.length > 0 && <div className="table-wrap"><table>
-          <thead><tr><th>{tx("Order")}</th><th>{tx("Datum")}</th><th>{tx("Klant")}</th><th>{tx("Soort")}</th><th>{tx("Leverdatum")}</th><th className="num">{tx("Totaal")}</th><th className="num">{tx("Nog te betalen")}</th><th>{tx("Status")}</th></tr></thead>
+          <thead><tr><th>{tx("Verkooporder")}</th><th>{tx("Datum")}</th><th>{tx("Klant")}</th><th>{tx("Soort")}</th><th>{tx("Leverdatum")}</th><th className="num">{tx("Totaal")}</th><th className="num">{tx("Nog te betalen")}</th><th>{tx("Status")}</th></tr></thead>
           <tbody>{shown.map(({ o, stage, cust }) => (
             <tr key={o.id} className="click" onClick={() => go(`orders-${o.id}`)}>
               <td><a className="rowlink" href={`#orders-${o.id}`}>{o.number}</a></td>
@@ -59,7 +59,7 @@ export function OrderDetail({ id }: { id: string }) {
   const { s, run } = useApp()
   const o = s.sales_orders.find((x) => x.id === id)
   const [modal, setModal] = useState<'date' | 'plan' | 'pay' | 'cancel' | null>(null)
-  if (!o) return <div className="panel">{tx("Order niet gevonden.")} <a href="#orders">{tx("Terug naar orders")}</a>.</div>
+  if (!o) return <div className="panel">{tx("Verkooporder niet gevonden.")} <a href="#orders">{tx("Terug naar verkooporders")}</a>.</div>
   const c = s.customers.find((x) => x.id === o.customer_id)!
   const lines = orderLines(s, id)
   const stage = orderStage(s, o)
@@ -86,7 +86,7 @@ export function OrderDetail({ id }: { id: string }) {
 
   return (
     <>
-      <Head title={o.number} sub={<>{c.company || c.name}, {fmtDate(o.order_date)} <Pill tone={stageTone[stage]}>{tx(STAGE_LABEL[stage])}</Pill></>} back={{ href: '#orders', label: tx("Orders") }}>
+      <Head title={o.number} sub={<>{c.company || c.name}, {fmtDate(o.order_date)} <Pill tone={stageTone[stage]}>{tx(STAGE_LABEL[stage])}</Pill></>} back={{ href: '#orders', label: tx("Verkooporders") }}>
         {open && stage !== 'gefactureerd' && <>
           <button className="btn" onClick={() => setModal('date')}><CalendarClock size={16} />{tx("Leverdatum")}</button>
           <a className="btn" href={`#orders-wijzig-${id}`}><Pencil size={16} />{tx("Wijzigen")}</a>
@@ -110,7 +110,7 @@ export function OrderDetail({ id }: { id: string }) {
                 const here = l.warehouse_id ? hand.get(stockKey(l.product_id, l.warehouse_id)) ?? 0 : 0
                 return (
                   <tr key={l.id}>
-                    <td className="strong">{l.description}{l.options && <div className="muted small" style={{ fontWeight: 400 }}>{l.options}</div>}</td>
+                    <td className="strong">{l.description}{l.take_now && <> <Pill tone="good">{tx("Meegenomen")}</Pill></>}{l.options && <div className="muted small" style={{ fontWeight: 400 }}>{l.options}</div>}</td>
                     <td style={{ minWidth: 170 }}>
                       {!l.warehouse_id ? <Pill tone="warn">{tx("Op bestelling")}</Pill>
                         : open && unplanned ? (
@@ -133,7 +133,7 @@ export function OrderDetail({ id }: { id: string }) {
           {onOrder.length > 0 && (
             <section className="panel">
               <div className="panel-head">
-                <h2>{tx("Inkoop voor deze order")}</h2>
+                <h2>{tx("Inkoop voor deze verkooporder")}</h2>
                 {open && toPurchase > 0 && <a className="btn sm primary" href={`#inkoop-nieuw-order-${id}`}><Plus size={14} />{tx("Inkooporder maken")}</a>}
               </div>
               <div className="table-wrap"><table>
@@ -189,6 +189,7 @@ export function OrderDetail({ id }: { id: string }) {
             <dl className="dl">
               <dt>{tx("Klant")}</dt><dd><div>{c.company || c.name}</div><div className="muted small">{[c.phone, c.email].filter(Boolean).join(', ')}</div></dd>
               {o.customer_reference && <><dt>{tx("Referentie")}</dt><dd>{o.customer_reference}</dd></>}
+              <dt>{tx("Verkoper")}</dt><dd>{s.salespeople.find((x) => x.id === o.salesperson_id)?.name ?? '–'}</dd>
               <dt>{tx("Afleverwijze")}</dt><dd>{{ meenemen: tx("Klant neemt mee"), bezorgen: tx("Bezorgen door eigen team"), verzenden: tx("Verzenden met vervoerder") }[o.fulfilment]}</dd>
               <dt>{tx("Gewenst")}</dt><dd>{fmtDate(o.requested_date)}</dd>
               <dt>{tx("Beloofd")}</dt><dd>{fmtDate(o.promised_date)}</dd>
@@ -201,7 +202,7 @@ export function OrderDetail({ id }: { id: string }) {
           <section className="panel">
             <h2>{tx("Betalingen")}</h2>
             <div className="totals" style={{ maxWidth: 'none' }}>
-              <div><span>{tx("Ordertotaal")}</span><span>{eur(total)}</span></div>
+              <div><span>{tx("Totaal verkooporder")}</span><span>{eur(total)}</span></div>
               {payments.map((p) => <div key={p.id} className="small"><span className="muted">{fmtDate(p.paid_at)} {tx(p.kind)} ({tx(p.method)})</span><span>−{eur(p.amount)}</span></div>)}
               <div className="grand"><span>{tx("Nog te betalen")}</span><span>{eur(outstanding)}</span></div>
               {depositAvailable(s, id) > 0 && <div className="small muted"><span>{tx("Nog te verrekenen op factuur")}</span><span>{eur(depositAvailable(s, id))}</span></div>}
@@ -215,7 +216,7 @@ export function OrderDetail({ id }: { id: string }) {
                 {e.new_date && <div className="muted small">{e.old_date ? tx("{0} naar ", fmtDate(e.old_date)) : tx("Nieuw: ")}{fmtDate(e.new_date)}{tx(", klant")} {e.customer_notified ? 'geïnformeerd' : tx("nog niet geïnformeerd")}</div>}
               </div></li>
             ))}</ul>
-            {open && !lines.some((l) => shippedQty(s, l.id) > 0) && <button className="btn sm danger" style={{ marginTop: 14 }} onClick={() => setModal('cancel')}>{tx("Order annuleren")}</button>}
+            {open && !lines.some((l) => shippedQty(s, l.id) > 0) && <button className="btn sm danger" style={{ marginTop: 14 }} onClick={() => setModal('cancel')}>{tx("Verkooporder annuleren")}</button>}
           </section>
         </div>
       </div>
@@ -334,7 +335,7 @@ function PaymentModal({ order, onClose }: { order: SalesOrder; onClose: () => vo
         <TextField label={tx("Datum")} type="date" value={date} onChange={setDate} />
         <TextField label={tx("Referentie")} value={ref} onChange={setRef} />
       </div>
-      <p className="small muted" style={{ margin: 0 }}>{tx("Wordt verrekend op de eerstvolgende factuur van deze order.")}</p>
+      <p className="small muted" style={{ margin: 0 }}>{tx("Wordt verrekend op de eerstvolgende factuur van deze verkooporder.")}</p>
     </Modal>
   )
 }
@@ -345,7 +346,7 @@ function CancelModal({ order, onClose }: { order: SalesOrder; onClose: () => voi
   return (
     <Modal title={tx("{0} annuleren?", order.number)} onClose={onClose} footer={<>
       <button className="btn" onClick={onClose}>{tx("Terug")}</button>
-      <button className="btn danger" onClick={async () => { if (await run((db) => cancelOrder(db, order.id, reason), tx("Order geannuleerd"))) onClose() }}>{tx("Order annuleren")}</button>
+      <button className="btn danger" onClick={async () => { if (await run((db) => cancelOrder(db, order.id, reason), tx("Verkooporder geannuleerd"))) onClose() }}>{tx("Verkooporder annuleren")}</button>
     </>}>
       <p style={{ margin: 0 }}>{tx("Geplande leveringen vervallen en de reservering op de voorraad komt vrij. Eventuele vooruitbetalingen moet je zelf terugboeken.")}</p>
       <TextField label={tx("Reden")} value={reason} onChange={setReason} />

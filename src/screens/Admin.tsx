@@ -1,13 +1,13 @@
 import { useState } from 'react'
 import { Plus } from 'lucide-react'
-import type { Customer, Product, Settings, Supplier, Warehouse } from '../data/types'
+import type { Customer, Product, Salesperson, Settings, Supplier, Warehouse } from '../data/types'
 import { saveRecord, saveSettings, type PrefixField } from '../domain/services'
 import { useApp } from '../ui/app-context'
 import { AreaField, Check, eur, Head, Modal, NumberField, Pill, SelectField, Tabs, TextField } from '../ui/kit'
 import { CustomerFields } from './OrderForm'
 import { tx } from '../i18n'
 
-type Tab = 'magazijnen' | 'producten' | 'leveranciers' | 'klanten' | 'bedrijf'
+type Tab = 'magazijnen' | 'producten' | 'leveranciers' | 'klanten' | 'verkopers' | 'bedrijf'
 
 const NEW = {
   warehouse: { code: '', name: '', kind: 'magazijn', address: '', postal_code: '', city: '', phone: '', contact_name: '', receives_goods: true, ships_goods: true, is_active: true, latitude: null, longitude: null, is_route_origin: false } as Omit<Warehouse, 'id'>,
@@ -23,9 +23,10 @@ export function Admin() {
   const [pr, setPr] = useState<(Omit<Product, 'id'> & { id?: string }) | null>(null)
   const [su, setSu] = useState<(Omit<Supplier, 'id'> & { id?: string }) | null>(null)
   const [cu, setCu] = useState<(Omit<Customer, 'id'> & { id?: string }) | null>(null)
+  const [se, setSe] = useState<(Omit<Salesperson, 'id'> & { id?: string }) | null>(null)
   const [co, setCo] = useState<Settings>(s.settings[0])
 
-  const addButton = { magazijnen: [tx("Magazijn toevoegen"), () => setWh({ ...NEW.warehouse })], producten: [tx("Product toevoegen"), () => setPr({ ...NEW.product })], leveranciers: [tx("Leverancier toevoegen"), () => setSu({ ...NEW.supplier })], klanten: [tx("Klant toevoegen"), () => setCu({ ...NEW.customer })] } as Record<string, [string, () => void]>
+  const addButton = { magazijnen: [tx("Magazijn toevoegen"), () => setWh({ ...NEW.warehouse })], producten: [tx("Product toevoegen"), () => setPr({ ...NEW.product })], leveranciers: [tx("Leverancier toevoegen"), () => setSu({ ...NEW.supplier })], klanten: [tx("Klant toevoegen"), () => setCu({ ...NEW.customer })], verkopers: [tx("Verkoper toevoegen"), () => setSe({ name: '', email: '', phone: '', is_active: true })] } as Record<string, [string, () => void]>
   const need = (ok: unknown, msg: string) => { if (!ok) toast(msg, true); return !!ok }
 
   return (
@@ -35,7 +36,7 @@ export function Admin() {
       </Head>
       <Tabs<Tab> value={tab} onChange={setTab} tabs={[
         { value: 'magazijnen', label: tx("Magazijnen"), n: s.warehouses.length }, { value: 'producten', label: tx("Producten"), n: s.products.length },
-        { value: 'leveranciers', label: tx("Leveranciers"), n: s.suppliers.length }, { value: 'klanten', label: tx("Klanten"), n: s.customers.length }, { value: 'bedrijf', label: tx("Bedrijf en factuur") },
+        { value: 'leveranciers', label: tx("Leveranciers"), n: s.suppliers.length }, { value: 'klanten', label: tx("Klanten"), n: s.customers.length }, { value: 'verkopers', label: tx("Verkopers"), n: s.salespeople.length }, { value: 'bedrijf', label: tx("Bedrijf en factuur") },
       ]} />
 
       {tab === 'magazijnen' && <section className="panel"><div className="table-wrap"><table>
@@ -62,6 +63,11 @@ export function Admin() {
         <tbody>{s.customers.map((c) => <tr key={c.id} className="click" onClick={() => setCu(c)}><td className="strong">{c.company || c.name}</td><td>{tx(c.kind[0].toUpperCase() + c.kind.slice(1))}</td><td>{c.city}</td><td>{c.phone}</td><td className="muted">{c.email}</td><td>{{ es: tx("Spaans"), nl: tx("Nederlands"), en: tx("Engels") }[c.language]}</td></tr>)}</tbody>
       </table></div></section>}
 
+      {tab === 'verkopers' && <section className="panel"><div className="table-wrap"><table>
+        <thead><tr><th>{tx("Naam")}</th><th>{tx("E-mail")}</th><th>{tx("Telefoon")}</th><th>{tx("Status")}</th></tr></thead>
+        <tbody>{s.salespeople.map((x) => <tr key={x.id} className="click" onClick={() => setSe(x)}><td className="strong">{x.name}</td><td className="muted">{x.email || '–'}</td><td className="muted">{x.phone || '–'}</td><td>{x.is_active ? <Pill tone="good">{tx("Actief")}</Pill> : <Pill>{tx("Inactief")}</Pill>}</td></tr>)}</tbody>
+      </table></div></section>}
+
       {tab === 'bedrijf' && <section className="panel">
         <h2>{tx("Bedrijf en factuur")}</h2>
         <div className="form-grid">
@@ -86,6 +92,19 @@ export function Admin() {
         </div>
         <button className="btn primary" style={{ marginTop: 14 }} onClick={() => { const { id: _i, ...patch } = co; run((db) => saveSettings(db, patch), tx("Bedrijfsgegevens opgeslagen")) }}>{tx("Opslaan")}</button>
       </section>}
+
+      {se && <Modal title={se.id ? se.name : tx("Verkoper toevoegen")} onClose={() => setSe(null)} footer={<>
+        <button className="btn" onClick={() => setSe(null)}>{tx("Annuleren")}</button>
+        <button className="btn primary" onClick={async () => { if (need(se.name.trim(), tx("Vul de naam in.")) && await run((db) => saveRecord(db, 'salespeople', se as Salesperson), tx("Verkoper opgeslagen"))) setSe(null) }}>{tx("Opslaan")}</button>
+      </>}>
+        <div className="form-grid">
+          <TextField className="span-2" label={tx("Naam")} value={se.name} onChange={(v) => setSe({ ...se, name: v })} />
+          <TextField label={tx("E-mail")} value={se.email} onChange={(v) => setSe({ ...se, email: v })} />
+          <TextField label={tx("Telefoon")} value={se.phone} onChange={(v) => setSe({ ...se, phone: v })} />
+        </div>
+        <Check label={tx("Actief")} checked={se.is_active} onChange={(v) => setSe({ ...se, is_active: v })} />
+        <p className="small muted" style={{ margin: 0 }}>{tx("Een inactieve verkoper staat niet meer in de keuzelijst. Bestaande verkooporders blijven aan hem gekoppeld.")}</p>
+      </Modal>}
 
       {wh && <Modal wide title={wh.id ? wh.name : tx("Magazijn toevoegen")} onClose={() => setWh(null)} footer={<>
         <button className="btn" onClick={() => setWh(null)}>{tx("Annuleren")}</button>

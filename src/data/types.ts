@@ -23,6 +23,7 @@ export interface Customer {
   email: string; phone: string; language: Language; address: string; postal_code: string
   city: string; province: string; country: string; notes: string
 }
+export interface Salesperson { id: string; name: string; email: string; phone: string; is_active: boolean }
 export interface Product {
   id: string; sku: string; name: string; collection: string; category: string; material: string
   color: string; dimensions: string; weight_kg: number; colli: number; purchase_price: number
@@ -32,7 +33,7 @@ export type OrderType = 'direct' | 'bestelling'
 export type Fulfilment = 'meenemen' | 'verzenden' | 'bezorgen'
 export interface SalesOrder {
   id: string; number: string; customer_id: string; order_date: string
-  channel: 'winkel' | 'online' | 'telefoon' | 'beurs'; salesperson: string; customer_reference: string
+  channel: 'winkel' | 'online' | 'telefoon' | 'beurs'; salesperson_id: string; customer_reference: string
   order_type: OrderType; fulfilment: Fulfilment; requested_date: string | null; promised_date: string | null
   delivery_name: string; delivery_phone: string; delivery_address: string; delivery_postal_code: string
   delivery_city: string; delivery_latitude: number | null; delivery_longitude: number | null; floor: string; has_elevator: boolean; needs_assembly: boolean
@@ -41,7 +42,7 @@ export interface SalesOrder {
 export interface SalesOrderLine {
   id: string; sales_order_id: string; product_id: string; description: string; options: string
   qty: number; unit_price: number; discount_pct: number; vat_rate: number
-  source: 'voorraad' | 'bestelling'; warehouse_id: string | null
+  source: 'voorraad' | 'bestelling'; warehouse_id: string | null; take_now: boolean
 }
 export interface OrderEvent {
   id: string; sales_order_id: string; kind: string; message: string; old_date: string | null
@@ -102,7 +103,7 @@ export interface Payment {
 export interface NumberSeries { id: string; last_number: number }
 
 export interface Snapshot {
-  settings: Settings[]; warehouses: Warehouse[]; suppliers: Supplier[]; customers: Customer[]; products: Product[]
+  settings: Settings[]; warehouses: Warehouse[]; suppliers: Supplier[]; customers: Customer[]; salespeople: Salesperson[]; products: Product[]
   sales_orders: SalesOrder[]; sales_order_lines: SalesOrderLine[]; order_events: OrderEvent[]
   purchase_orders: PurchaseOrder[]; purchase_order_lines: PurchaseOrderLine[]
   transports: Transport[]; inbound_shipments: InboundShipment[]; inbound_shipment_lines: InboundShipmentLine[]
@@ -114,7 +115,7 @@ export type TableName = keyof Snapshot
 
 // Volgorde respecteert de foreign keys; gebruikt voor laden en voor seed.sql.
 export const TABLES: TableName[] = [
-  'settings', 'warehouses', 'suppliers', 'customers', 'products', 'sales_orders', 'sales_order_lines',
+  'settings', 'warehouses', 'suppliers', 'customers', 'salespeople', 'products', 'sales_orders', 'sales_order_lines',
   'order_events', 'purchase_orders', 'purchase_order_lines', 'transports', 'inbound_shipments', 'inbound_shipment_lines',
   'goods_receipts', 'goods_receipt_lines', 'stock_movements', 'deliveries', 'delivery_lines', 'invoices',
   'invoice_lines', 'payments', 'number_series',
