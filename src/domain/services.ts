@@ -74,6 +74,15 @@ export async function createPurchaseOrder(db: Driver, input: PurchaseInput) {
   return id
 }
 
+/** Het label mag wijzigen. Staat er een regel voor een klant op, dan blijft het Verkoop. */
+export async function setPurchaseLabel(db: Driver, id: string, label: PurchaseLabel) {
+  const lines = (await db.list('purchase_order_lines')).filter((l) => l.purchase_order_id === id)
+  const forSale = lines.some((l) => l.sales_order_line_id)
+  if (forSale && label !== 'verkoop') fail(tx("Deze inkooporder heeft regels voor een verkooporder en houdt het label Verkoop."))
+  if (!forSale && label === 'verkoop') fail(tx("Het label Verkoop hoort bij regels van een verkooporder."))
+  await db.update('purchase_orders', id, { label })
+}
+
 export interface ConvertInput {
   lines: { sales_order_line_id: string; supplier_id: string }[]
   order_date: string; warehouse_id: string

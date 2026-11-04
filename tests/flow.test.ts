@@ -7,7 +7,7 @@ import { TABLES } from '../src/data/types'
 import { openLinesOnTransport, linePurchaseStatus, linesToPurchase, flowCounts, freeAt, transportLoad, invoiceBalance, onHandMap, orderStage, reservedMap, stockKey, vatBreakdown } from '../src/domain/calc'
 import { seedDemo } from '../src/domain/demo'
 import {
-  createDelivery, createInvoice, createOrder, createPurchaseOrder, lineFromProduct, markDelivered, assignShipmentsToTransport, cancelTransport, convertLinesToPurchaseOrders, createTransport, markReady, receiveGoods, rescheduleDelivery, saveRouteOrder, saveSettings, splitLinesForStock, setDeliveryInTransit, setShipmentWarehouse, setTransportStatus, updateTransport, transferStock,
+  createDelivery, createInvoice, createOrder, createPurchaseOrder, lineFromProduct, markDelivered, assignShipmentsToTransport, cancelTransport, convertLinesToPurchaseOrders, createTransport, markReady, receiveGoods, rescheduleDelivery, saveRouteOrder, saveSettings, setPurchaseLabel, splitLinesForStock, setDeliveryInTransit, setShipmentWarehouse, setTransportStatus, updateTransport, transferStock,
 } from '../src/domain/services'
 import { estimateMatrix, parseRouterTable } from '../src/data/geo'
 import { googleMapsRouteUrl, optimizeRoute, tourCost } from '../src/domain/route'
@@ -321,6 +321,10 @@ describe('label van een inkooporder', () => {
     const after = await loadSnapshot(db)
     const label = (id: string) => after.purchase_orders.find((p) => p.id === id)!.label
     expect([label(a), label(b), label(c)]).toEqual(['showroom', 'magazijn', 'verkoop'])
+    await setPurchaseLabel(db, a, 'magazijn')
+    expect((await loadSnapshot(db)).purchase_orders.find((p) => p.id === a)!.label).toBe('magazijn')
+    await expect(setPurchaseLabel(db, c, 'showroom')).rejects.toThrow(/houdt het label/)
+    await expect(setPurchaseLabel(db, a, 'verkoop')).rejects.toThrow(/hoort bij/)
   })
 })
 

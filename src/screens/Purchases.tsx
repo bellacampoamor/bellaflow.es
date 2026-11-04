@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Plus, Trash2 } from 'lucide-react'
 import { linesToPurchase, round2, shipmentIsOpen, todayISO } from '../domain/calc'
-import { assignShipmentsToTransport, cancelPurchaseOrder, createPurchaseOrder, setShipmentWarehouse } from '../domain/services'
+import { assignShipmentsToTransport, cancelPurchaseOrder, createPurchaseOrder, setPurchaseLabel, setShipmentWarehouse } from '../domain/services'
 import type { PurchaseLabel } from '../data/types'
 import { tx } from '../i18n'
 import { go, useApp } from '../ui/app-context'
@@ -20,16 +20,27 @@ export function Purchases() {
   const { s } = useApp()
   const waiting = linesToPurchase(s)
   const [tab, setTab] = useState<'queue' | 'orders'>(waiting.length ? 'queue' : 'orders')
-  const rows = [...s.purchase_orders].sort((a, b) => b.order_date.localeCompare(a.order_date) || b.number.localeCompare(a.number))
+  const [labelFilter, setLabelFilter] = useState<PurchaseLabel | ''>('')
+  const all = [...s.purchase_orders].sort((a, b) => b.order_date.localeCompare(a.order_date) || b.number.localeCompare(a.number))
+  const rows = all.filter((po) => !labelFilter || (po.label ?? 'magazijn') === labelFilter)
   return (
     <>
       <Head title={tx("Inkooporders")} sub={tx("Gedurende de dag ontstaan verkooporders. Zet de regels die ingekocht moeten worden door naar een inkooporder bij de leverancier.")}>
         <a className="btn primary" href="#inkoop-nieuw"><Plus size={16} />{tx("Nieuwe inkooporder")}</a>
       </Head>
-      <Tabs<'queue' | 'orders'> value={tab} onChange={setTab} tabs={[{ value: 'queue', label: tx("Door te zetten"), n: waiting.length }, { value: 'orders', label: tx("Inkooporders"), n: rows.length }]} />
+      <Tabs<'queue' | 'orders'> value={tab} onChange={setTab} tabs={[{ value: 'queue', label: tx("Door te zetten"), n: waiting.length }, { value: 'orders', label: tx("Inkooporders"), n: all.length }]} />
       {tab === 'queue' && <PurchaseQueue onDone={() => setTab('orders')} />}
       {tab === 'orders' && <section className="panel">
-        {rows.length === 0 && <Empty>{tx("Nog geen inkooporders. Maak de eerste met de knop rechtsboven.")}</Empty>}
+        <div className="panel-head">
+          <select style={{ width: 'auto' }} aria-label={tx("Filter op label")} value={labelFilter} onChange={(e) => setLabelFilter(e.target.value as PurchaseLabel | '')}>
+            <option value="">{tx("Alle labels")}</option>
+            <option value="showroom">{tx("Showroom")}</option>
+            <option value="magazijn">{tx("Magazijn")}</option>
+            <option value="verkoop">{tx("Verkoop")}</option>
+          </select>
+          <span className="small muted">{tx("{0} van {1} inkooporders", rows.length, all.length)}</span>
+        </div>
+        {rows.length === 0 && <Empty>{all.length ? tx("Geen inkooporders met dit label.") : tx("Nog geen inkooporders. Maak de eerste met de knop rechtsboven.")}</Empty>}
         <div className="table-wrap"><table>
           <thead><tr><th>{tx("Nummer")}</th><th>{tx("Leverancier")}</th><th>{tx("Besteld")}</th><th>{tx("Label")}</th><th>{tx("Referentie")}</th><th className="num">{tx("Op transport")}</th><th className="num">{tx("Waarde")}</th><th>{tx("Status")}</th></tr></thead>
           <tbody>{rows.map((po) => {
@@ -65,10 +76,15 @@ export function PurchaseDetail({ id }: { id: string }) {
   const planned = s.transports.filter((t) => t.status === 'planned').sort((a, b) => a.departure_date.localeCompare(b.departure_date))
   const shipmentOf = (lineId: string) => s.inbound_shipments.find((x) => s.inbound_shipment_lines.some((l) => l.shipment_id === x.id && l.purchase_order_line_id === lineId))!
   const supplier = s.suppliers.find((x) => x.id === po.supplier_id)
+  const forSale = lines.some((l) => l.sales_order_line_id)
   const hasReceipts = lines.some((l) => s.goods_receipt_lines.some((r) => r.shipment_line_id === s.inbound_shipment_lines.find((x) => x.purchase_order_line_id === l.id)?.id))
   return (
     <>
-      <Head title={<>{po.number} <LabelPill label={po.label} /></>} sub={tx("{0}, besteld op {1}{2}", supplier?.name, fmtDate(po.order_date), po.supplier_reference ? tx(", referentie {0}", po.supplier_reference) : '')} back={{ href: '#inkoop', label: tx("Inkooporders") }}>
+      <Head title={<>{po.number} {forSale && <LabelPill label="verkoop" />}</>} sub={tx("{0}, besteld op {1}{2}", supplier?.name, fmtDate(po.order_date), po.supplier_reference ? tx(", referentie {0}", po.supplier_reference) : '')} back={{ href: '#inkoop', label: tx("Inkooporders") }}>
+        {!forSale && <select style={{ width: 'auto' }} aria-label={tx("Label")} value={po.label ?? 'magazijn'} onChange={(e) => run((db) => setPurchaseLabel(db, id, e.target.value as PurchaseLabel), tx("Label aangepast"))}>
+          <option value="showroom">{tx("Showroom")}</option>
+          <option value="magazijn">{tx("Magazijn")}</option>
+        </select>}
         {po.status === 'open' && !hasReceipts && <button className="btn danger" onClick={() => setConfirm(true)}>{tx("Inkooporder annuleren")}</button>}
       </Head>
       <div className="stack">

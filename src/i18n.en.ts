@@ -807,4 +807,11 @@ export const en: Record<string, string> = {
   "Label": "Label",
   "Showroom": "Showroom",
   "Nog leeg. Koppel hierboven de inkoopregels.": "Still empty. Link the purchase lines above.",
+  "Deze inkooporder heeft regels voor een verkooporder en houdt het label Verkoop.": "This purchase order has lines for a sales order and keeps the label Sales.",
+  "Het label Verkoop hoort bij regels van een verkooporder.": "The label Sales belongs to lines from a sales order.",
+  "Filter op label": "Filter by label",
+  "Alle labels": "All labels",
+  "{0} van {1} inkooporders": "{0} of {1} purchase orders",
+  "Geen inkooporders met dit label.": "No purchase orders with this label.",
+  "Label aangepast": "Label changed",
 }
