@@ -16,7 +16,7 @@ export const en: Record<string, string> = {
   ", vervalt": ", due",
   ", zending": ", shipment",
   ", {0} verrekend": ", {0} applied",
-  ". Al {0} onderweg": ". {0} already on the way",
+  ". Al {0} ingekocht": ". {0} already purchased",
   ". Pas daar de beloofde leverdatum aan en informeer de klant.": ". Update the promised delivery date there and inform the customer.",
   ". Tijd bij de klant niet meegerekend.": ". Time at the customer not included.",
   ". Wel op {0}": ". Available at {0}",
@@ -810,9 +810,6 @@ export const en: Record<string, string> = {
   "Ontvangen {0}": "Received {0}",
   "Voorraad verhuizen": "Move stock",
   "Voorraad verhuisd, direct op de nieuwe locatie": "Stock moved, immediately at the new location",
-  "Nog te ontvangen": "Still to receive",
   "Verhuizing": "Move",
-  "gaat direct. De stuks staan meteen op de nieuwe locatie en staan nooit onderweg.": "happens immediately. The items are at the new location right away and are never in transit.",
-  "ingekocht bij de leverancier en nog niet binnengeboekt. Dit telt mee tot de goederenontvangst, en staat los van verhuizingen.": "purchased from the supplier and not booked in yet. It counts until the goods receipt and is separate from moves.",
   "De stuks staan direct op de nieuwe locatie.": "The items are at the new location immediately.",
 }

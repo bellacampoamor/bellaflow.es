@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { ArrowLeftRight, SlidersHorizontal } from 'lucide-react'
-import { inboundByProduct, onHandMap, reservedMap, stockKey, todayISO } from '../domain/calc'
+import { onHandMap, reservedMap, stockKey, todayISO } from '../domain/calc'
 import { correctStock, transferStock } from '../domain/services'
 import { useApp } from '../ui/app-context'
 import { Combo, Empty, Field, fmtDate, Head, Modal, NumberField, Pill, SelectField, Tabs, TextField } from '../ui/kit'
@@ -16,7 +16,7 @@ export function Stock() {
   const [to, setTo] = useState('')
   const [qty, setQty] = useState(1)
   const [note, setNote] = useState('')
-  const hand = onHandMap(s), res = reservedMap(s), inbound = inboundByProduct(s)
+  const hand = onHandMap(s), res = reservedMap(s)
   const wh = s.warehouses.filter((w) => w.is_active)
   const t = q.trim().toLowerCase()
   const products = s.products.filter((p) => !t || `${p.name} ${p.sku} ${p.collection} ${p.category}`.toLowerCase().includes(t))
@@ -38,17 +38,13 @@ export function Stock() {
         <button className="btn" onClick={() => openModal('correct')}><SlidersHorizontal size={16} />{tx("Correctie")}</button>
         <button className="btn primary" onClick={() => openModal('transfer')}><ArrowLeftRight size={16} />{tx("Verhuizen")}</button>
       </Head>
-      <div className="note" style={{ marginBottom: 16 }}>
-        <div><strong>{tx("Verhuizen")}</strong>: {tx("gaat direct. De stuks staan meteen op de nieuwe locatie en staan nooit onderweg.")}</div>
-        <div><strong>{tx("Nog te ontvangen")}</strong>: {tx("ingekocht bij de leverancier en nog niet binnengeboekt. Dit telt mee tot de goederenontvangst, en staat los van verhuizingen.")}</div>
-      </div>
       <section className="panel">
         <div className="panel-head" style={{ alignItems: 'flex-end' }}>
           <Tabs value={tab} onChange={setTab} tabs={[{ value: 'stand', label: tx("Voorraadstand") }, { value: 'moves', label: tx("Mutaties") }]} />
           {tab === 'stand' && <input style={{ maxWidth: 280, marginBottom: 14 }} aria-label={tx("Product zoeken")} placeholder={tx("Zoek op product of artikelnummer")} value={q} onChange={(e) => setQ(e.target.value)} />}
         </div>
         {tab === 'stand' && <div className="table-wrap"><table>
-          <thead><tr><th>{tx("Product")}</th>{wh.map((w) => <th key={w.id} className="num">{w.name}</th>)}<th className="num">{tx("Totaal vrij")}</th><th className="num">{tx("Nog te ontvangen")}</th><th></th><th></th></tr></thead>
+          <thead><tr><th>{tx("Product")}</th>{wh.map((w) => <th key={w.id} className="num">{w.name}</th>)}<th className="num">{tx("Totaal vrij")}</th><th></th><th></th></tr></thead>
           <tbody>{products.map((p) => {
             let free = 0
             return (
@@ -60,7 +56,6 @@ export function Stock() {
                   return <td key={w.id} className="stock-cell">{h === 0 && r === 0 ? <span className="zero">0</span> : <>{h}{r > 0 && <small>{h - r} {tx("vrij,")} {r} {tx("gereserveerd")}</small>}</>}</td>
                 })}
                 <td className="num strong" style={free < 0 ? { color: 'var(--bad)' } : undefined}>{free}</td>
-                <td className="num">{inbound.get(p.id) || <span className="zero">0</span>}</td>
                 <td style={{ whiteSpace: 'nowrap' }}><button className="btn sm" onClick={() => moveToShowroom(p.id)}>{tx("Verhuizen")}</button></td>
                 <td>{free < p.min_stock && <Pill tone={free < 0 ? 'bad' : 'warn'}>{tx("Onder minimum (")}{p.min_stock})</Pill>}</td>
               </tr>

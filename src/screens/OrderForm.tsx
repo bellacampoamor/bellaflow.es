@@ -171,7 +171,7 @@ export function OrderForm({ id }: { id?: string }) {
                       <div className="small">
                         {short && !l.take_now && !existing && <span className="strong">{tx("Bij opslaan: {0} uit voorraad, {1} op bestelling", Math.max(0, free), l.qty - Math.max(0, free))}{others.length ? tx(". Wel op {0}", others.map((w) => `${w.name} (${freeAt(l.product_id, w.id)})`).join(', ')) : ''}. </span>}
                         {short && (l.take_now || existing) && <span style={{ color: 'var(--bad)', fontWeight: 600 }}>{tx("Maar")} {free} {tx("vrij op dit magazijn")}{others.length ? tx(". Wel op {0}", others.map((w) => `${w.name} (${freeAt(l.product_id, w.id)})`).join(', ')) : ''}. </span>}
-                        {l.source === 'bestelling' && l.product_id && <span className="muted">{tx("Komt op de lijst \"Nog in te kopen\"")}{inbound.get(l.product_id) ? tx(". Al {0} onderweg", inbound.get(l.product_id)) : ''}. </span>}
+                        {l.source === 'bestelling' && l.product_id && <span className="muted">{tx("Komt op de lijst \"Nog in te kopen\"")}{inbound.get(l.product_id) ? tx(". Al {0} ingekocht", inbound.get(l.product_id)) : ''}. </span>}
                       </div>
                       <div className="actions">
                         <span className="num strong">{eur(lineTotal(l))}</span>
