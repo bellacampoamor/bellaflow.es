@@ -7,7 +7,7 @@ import type {
   SalesOrderLine, Snapshot, StockMovement, TableName,
 } from '../data/types'
 import {
-  addDays, depositAvailable, freeAt, linesToPurchase, invoicedDeliveryLineIds, invoicesOnDelivery, lineTotal, onHandMap, orderLines, plannedQty, round2,
+  addDays, depositAvailable, freeAt, linesToPurchase, invoicedDeliveryLineIds, lineTotal, onHandMap, orderLines, plannedQty, round2,
   shipmentLineOpen, shippedQty, stockKey, todayISO, vatBreakdown,
 } from './calc'
 
@@ -21,8 +21,8 @@ const event = (sales_order_id: string, kind: string, message: string, extra: Par
 
 // Nummering ----------------------------------------------------------------------
 
-export type PrefixField = 'prefix_sales_order' | 'prefix_purchase' | 'prefix_receipt' | 'prefix_delivery' | 'prefix_invoice' | 'prefix_transport'
-export const PREFIX_FIELDS: PrefixField[] = ['prefix_sales_order', 'prefix_purchase', 'prefix_receipt', 'prefix_delivery', 'prefix_invoice', 'prefix_transport']
+export type PrefixField = 'prefix_sales_order' | 'prefix_purchase' | 'prefix_receipt' | 'prefix_delivery' | 'prefix_invoice' | 'prefix_transport' | 'prefix_proforma'
+export const PREFIX_FIELDS: PrefixField[] = ['prefix_sales_order', 'prefix_purchase', 'prefix_receipt', 'prefix_delivery', 'prefix_invoice', 'prefix_transport', 'prefix_proforma']
 
 /** De teller hoort bij de soort document, dus een ander voorvoegsel laat de nummers gewoon doorlopen. */
 async function nextDocumentNumber(db: Driver, series: string, field: PrefixField, year: number) {
@@ -418,7 +418,7 @@ export async function createDelivery(db: Driver, input: DeliveryInput) {
   const id = newId()
   const sequence = s.deliveries.filter((d) => d.sales_order_id === input.sales_order_id).length + 1
   const number = await nextDocumentNumber(db, 'LV', 'prefix_delivery', yearOf(input.planned_date))
-  await db.insert('deliveries', [{ id, number, sales_order_id: input.sales_order_id, sequence, method: input.method, planned_date: input.planned_date, carrier: input.carrier, status: 'planned', delivered_at: null, signed_by: '', notes: input.notes, ready_at: null, approved_by: '', note_printed_at: null, signed_note_received: false, route_position: null }])
+  await db.insert('deliveries', [{ id, number, sales_order_id: input.sales_order_id, sequence, method: input.method, planned_date: input.planned_date, carrier: input.carrier, status: 'planned', proforma_number: null, delivered_at: null, signed_by: '', notes: input.notes, ready_at: null, approved_by: '', note_printed_at: null, signed_note_received: false, route_position: null }])
   await db.insert('delivery_lines', lines.map((l) => ({ ...l, delivery_id: id })))
   return id
 }
@@ -502,15 +502,32 @@ export async function markDelivered(db: Driver, id: string, input: { date: strin
     id: newId(), product_id: productOf(l.sales_order_line_id).product_id, warehouse_id: l.warehouse_id, qty: -l.qty,
     kind: 'levering' as const, ref_id: d.number, note: '', moved_at: input.date,
   })))
-  await db.update('deliveries', id, { status: 'delivered', delivered_at: input.date, signed_by: input.signed_by, signed_note_received: input.signed_note_received ?? false })
+  await db.update('deliveries', id, { status: 'delivered', delivered_at: input.date, signed_by: input.signed_by, signed_note_received: input.signed_note_received ?? false, proforma_number: await nextDocumentNumber(db, 'PF', 'prefix_proforma', yearOf(input.date)) })
   await db.insert('order_events', [event(d.sales_order_id, 'levering', `${d.number} geleverd.`)])
-  if (invoicesOnDelivery(s, d)) {
-    await createInvoice(db, { sales_order_id: d.sales_order_id, delivery_ids: [id], invoice_date: laterOf(input.date, latestInvoiceDate(s)), settle_deposit: true })
+}
+
+/** Leveringen van voor de proforma krijgen alsnog een nummer, zodat ze aangevinkt kunnen worden. */
+export async function ensureProformas(db: Driver) {
+  const s = await loadSnapshot(db)
+  const billed = invoicedDeliveryLineIds(s)
+  for (const d of s.deliveries.filter((x) => x.status === 'delivered' && !x.proforma_number)) {
+    if (s.delivery_lines.some((l) => l.delivery_id === d.id && !billed.has(l.id))) {
+      await db.update('deliveries', d.id, { proforma_number: await nextDocumentNumber(db, 'PF', 'prefix_proforma', yearOf(d.delivered_at ?? d.planned_date)) })
+    }
   }
 }
 
+/** Pas hier ontstaan de facturen: één per aangevinkte proforma, oudste eerst, met verrekening van vooruitbetalingen. */
+export async function invoiceProformas(db: Driver, input: { delivery_ids: string[]; invoice_date: string }) {
+  if (!input.delivery_ids.length) fail(tx("Vink minimaal één proforma aan."))
+  const s = await loadSnapshot(db)
+  const chosen = s.deliveries.filter((d) => input.delivery_ids.includes(d.id)).sort((a, b) => a.number.localeCompare(b.number))
+  const ids: string[] = []
+  for (const d of chosen) ids.push(await createInvoice(db, { sales_order_id: d.sales_order_id, delivery_ids: [d.id], invoice_date: input.invoice_date, settle_deposit: true }))
+  return ids
+}
+
 const latestInvoiceDate = (s: Snapshot) => s.invoices.reduce((m, i) => (i.invoice_date > m ? i.invoice_date : m), '')
-const laterOf = (a: string, b: string) => (a > b ? a : b)
 
 // Facturatie -------------------------------------------------------------------
 

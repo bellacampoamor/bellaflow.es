@@ -190,17 +190,6 @@ export function uninvoicedDeliveries(s: Snapshot, orderId: string): Delivery[] {
   )
 }
 
-/** Deel van een order: dekt niet de hele order, of de order heeft meerdere leveringen. */
-export function isPartialDelivery(s: Snapshot, d: Delivery) {
-  const others = s.deliveries.some((x) => x.sales_order_id === d.sales_order_id && x.id !== d.id && x.status !== 'cancelled')
-  const qty = s.delivery_lines.filter((l) => l.delivery_id === d.id).reduce((n, l) => n + l.qty, 0)
-  return others || qty < orderLines(s, d.sales_order_id).reduce((n, l) => n + l.qty, 0)
-}
-
-/** Deelleveringen worden altijd direct gefactureerd; hele leveringen volgen de instelling. */
-export const invoicesOnDelivery = (s: Snapshot, d: Delivery) =>
-  isPartialDelivery(s, d) || s.settings[0]?.invoice_mode === 'auto'
-
 export const deliveryIsOpen = (d: Delivery) => d.status === 'planned' || d.status === 'ready' || d.status === 'in_transit'
 
 export function deliveryValue(s: Snapshot, deliveryId: string) {

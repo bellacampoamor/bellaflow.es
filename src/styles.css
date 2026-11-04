@@ -248,6 +248,8 @@ td input.price { width: 104px; }
 .login form { width: min(380px, 100%); display: grid; gap: 12px; }
 
 /* Routeplanning */
+.pdf-ic { display: inline-flex; align-items: center; gap: 3px; color: #b3261e; font-size: .68rem; font-weight: 700; text-decoration: none; vertical-align: middle; }
+:root[data-theme="dark"] .pdf-ic { color: #f2857c; }
 .route-bar { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; justify-content: space-between; background: var(--surface-2); border-radius: 8px; padding: 9px 12px; margin-bottom: 8px; font-size: .9rem; }
 .stop { position: relative; display: grid; grid-template-columns: 32px minmax(0, 1fr); gap: 10px; align-items: start; border-bottom: 1px solid var(--line); padding: 10px 14px; margin-inline: -14px; border-radius: 8px; background: var(--surface); }
 @media (hover: hover) {

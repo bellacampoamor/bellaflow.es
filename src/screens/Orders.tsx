@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { CalendarClock, Copy, Pencil, Plus, Truck } from 'lucide-react'
+import { CalendarClock, Copy, FileText, Pencil, Plus, Truck } from 'lucide-react'
 import type { Delivery, Payment, SalesOrder } from '../data/types'
 import { linePurchaseStatus, linesToPurchase, depositAvailable, depositPaid, invoiceBalance, lineTotal, onHandMap, orderLines, orderOutstanding, orderStage, orderTab, orderTotal, plannedQty, shippedQty, STAGE_LABEL, stockKey, todayISO, uninvoicedDeliveries, type OrderStage, type OrderTab } from '../domain/calc'
 import { addOrderPayment, cancelOrder, createDelivery, defaultMethod, rescheduleOrder, setLineWarehouse } from '../domain/services'
@@ -186,7 +186,7 @@ export function OrderDetail({ id }: { id: string }) {
               const bal = invoiceBalance(s, i)
               return (
                 <a key={i.id} href={`#facturatie-${i.id}`} className="task">
-                  <div><div className="task-t">{i.number}</div><div className="muted small">{fmtDate(i.invoice_date)}, {tx(i.kind)}, {eur(i.total)}{i.deposit_settled ? tx(", {0} verrekend", eur(i.deposit_settled)) : ''}</div></div>
+                  <div><div className="task-t"><span className="pdf-ic" title={tx("Factuur {0} openen als PDF", i.number)}><FileText size={16} /><span>PDF</span></span> {i.number}</div><div className="muted small">{fmtDate(i.invoice_date)}, {tx(i.kind)}, {eur(i.total)}{i.deposit_settled ? tx(", {0} verrekend", eur(i.deposit_settled)) : ''}</div></div>
                   <Pill tone={bal <= 0 ? 'good' : 'bill'}>{bal <= 0 ? tx("Betaald") : tx("Open {0}", eur(bal))}</Pill>
                 </a>
               )

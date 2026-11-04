@@ -7,7 +7,7 @@ import { TABLES } from '../src/data/types'
 import { openLinesOnTransport, linePurchaseStatus, linesToPurchase, flowCounts, freeAt, transportLoad, invoiceBalance, onHandMap, orderStage, orderTab, reservedMap, stockKey, vatBreakdown } from '../src/domain/calc'
 import { renameOldSuppliers, restoreSuppliers, seedDemo } from '../src/domain/demo'
 import {
-  createDelivery, createInvoice, createOrder, createPurchaseOrder, lineFromProduct, markDelivered, assignShipmentsToTransport, cancelTransport, convertLinesToPurchaseOrders, createTransport, markReady, receiveGoods, rescheduleDelivery, rescheduleOrder, saveRouteOrder, saveSettings, setPurchaseLabel, splitLinesForStock, setDeliveryInTransit, setShipmentWarehouse, setTransportStatus, updateTransport, transferStock,
+  createDelivery, createInvoice, createOrder, createPurchaseOrder, invoiceProformas, lineFromProduct, markDelivered, assignShipmentsToTransport, cancelTransport, convertLinesToPurchaseOrders, createTransport, markReady, receiveGoods, rescheduleDelivery, rescheduleOrder, saveRouteOrder, saveSettings, setPurchaseLabel, splitLinesForStock, setDeliveryInTransit, setShipmentWarehouse, setTransportStatus, updateTransport, transferStock,
 } from '../src/domain/services'
 import { estimateMatrix, parseRouterTable } from '../src/data/geo'
 import { dropIndex, googleMapsRouteUrl, moveItem, optimizeRoute, tourCost } from '../src/domain/route'
@@ -88,6 +88,11 @@ describe('van inkoop tot factuur', () => {
     await deliver(d1)
     expect(await stockAt(north.id)).toBe(beforeNorth)
     s = await loadSnapshot(db)
+    // Afmelden maakt alleen een proforma; de factuur ontstaat pas bij Factureren.
+    expect(s.invoices.filter((i) => i.sales_order_id === orderId)).toHaveLength(0)
+    expect(s.deliveries.find((x) => x.id === d1)!.proforma_number).toMatch(/^PF-2026-/)
+    await invoiceProformas(db, { delivery_ids: [d1], invoice_date: TODAY })
+    s = await loadSnapshot(db)
     const inv1 = s.invoices.find((i) => i.sales_order_id === orderId)!
     expect(inv1).toMatchObject({ kind: 'deelfactuur', total: 363, base_amount: 300, vat_amount: 63, deposit_settled: 363 })
     expect(invoiceBalance(s, inv1)).toBe(0)
@@ -107,6 +112,7 @@ describe('van inkoop tot factuur', () => {
     await transferStock(db, { product_id: product.id, from_id: south.id, to_id: north.id, qty: 1, note: '', date: TODAY })
     const d2 = await createDelivery(db, { sales_order_id: orderId, method: 'eigen_team', planned_date: TODAY, carrier: '', notes: '', lines: [{ sales_order_line_id: line.id, qty: 7 }] })
     await deliver(d2)
+    await invoiceProformas(db, { delivery_ids: [d2], invoice_date: TODAY })
     s = await loadSnapshot(db)
     const inv2 = s.invoices.filter((i) => i.sales_order_id === orderId).find((i) => i.id !== inv1.id)!
     expect(inv2).toMatchObject({ kind: 'eindfactuur', total: 847, deposit_settled: 137 })
@@ -136,13 +142,21 @@ describe('van inkoop tot factuur', () => {
     expect((await loadSnapshot(db)).invoices.filter((i) => i.sales_order_id === id)).toHaveLength(0)
   })
 
-  it('factureert automatisch als dat is ingesteld', async () => {
-    await db.update('settings', 'default', { invoice_mode: 'auto' })
+  it('maakt per aangevinkte proforma één factuur en weigert een lege keuze', async () => {
     const s = await loadSnapshot(db)
     const product = s.products.find((p) => p.sku === 'LIG-AL-WT')!
-    const count = s.invoices.length
-    await createOrder(db, { header: header(s.customers[0].id, { order_type: 'direct', fulfilment: 'meenemen' }), lines: [lineFromProduct(product, { qty: 1, take_now: true, warehouse_id: s.warehouses[1].id })] })
-    expect((await loadSnapshot(db)).invoices.length).toBe(count + 1)
+    const make = async () => {
+      const id = await createOrder(db, { header: header(s.customers[0].id), lines: [lineFromProduct(product, { qty: 1, warehouse_id: s.warehouses[1].id })] })
+      const line = (await loadSnapshot(db)).sales_order_lines.find((l) => l.sales_order_id === id)!
+      const d = await createDelivery(db, { sales_order_id: id, method: 'eigen_team', planned_date: TODAY, carrier: '', notes: '', lines: [{ sales_order_line_id: line.id, qty: 1 }] })
+      await deliver(d)
+      return d
+    }
+    const [a, b] = [await make(), await make()]
+    const count = (await loadSnapshot(db)).invoices.length
+    await expect(invoiceProformas(db, { delivery_ids: [], invoice_date: TODAY })).rejects.toThrow(/proforma/)
+    await invoiceProformas(db, { delivery_ids: [a, b], invoice_date: TODAY })
+    expect((await loadSnapshot(db)).invoices.length).toBe(count + 2)
   })
 
   it('voorbeeldgegevens hebben geen negatieve voorraad en werk in elke stap', async () => {
@@ -304,7 +318,7 @@ describe('verkoop stuurt inkoop', () => {
 })
 
 describe('meenemen per regel', () => {
-  it('geeft een regel direct mee, factureert dat deel en houdt de rest open', async () => {
+  it('geeft een regel direct mee, zet dat deel klaar als proforma en houdt de rest open', async () => {
     const s = await loadSnapshot(db)
     const campoamor = s.warehouses[1]
     const taken = s.products.find((p) => p.sku === 'LIG-AL-WT')!
@@ -318,7 +332,11 @@ describe('meenemen per regel', () => {
     const order = after.sales_orders.find((o) => o.id === id)!
     expect(order.order_type).toBe('bestelling')
     expect(onHandMap(after).get(stockKey(taken.id, campoamor.id))).toBe(before - 2)
-    expect(after.invoices.filter((i) => i.sales_order_id === id)).toMatchObject([{ kind: 'deelfactuur', total: 242 }])
+    expect(after.invoices.filter((i) => i.sales_order_id === id)).toHaveLength(0)
+    const taken1 = after.deliveries.find((d) => d.sales_order_id === id)!
+    expect(taken1.proforma_number).toBeTruthy()
+    await invoiceProformas(db, { delivery_ids: [taken1.id], invoice_date: TODAY })
+    expect((await loadSnapshot(db)).invoices.filter((i) => i.sales_order_id === id)).toMatchObject([{ kind: 'deelfactuur', total: 242 }])
     expect(orderStage(after, order)).toBe('deels_geleverd')
     expect(linesToPurchase(after).some((l) => l.sales_order_id === id && l.product_id === later.id)).toBe(true)
   })

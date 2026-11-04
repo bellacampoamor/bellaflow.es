@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { CalendarClock, ChevronDown, ChevronUp, ClipboardCheck, FileText, GripVertical, Map as MapIcon, PackageCheck, Route, Truck } from 'lucide-react'
 import { geocodeAddress, travelMatrix, type TravelMatrix } from '../data/geo'
 import type { Delivery, SalesOrder } from '../data/types'
-import { deliveryIsOpen, invoicesOnDelivery, isPartialDelivery, onHandMap, stockKey, todayISO } from '../domain/calc'
+import { deliveryIsOpen, onHandMap, stockKey, todayISO } from '../domain/calc'
 import { googleMapsRouteUrl, MAPS_MAX_WAYPOINTS, optimizeRoute, tourCost, type Point } from '../domain/route'
 import { cancelDelivery, markDelivered, markReady, rescheduleDelivery, saveRouteOrder, setDeliveryInTransit, setOrderCoordinates } from '../domain/services'
 import { go, useApp } from '../ui/app-context'
@@ -232,20 +232,18 @@ function FinishModal({ d, onClose }: { d: Delivery; onClose: () => void }) {
   const [date, setDate] = useState(todayISO())
   const [signed, setSigned] = useState('')
   const [received, setReceived] = useState(false)
-  const auto = invoicesOnDelivery(s, d)
-  const partial = isPartialDelivery(s, d)
   const needsNote = d.method !== 'meenemen'
   return (
     <Modal title={tx("{0} afmelden", d.number)} onClose={onClose} footer={<>
       <button className="btn" onClick={onClose}>{tx("Annuleren")}</button>
-      <button className="btn primary" onClick={async () => { if (await run((db) => markDelivered(db, d.id, { date, signed_by: signed, signed_note_received: received }), auto ? tx("Geleverd en gefactureerd") : tx("Geleverd. Klaar om te factureren"))) onClose() }}>{tx("Levering afmelden")}</button>
+      <button className="btn primary" onClick={async () => { if (await run((db) => markDelivered(db, d.id, { date, signed_by: signed, signed_note_received: received }), tx("Geleverd. De proforma staat klaar onder Facturatie"))) onClose() }}>{tx("Levering afmelden")}</button>
     </>}>
       <div className="form-grid">
         <TextField label={tx("Geleverd op")} type="date" value={date} onChange={setDate} />
         <TextField className="span-2" label={needsNote ? tx("Afleverbon ondertekend door") : tx("Opgehaald door")} value={signed} onChange={setSigned} />
       </div>
       {needsNote && <Check label={tx("Getekende afleverbon is terug op kantoor")} checked={received} onChange={setReceived} />}
-      <p className="small muted" style={{ margin: 0 }}>{tx("De voorraad wordt afgeboekt.")}{partial ? tx(" De factuur voor deze deellevering wordt direct gemaakt.") : auto ? tx(" De factuur wordt automatisch gemaakt.") : ''}</p>
+      <p className="small muted" style={{ margin: 0 }}>{tx("De voorraad wordt afgeboekt en er komt een proforma klaar te staan onder Facturatie.")}</p>
     </Modal>
   )
 }

@@ -3,8 +3,8 @@
 export interface Settings {
   id: string; company_name: string; tax_id: string; address: string; postal_code: string; city: string
   province: string; phone: string; email: string; iban: string
-  invoice_mode: 'manual' | 'auto'; payment_days: number; invoice_footer: string
-  prefix_sales_order: string; prefix_purchase: string; prefix_receipt: string; prefix_delivery: string; prefix_invoice: string; prefix_transport: string
+  payment_days: number; invoice_footer: string
+  prefix_sales_order: string; prefix_purchase: string; prefix_receipt: string; prefix_delivery: string; prefix_invoice: string; prefix_transport: string; prefix_proforma: string
 }
 export interface Warehouse {
   id: string; code: string; name: string; kind: 'winkel' | 'magazijn' | 'extern'
@@ -83,7 +83,7 @@ export interface Delivery {
   method: 'meenemen' | 'vervoerder' | 'eigen_team'; planned_date: string; carrier: string
   status: 'planned' | 'ready' | 'in_transit' | 'delivered' | 'cancelled'; delivered_at: string | null
   signed_by: string; notes: string; ready_at: string | null; approved_by: string; note_printed_at: string | null
-  signed_note_received: boolean; route_position: number | null
+  signed_note_received: boolean; route_position: number | null; proforma_number: string | null
 }
 export interface DeliveryLine {
   id: string; delivery_id: string; sales_order_line_id: string; warehouse_id: string; qty: number

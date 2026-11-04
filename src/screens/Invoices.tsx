@@ -1,9 +1,10 @@
-import { useState } from 'react'
-import type { Language, Payment, SalesOrder } from '../data/types'
+import { useEffect, useState } from 'react'
+import { FileText } from 'lucide-react'
+import type { Language, Payment } from '../data/types'
 import { deliveryValue, depositAvailable, invoiceBalance, invoiceState, todayISO, uninvoicedDeliveries, vatBreakdown } from '../domain/calc'
-import { createInvoice, payInvoice } from '../domain/services'
+import { ensureProformas, invoiceProformas, payInvoice } from '../domain/services'
 import { go, useApp } from '../ui/app-context'
-import { Check, Empty, eur, fmtDate, Head, Modal, NumberField, Pill, SelectField, Tabs, TextField } from '../ui/kit'
+import { Empty, eur, fmtDate, Head, Modal, NumberField, Pill, SelectField, Tabs, TextField } from '../ui/kit'
 import { tx } from '../i18n'
 
 const STATE = { betaald: ['Betaald', 'good'], open: ['Open', 'bill'], te_laat: ['Te laat', 'bad'] } as const
@@ -11,48 +12,53 @@ const STATE = { betaald: ['Betaald', 'good'], open: ['Open', 'bill'], te_laat: [
 export function Invoices() {
   const { s, run } = useApp()
   const [tab, setTab] = useState<'open' | 'all'>('open')
-  const [make, setMake] = useState<{ order: SalesOrder; ids: string[] } | null>(null)
-  const pending = s.sales_orders.filter((o) => o.status === 'open' && uninvoicedDeliveries(s, o.id).length)
+  const [ticked, setTicked] = useState<Set<string>>(new Set())
+  const [confirm, setConfirm] = useState(false)
+  const proformas = s.sales_orders.filter((o) => o.status === 'open').flatMap((o) => uninvoicedDeliveries(s, o.id).map((d) => ({ d, o, c: s.customers.find((x) => x.id === o.customer_id)! }))).sort((a, b) => a.d.number.localeCompare(b.d.number))
+  const chosen = proformas.filter((p) => ticked.has(p.d.id))
+  const allTicked = proformas.length > 0 && chosen.length === proformas.length
+  const toggle = (id: string, on: boolean) => setTicked((v) => { const n = new Set(v); if (on) n.add(id); else n.delete(id); return n })
   const rows = [...s.invoices].sort((a, b) => b.number.localeCompare(a.number)).filter((i) => tab === 'all' || invoiceBalance(s, i) > 0)
-  const mode = s.settings[0]?.invoice_mode ?? 'manual'
+  const missing = s.deliveries.some((d) => d.status === 'delivered' && !d.proforma_number) && proformas.some((p) => !p.d.proforma_number)
+  useEffect(() => { if (missing) void run((db) => ensureProformas(db)) }, [missing, run])
   return (
     <>
-      <Head title={tx("Facturatie")} sub={tx("Deelleveringen worden bij afmelden direct gefactureerd. Vooruitbetalingen worden verrekend.")}>
-        <SelectField label={tx("Hele leveringen factureren")} value={mode} onChange={(v) => run((db) => db.update('settings', 'default', { invoice_mode: v }), v === 'auto' ? tx("Hele leveringen worden nu automatisch gefactureerd") : tx("Hele leveringen factureer je nu zelf"))} options={[{ value: 'manual', label: tx("Handmatig") }, { value: 'auto', label: tx("Automatisch bij levering") }]} />
-      </Head>
+      <Head title={tx("Facturatie")} sub={tx("Elke afgemelde levering krijgt een proforma. Vink aan wat je wilt factureren: pas dan ontstaat de factuur. Vooruitbetalingen worden verrekend.")} />
       <div className="stack">
         <section className="panel">
-          <h2>{tx("Geleverd, nog te factureren")}</h2>
-          {pending.length === 0 && <Empty>{tx("Alle leveringen zijn gefactureerd.")}</Empty>}
-          {pending.map((o) => {
-            const ds = uninvoicedDeliveries(s, o.id)
-            const c = s.customers.find((x) => x.id === o.customer_id)!
-            const dep = depositAvailable(s, o.id)
-            return (
-              <div className="task" key={o.id} style={{ flexWrap: 'wrap' }}>
-                <div style={{ flex: '1 1 300px' }}>
-                  <div className="task-t"><a className="rowlink" href={`#orders-${o.id}`}>{o.number}</a>, {c.company || c.name}</div>
-                  {ds.map((d) => <div className="small" key={d.id}>{d.number}{tx(", geleverd")} {fmtDate(d.delivered_at)}: <span className="num">{eur(deliveryValue(s, d.id))}</span></div>)}
-                  {dep > 0 && <div className="muted small">{eur(dep)} {tx("vooruitbetaald, nog te verrekenen")}</div>}
-                </div>
-                <div className="actions">
-                  {ds.length > 1 && ds.map((d) => <button className="btn sm" key={d.id} onClick={() => setMake({ order: o, ids: [d.id] })}>{tx("Alleen")} {d.number}</button>)}
-                  <button className="btn sm primary" onClick={() => setMake({ order: o, ids: ds.map((d) => d.id) })}>{tx("Factuur maken")}</button>
-                </div>
-              </div>
-            )
-          })}
+          <div className="panel-head">
+            <h2>{tx("Proforma's, klaar om te factureren")}</h2>
+            {proformas.length > 0 && <div className="btn-row">
+              <button className="btn sm" onClick={() => setTicked(allTicked ? new Set() : new Set(proformas.map((p) => p.d.id)))}>{allTicked ? tx("Niets aanvinken") : tx("Alles aanvinken")}</button>
+              <button className="btn sm primary" disabled={!chosen.length} onClick={() => setConfirm(true)}>{tx("Factureren")}{chosen.length ? ` (${chosen.length})` : ''}</button>
+            </div>}
+          </div>
+          {proformas.length === 0 && <Empty>{tx("Er staan geen proforma's klaar.")}</Empty>}
+          {proformas.length > 0 && <div className="table-wrap"><table>
+            <thead><tr><th aria-label={tx("Aanvinken")} /><th>{tx("Proforma")}</th><th>{tx("Verkooporder")}</th><th>{tx("Klant")}</th><th>{tx("Levering")}</th><th>{tx("Geleverd")}</th><th className="num">{tx("Bedrag")}</th><th className="num">{tx("Te verrekenen")}</th></tr></thead>
+            <tbody>{proformas.map(({ d, o, c }) => {
+              const dep = depositAvailable(s, o.id)
+              return (
+                <tr key={d.id}>
+                  <td><input type="checkbox" aria-label={tx("{0} aanvinken", d.proforma_number ?? d.number)} checked={ticked.has(d.id)} onChange={(e) => toggle(d.id, e.target.checked)} /></td>
+                  <td className="strong">{d.proforma_number ?? '…'}</td><td><a className="rowlink" href={`#orders-${o.id}`}>{o.number}</a></td><td>{c.company || c.name}</td><td>{d.number}</td><td>{fmtDate(d.delivered_at)}</td>
+                  <td className="num">{eur(deliveryValue(s, d.id))}</td><td className="num">{dep > 0 ? eur(dep) : <span className="zero">–</span>}</td>
+                </tr>
+              )
+            })}</tbody>
+          </table></div>}
         </section>
         <section className="panel">
           <Tabs value={tab} onChange={setTab} tabs={[{ value: 'open', label: tx("Openstaand"), n: s.invoices.filter((i) => invoiceBalance(s, i) > 0).length }, { value: 'all', label: tx("Alle facturen"), n: s.invoices.length }]} />
           {rows.length === 0 && <Empty>{tab === 'open' ? tx("Geen openstaande facturen.") : tx("Nog geen facturen.")}</Empty>}
           {rows.length > 0 && <div className="table-wrap"><table>
-            <thead><tr><th>{tx("Factuur")}</th><th>{tx("Datum")}</th><th>{tx("Klant")}</th><th>{tx("Soort")}</th><th className="num">{tx("Totaal")}</th><th className="num">{tx("Verrekend")}</th><th className="num">{tx("Open")}</th><th>{tx("Vervalt")}</th><th>{tx("Status")}</th></tr></thead>
+            <thead><tr><th aria-label="PDF" /><th>{tx("Factuur")}</th><th>{tx("Datum")}</th><th>{tx("Klant")}</th><th>{tx("Soort")}</th><th className="num">{tx("Totaal")}</th><th className="num">{tx("Verrekend")}</th><th className="num">{tx("Open")}</th><th>{tx("Vervalt")}</th><th>{tx("Status")}</th></tr></thead>
             <tbody>{rows.map((i) => {
               const c = s.customers.find((x) => x.id === i.customer_id)!
               const [label, tone] = STATE[invoiceState(s, i)]
               return (
                 <tr key={i.id} className="click" onClick={() => go(`facturatie-${i.id}`)}>
+                  <td><a className="pdf-ic" href={`#facturatie-${i.id}`} title={tx("Factuur {0} openen als PDF", i.number)} aria-label={tx("Factuur {0} openen als PDF", i.number)}><FileText size={18} /><span>PDF</span></a></td>
                   <td><a className="rowlink" href={`#facturatie-${i.id}`}>{i.number}</a></td><td>{fmtDate(i.invoice_date)}</td><td>{c.company || c.name}</td>
                   <td>{tx(i.kind[0].toUpperCase() + i.kind.slice(1))}</td><td className="num">{eur(i.total)}</td><td className="num">{i.deposit_settled ? eur(i.deposit_settled) : <span className="zero">–</span>}</td>
                   <td className="num">{eur(invoiceBalance(s, i))}</td><td>{fmtDate(i.due_date)}</td><td><Pill tone={tone}>{tx(label)}</Pill></td>
@@ -62,37 +68,29 @@ export function Invoices() {
           </table></div>}
         </section>
       </div>
-      {make && <MakeInvoiceModal {...make} onClose={() => setMake(null)} />}
+      {confirm && <InvoiceProformasModal ids={chosen.map((p) => p.d.id)} onClose={() => setConfirm(false)} onDone={() => { setConfirm(false); setTicked(new Set()) }} />}
     </>
   )
 }
 
-function MakeInvoiceModal({ order, ids, onClose }: { order: SalesOrder; ids: string[]; onClose: () => void }) {
+function InvoiceProformasModal({ ids, onClose, onDone }: { ids: string[]; onClose: () => void; onDone: () => void }) {
   const { s, run } = useApp()
   const last = s.invoices.reduce((m, i) => (i.invoice_date > m ? i.invoice_date : m), '')
   const [date, setDate] = useState(todayISO() > last ? todayISO() : last)
-  const available = depositAvailable(s, order.id)
-  const [settle, setSettle] = useState(available > 0)
   const value = ids.reduce((n, id) => n + deliveryValue(s, id), 0)
-  const settled = settle ? Math.min(available, value) : 0
   const create = async () => {
-    let id = ''
-    const ok = await run(async (db) => { id = await createInvoice(db, { sales_order_id: order.id, delivery_ids: ids, invoice_date: date, settle_deposit: settle }) }, tx("Factuur gemaakt"))
-    if (ok) { onClose(); go(`facturatie-${id}`) }
+    if (await run((db) => invoiceProformas(db, { delivery_ids: ids, invoice_date: date }), ids.length === 1 ? tx("Factuur gemaakt") : tx("{0} facturen gemaakt", ids.length))) onDone()
   }
   return (
-    <Modal title={tx("Factuur maken")} onClose={onClose} footer={<>
+    <Modal title={tx("Factureren")} onClose={onClose} footer={<>
       <button className="btn" onClick={onClose}>{tx("Annuleren")}</button>
-      <button className="btn primary" onClick={create}>{tx("Factuur maken")}</button>
+      <button className="btn primary" onClick={create}>{ids.length === 1 ? tx("1 factuur maken") : tx("{0} facturen maken", ids.length)}</button>
     </>}>
       <TextField label={tx("Factuurdatum")} type="date" value={date} onChange={setDate} hint={last ? tx("Mag niet voor {0} liggen, de datum van de laatste factuur.", fmtDate(last)) : undefined} />
-      {available > 0 && <Check label={tx("Vooruitbetaling verrekenen ({0} beschikbaar)", eur(available))} checked={settle} onChange={setSettle} />}
       <div className="totals" style={{ maxWidth: 'none' }}>
-        <div><span>{tx("Factuurbedrag incl. IVA")}</span><span>{eur(value)}</span></div>
-        {settled > 0 && <div><span>{tx("Verrekend")}</span><span>−{eur(settled)}</span></div>}
-        <div className="grand"><span>{tx("Te betalen")}</span><span>{eur(value - settled)}</span></div>
+        <div className="grand"><span>{tx("Totaal incl. IVA")}</span><span>{eur(value)}</span></div>
       </div>
-      <p className="small muted" style={{ margin: 0 }}>{tx("Na het maken staat de factuur vast en kan hij niet meer worden gewijzigd.")}</p>
+      <p className="small muted" style={{ margin: 0 }}>{tx("Vooruitbetalingen worden verrekend. Na het maken staan de facturen vast en kunnen ze niet meer worden gewijzigd.")}</p>
     </Modal>
   )
 }
