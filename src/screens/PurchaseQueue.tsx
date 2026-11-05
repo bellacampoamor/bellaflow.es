@@ -98,33 +98,61 @@ export function PurchaseQueue({ onDone }: { onDone: () => void }) {
           <button className="btn primary" disabled={!chosen.length || missing} onClick={() => setConfirm(true)}>{tx("Doorzetten naar inkooporder")}<ArrowRight size={16} /></button>
         </div>
       )}
-      {confirm && <ConvertModal lines={chosen.map((l) => ({ id: l.id, qty: l.qty, product_id: l.product_id, supplier_id: supplierFor(l) }))} onClose={() => setConfirm(false)} onDone={() => {
+      {confirm && <ConvertModal lines={chosen.map((l) => ({ id: l.id, qty: l.qty, product_id: l.product_id, supplier_id: supplierFor(l), sales_order_id: l.sales_order_id, description: l.description, options: l.options }))} onClose={() => setConfirm(false)} onDone={() => {
         setSelected(new Set()); setConfirm(false); onDone()
       }} run={run} />}
     </section>
   )
 }
 
-function ConvertModal({ lines, onClose, onDone, run }: { lines: { id: string; qty: number; product_id: string; supplier_id: string }[]; onClose: () => void; onDone: () => void; run: ReturnType<typeof useApp>['run'] }) {
+function ConvertModal({ lines, onClose, onDone, run }: { lines: { id: string; qty: number; product_id: string; supplier_id: string; sales_order_id: string; description: string; options: string }[]; onClose: () => void; onDone: () => void; run: ReturnType<typeof useApp>['run'] }) {
   const { s } = useApp()
   const today = todayISO()
   const [date, setDate] = useState(today)
+  const [open, setOpen] = useState<Set<string>>(new Set())
+  const lineCost = (l: { qty: number; product_id: string }) => l.qty * (s.products.find((p) => p.id === l.product_id)?.purchase_price ?? 0)
   const perSupplier = [...new Set(lines.map((l) => l.supplier_id))].map((id) => {
     const rows = lines.filter((l) => l.supplier_id === id)
-    return { id, name: s.suppliers.find((x) => x.id === id)?.name, count: rows.length, value: round2(rows.reduce((n, l) => n + l.qty * (s.products.find((p) => p.id === l.product_id)?.purchase_price ?? 0), 0)) }
+    const orders = [...new Set(rows.map((l) => l.sales_order_id))].map((orderId) => ({ order: s.sales_orders.find((o) => o.id === orderId)!, lines: rows.filter((l) => l.sales_order_id === orderId) })).sort((a, b) => a.order.number.localeCompare(b.order.number))
+    return { id, name: s.suppliers.find((x) => x.id === id)?.name, count: rows.length, value: round2(rows.reduce((n, l) => n + lineCost(l), 0)), orders }
   })
+  const toggleOpen = (id: string) => setOpen((v) => { const next = new Set(v); if (next.has(id)) next.delete(id); else next.add(id); return next })
   const save = async () => {
     const ok = await run((db) => convertLinesToPurchaseOrders(db, { lines: lines.map((l) => ({ sales_order_line_id: l.id })), order_date: date }), perSupplier.length === 1 ? tx("Inkooporder aangemaakt") : tx("{0} inkooporders aangemaakt", perSupplier.length))
     if (ok) onDone()
   }
   return (
-    <Modal title={tx("Doorzetten naar inkooporder")} onClose={onClose} footer={<>
+    <Modal wide title={tx("Doorzetten naar inkooporder")} onClose={onClose} footer={<>
       <button className="btn" onClick={onClose}>{tx("Annuleren")}</button>
       <button className="btn primary" onClick={save}>{perSupplier.length === 1 ? tx("Inkooporder aanmaken") : tx("{0} inkooporders aanmaken", perSupplier.length)}</button>
     </>}>
-      <div className="table-wrap flush"><table>
-        <thead><tr><th>{tx("Leverancier")}</th><th className="num">{tx("Regels")}</th><th className="num">{tx("Waarde")}</th></tr></thead>
-        <tbody>{perSupplier.map((x) => <tr key={x.id}><td className="strong">{x.name}</td><td className="num">{x.count}</td><td className="num">{eur(x.value)}</td></tr>)}</tbody>
+      <div className="table-wrap flush convert-list"><table>
+        <thead><tr><th>{tx("Leverancier")}</th><th className="num">{tx("Aantal")}</th><th className="num">{tx("Waarde")}</th></tr></thead>
+        {perSupplier.map((x) => {
+          const isOpen = open.has(x.id)
+          return (
+            <tbody key={x.id}>
+              <tr className="click" onClick={() => toggleOpen(x.id)}>
+                <td className="strong"><span className="convert-sup"><button type="button" className={`tri${isOpen ? ' open' : ''}`} aria-expanded={isOpen} aria-label={isOpen ? tx("{0} dichtklappen", x.name) : tx("{0} openklappen", x.name)} onClick={(e) => { e.stopPropagation(); toggleOpen(x.id) }}><svg viewBox="0 0 12 12" width="12" height="12" aria-hidden="true"><path d="M1 3h10L6 10z" fill="currentColor" /></svg></button>{x.name}</span></td>
+                <td className="num muted small">{x.count === 1 ? tx("1 regel") : tx("{0} regels", x.count)}</td>
+                <td className="num strong">{eur(x.value)}</td>
+              </tr>
+              {isOpen && x.orders.flatMap(({ order, lines: rows }) => {
+                const customer = s.customers.find((c) => c.id === order.customer_id)
+                return [
+                  <tr key={order.id} className="convert-order"><td colSpan={3}><span className="strong">{order.number}</span> <span className="muted small">{customer?.company || customer?.name}</span></td></tr>,
+                  ...rows.map((l) => (
+                    <tr key={l.id} className="convert-line">
+                      <td>{l.description}<Sku code={articleNo(s, l.product_id)} />{l.options && <div className="muted small">{l.options}</div>}</td>
+                      <td className="num">{l.qty}</td>
+                      <td className="num">{eur(round2(lineCost(l)))}</td>
+                    </tr>
+                  )),
+                ]
+              })}
+            </tbody>
+          )
+        })}
       </table></div>
       <div className="form-grid">
         <div className="field"><span className="lbl">{tx("Bestemming")}</span><div style={{ minHeight: 38, display: 'flex', alignItems: 'center' }}>{inboundWarehouse(s.warehouses)?.name}</div></div>

@@ -408,3 +408,10 @@ body.route-dragging, body.route-dragging * { cursor: grabbing !important; user-s
 .panel.section > h2 { font-size: 1.22rem; font-weight: 700; color: var(--link); padding-bottom: 8px; margin-bottom: 14px; border-bottom: 2px solid var(--brand-line); }
 .panel.section > h2 + p { margin: -4px 0 14px; }
 .cols-even.same-height { align-items: stretch; }
+
+/* Doorzetten: leverancier, daarbinnen verkooporder en artikelen. De lijst scrolt, de knoppen blijven in beeld. */
+.convert-list { max-height: 50vh; overflow-y: auto; }
+.convert-list thead th { position: sticky; top: 0; background: var(--surface); z-index: 1; }
+.convert-sup { display: flex; align-items: center; gap: 6px; }
+.convert-order td { background: var(--surface-2); padding-left: 44px; padding-block: 6px; }
+.convert-line td:first-child { padding-left: 44px; }
