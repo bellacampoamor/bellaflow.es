@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react'
 import { ArrowLeft, Check as CheckIcon, ChevronLeft, ChevronRight, Map as MapIcon, Phone } from 'lucide-react'
 import type { Delivery } from '../data/types'
-import { addDays, articleNo, documentLanguage, todayISO } from '../domain/calc'
+import { addDays, articleNo, documentLanguage, driverStops, todayISO, visibleToDriver } from '../domain/calc'
 import { NOTE_TEXT } from '../domain/noteText'
 import { googleMapsRouteUrl, MAPS_MAX_WAYPOINTS, type Point } from '../domain/route'
 import { signDelivery } from '../domain/services'
@@ -24,9 +24,7 @@ export function Driver({ param }: { param: string }) {
 
 function DriverRoute({ day, setDay }: { day: string; setDay: (d: string) => void }) {
   const { s } = useApp()
-  const stops = s.deliveries
-    .filter((d) => d.planned_date === day && d.method === 'eigen_team' && d.status !== 'cancelled')
-    .sort((a, b) => (a.route_position ?? 999) - (b.route_position ?? 999) || a.number.localeCompare(b.number))
+  const stops = driverStops(s, day)
   const orderOf = (d: Delivery) => s.sales_orders.find((o) => o.id === d.sales_order_id)!
   const done = stops.filter((d) => d.status === 'delivered').length
   const origin = s.warehouses.find((w) => w.is_route_origin && w.latitude != null && w.longitude != null)
@@ -56,7 +54,7 @@ function DriverRoute({ day, setDay }: { day: string; setDay: (d: string) => void
                 <span>{o.delivery_address}, {o.delivery_city}</span>
                 <span className="muted small">{tx("{0} artikelen", qty)}, {d.number}</span>
               </span>
-              {isDone ? <Pill tone="good">{tx("Getekend")}</Pill> : canSign(d) ? <ChevronRight size={22} /> : <Pill tone="warn">{tx("Niet klaargezet")}</Pill>}
+              {isDone ? <Pill tone="good">{tx("Getekend")}</Pill> : <ChevronRight size={22} />}
             </a>
           </li>
         )
@@ -73,7 +71,7 @@ function DriverStop({ id }: { id: string }) {
   const o = d && s.sales_orders.find((x) => x.id === d.sales_order_id)
   const c = o && s.customers.find((x) => x.id === o.customer_id)
   const [name, setName] = useState(o?.delivery_name || c?.name || '')
-  if (!d || !o || !c) return <section className="panel">{tx("Levering niet gevonden.")} <a href="#chauffeur">{tx("Terug naar de route")}</a>.</section>
+  if (!d || !o || !c || !visibleToDriver(d)) return <section className="panel">{tx("Levering niet gevonden.")} <a href="#chauffeur">{tx("Terug naar de route")}</a>.</section>
   const t = NOTE_TEXT[documentLanguage(s.settings[0]?.language_delivery_note, c.language)]
   const lines = s.delivery_lines.filter((l) => l.delivery_id === id).map((l) => ({ ...l, sol: s.sales_order_lines.find((x) => x.id === l.sales_order_line_id)! }))
   const address = [o.delivery_address, o.delivery_postal_code, o.delivery_city].filter(Boolean).join(', ')
@@ -119,7 +117,6 @@ function DriverStop({ id }: { id: string }) {
           <div className="small">{d.signed_by}, {fmtDate(d.delivered_at)}</div>
         </section>
       )}
-      {!canSign(d) && d.status !== 'delivered' && <section className="panel"><p style={{ margin: 0 }}>{tx("Deze levering is nog niet klaargezet. Tekenen kan zodra het magazijn hem heeft klaargezet.")}</p></section>}
       {canSign(d) && (
         <section className="drv-sign">
           <label className="drv-name"><span className="small muted">{t.name}</span><input id="drv-name" value={name} onChange={(e) => setName(e.target.value)} autoComplete="off" /></label>

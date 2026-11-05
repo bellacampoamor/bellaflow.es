@@ -347,3 +347,12 @@ export function invoiceQrUrl(input: { nif: string; number: string; date: string;
 
 /** Een Spaans NIF of CIF is negen tekens; de tijdelijke tekst uit de voorbeeldgegevens telt niet. */
 export const hasTaxId = (nif: string) => /^[A-Z0-9]{9}$/i.test(nif.trim())
+
+// Chauffeursapp ----------------------------------------------------------------
+
+/** De chauffeur ziet alleen wat is klaargezet, onderweg is of al is afgeleverd. */
+export const visibleToDriver = (d: Delivery) => d.method === 'eigen_team' && (d.status === 'ready' || d.status === 'in_transit' || d.status === 'delivered')
+
+export const driverStops = (s: Snapshot, day: string) => s.deliveries
+  .filter((d) => d.planned_date === day && visibleToDriver(d))
+  .sort((a, b) => (a.route_position ?? 999) - (b.route_position ?? 999) || a.number.localeCompare(b.number))

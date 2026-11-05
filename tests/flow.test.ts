@@ -6,7 +6,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { loadSnapshot } from '../src/data/driver'
 import { LocalDriver } from '../src/data/localDriver'
 import { TABLES } from '../src/data/types'
-import { archiveRows, openLinesOnTransport, linePurchaseStatus, linesToPurchase, documentLanguage, flowCounts, freeAt, transportLoad, invoiceBalance, onHandMap, orderStage, orderTab, reservedMap, stockKey, vatBreakdown , invoiceReport, periodRange, invoiceQrUrl, hasTaxId } from '../src/domain/calc'
+import { archiveRows, openLinesOnTransport, linePurchaseStatus, linesToPurchase, documentLanguage, flowCounts, freeAt, transportLoad, invoiceBalance, onHandMap, orderStage, orderTab, reservedMap, stockKey, vatBreakdown , invoiceReport, periodRange, invoiceQrUrl, hasTaxId, driverStops } from '../src/domain/calc'
 import { renameOldSuppliers, restoreSettings, restoreSuppliers, seedDemo } from '../src/domain/demo'
 import {
   createDelivery, createInvoice, markDeliveriesReady, createOrder, createPurchaseOrder, invoiceProformas, lineFromProduct, markDelivered, assignShipmentsToTransport, cancelTransport, convertLinesToPurchaseOrders, createTransport, markReady, receiveGoods, rescheduleDelivery, rescheduleOrder, saveRouteOrder, saveSettings, mailSignedNote, setPurchaseLabel, signDelivery, splitLinesForStock, setDeliveryInTransit, setTransportStatus, updateTransport, transferStock,
@@ -651,6 +651,17 @@ describe('meerdere leveringen klaarzetten', () => {
     await markDeliveriesReady(db, [a, b], { approved_by: 'X', date: TODAY })
     const after = await loadSnapshot(db)
     expect([a, b].map((id) => after.deliveries.find((d) => d.id === id)!.status)).toEqual(['ready', 'ready'])
+  })
+})
+
+describe('chauffeursapp', () => {
+  it('toont pas een levering als die is klaargezet', async () => {
+    const s = await loadSnapshot(db)
+    const d = s.deliveries.find((x) => x.status === 'planned' && x.method === 'eigen_team')!
+    expect(driverStops(s, d.planned_date).map((x) => x.id)).not.toContain(d.id)
+    expect(driverStops(s, d.planned_date).every((x) => x.status !== 'planned' && x.status !== 'cancelled')).toBe(true)
+    await markDeliveriesReady(db, [d.id], { approved_by: 'X', date: TODAY })
+    expect(driverStops(await loadSnapshot(db), d.planned_date).map((x) => x.id)).toContain(d.id)
   })
 })
 
