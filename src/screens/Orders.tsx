@@ -109,7 +109,7 @@ export function OrderDetail({ id }: { id: string }) {
       )}
 
       <section className="panel" style={{ marginBottom: 16 }}>
-        <div className="track">{TRACK.map((t, i) => <div key={t.k} className={done[t.k] ? 'done' : i === firstOpen ? 'now' : ''}>{tx(t.l)}</div>)}</div>
+        <div className="track">{TRACK.map((t, i) => <div key={t.k} className={done[t.k] ? 'done' : i === firstOpen ? 'now' : ''}>{tx(t.l)}{t.k === 'delivered' && shipped > 0 && shipped < qty && <div className="track-note">{tx("(deels)")}</div>}</div>)}</div>
       </section>
 
       <div className="cols">
