@@ -72,7 +72,7 @@ a { color: var(--link); }
 .demo-bar { background: var(--sell); color: var(--sell-fg); font-size: .85rem; padding-block: 5px; }
 .demo-bar .inner { display: flex; gap: 12px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
 .linklike { background: none; border: 0; color: inherit; font: inherit; font-weight: 600; text-decoration: underline; cursor: pointer; padding: 0; }
-.top { background: var(--surface); padding-block: 12px 0; }
+.top { background: var(--surface); padding-block: 8px; border-bottom: 1px solid var(--line); position: sticky; top: 0; z-index: 30; }
 .top-row { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; justify-content: space-between; }
 .brand { display: inline-flex; background: var(--logo-plate); padding: var(--logo-pad); border-radius: 8px; max-width: 100%; }
 .brand picture { display: flex; }
@@ -85,7 +85,7 @@ a { color: var(--link); }
 .util a.on { background: var(--surface-2); color: var(--heading); font-weight: 600; }
 
 /* Procesbalk: de zes stappen uit de illustratie */
-.ribbon-wrap { background: var(--surface); border-bottom: 1px solid var(--line); padding-block: 12px; position: sticky; top: env(safe-area-inset-top, 0px); z-index: 20; }
+.ribbon-wrap { background: var(--surface); border-bottom: 1px solid var(--line); padding-block: 12px; position: sticky; top: var(--top-h, 0px); z-index: 20; }
 .ribbon { display: grid; grid-template-columns: repeat(6, minmax(142px, 1fr)); gap: 3px; overflow-x: auto; scrollbar-width: none; }
 .ribbon::-webkit-scrollbar { display: none; }
 .step { --tint: var(--buy); --tint-fg: var(--buy-fg); position: relative; display: flex; align-items: center; gap: 9px; padding: 9px 22px 9px 26px; background: var(--tint); color: var(--tint-fg); text-decoration: none; clip-path: polygon(0 0, calc(100% - 13px) 0, 100% 50%, calc(100% - 13px) 100%, 0 100%, 13px 50%); min-width: 0; }
@@ -243,7 +243,7 @@ td input.price { width: 104px; }
   /* Zonder paginamarge heeft de browser geen ruimte voor titel, url en paginanummer; de witruimte zit op het document zelf. */
   @page { margin: 0; }
   .demo-bar, .top, .ribbon-wrap, .head, .no-print, .toast { display: none !important; }
-  main { padding: 0; } .paper { border: 0; max-width: none; padding: 15mm; box-shadow: none; } body { background: #fff; }
+  main { padding: 0; } .paper { border: 0; max-width: none; padding: 0 15mm; box-shadow: none; } body { background: #fff; }
 }
 @media (prefers-reduced-motion: no-preference) { .btn, .step { transition: background-color .12s; } }
 
@@ -376,4 +376,30 @@ body.route-dragging, body.route-dragging * { cursor: grabbing !important; user-s
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) .step.on { background: var(--selected); color: var(--on-selected); }
   :root:not([data-theme="light"]) .step.on .ico { background: var(--surface); color: var(--selected); }
+}
+
+/* Hoofdmenu op smalle schermen: één regel die zijwaarts scrolt, en de stappenbalk scrolt mee weg */
+@media (max-width: 760px) {
+  .top { padding-top: max(6px, env(safe-area-inset-top, 0px)); padding-bottom: 4px; }
+  .top-row { gap: 4px; flex-wrap: nowrap; flex-direction: column; align-items: stretch; }
+  .util { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+  .util::-webkit-scrollbar { display: none; }
+  .util a, .util .btn-toggle { flex: none; white-space: nowrap; }
+  .brand { align-self: flex-start; }
+  .ribbon-wrap { position: static; }
+}
+@media (max-height: 560px) { .ribbon-wrap { position: static; } }
+
+/* Merkje op documenten */
+.doc-space-top, .doc-space-bottom { display: none; }
+.doc-mark { display: flex; flex-direction: column; align-items: center; gap: 3px; margin-top: 26px; color: var(--muted); font-size: 7.5pt; text-align: center; }
+.doc-mark img { display: block; height: 15px; width: auto; }
+@media print {
+  .doc-frame { display: table; width: 100%; table-layout: fixed; }
+  .doc-body { display: table-row-group; }
+  .doc-space-top { display: table-header-group; }
+  .doc-space-bottom { display: table-footer-group; }
+  .doc-space-top > div { height: 15mm; }
+  .doc-space-bottom > div { height: 20mm; }
+  .doc-mark { position: fixed; left: 0; right: 0; bottom: 6mm; margin: 0; }
 }

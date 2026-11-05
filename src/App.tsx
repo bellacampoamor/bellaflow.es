@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Archive, Headset, Languages, Moon, Store, Sun, Boxes, ClipboardList, FileText, LayoutDashboard, PackageCheck, Settings2, ShoppingCart, Truck, Warehouse as WarehouseIcon } from 'lucide-react'
 import { flowCounts } from './domain/calc'
 import { useApp, useHash } from './ui/app-context'
@@ -62,6 +62,17 @@ function useTheme() {
 export function App({ onResetDemo, onSignOut }: { onResetDemo?: () => Promise<void>; onSignOut?: () => void }) {
   const { s } = useApp()
   const [theme, toggleTheme] = useTheme()
+  // De stappenbalk plakt direct onder het hoofdmenu, dat op smalle schermen hoger is.
+  const headerRef = useRef<HTMLElement>(null)
+  useEffect(() => {
+    const el = headerRef.current
+    if (!el) return
+    const measure = () => document.documentElement.style.setProperty('--top-h', `${el.offsetHeight}px`)
+    measure()
+    const ro = new ResizeObserver(measure)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
   const [language, setUiLanguage] = useState(getLanguage)
   const switchLanguage = () => {
     const next = language === 'nl' ? 'en' : 'nl'
@@ -90,7 +101,7 @@ export function App({ onResetDemo, onSignOut }: { onResetDemo?: () => Promise<vo
           </div>
         </div>
       )}
-      <header className="top wrap">
+      <header className="top wrap" ref={headerRef}>
         <div className="inner top-row">
           <a className="brand" href="#overzicht" aria-label={tx("Bella Flow, naar overzicht")}><Logo /></a>
           <nav className="util" aria-label={tx("Algemeen")}>

@@ -1,7 +1,7 @@
-import { PDFDocument, rgb, StandardFonts, type PDFFont, type PDFPage } from 'pdf-lib'
+import { PDFDocument, rgb, StandardFonts, type PDFFont, type PDFImage, type PDFPage } from 'pdf-lib'
 import type { Snapshot } from '../data/types'
 import { documentLanguage } from './calc'
-import { NOTE_TEXT } from './noteText'
+import { DOC_MARK, NOTE_TEXT } from './noteText'
 
 const A4: [number, number] = [595.28, 841.89]
 const MARGIN = 48
@@ -24,13 +24,31 @@ const wrap = (text: string, font: PDFFont, size: number, width: number) => {
 
 const ymd = (iso: string | null | undefined) => (iso ? iso.slice(0, 10).split('-').reverse().join('-') : '')
 
+/** Klein logo met vermelding, midden onderaan elke pagina. Zonder logobestand blijft de tekst staan. */
+async function drawDocMark(doc: PDFDocument, font: PDFFont, text: string) {
+  let logo: PDFImage | null = null
+  try {
+    const res = await fetch(`${import.meta.env.BASE_URL}assets/brand/bellaflow-logo-small.png`)
+    if (res.ok) logo = await doc.embedPng(await res.arrayBuffer())
+  } catch { /* alleen de tekst */ }
+  for (const page of doc.getPages()) {
+    const size = 7
+    page.drawText(text, { x: (A4[0] - font.widthOfTextAtSize(text, size)) / 2, y: 14, size, font, color: MUTED })
+    if (logo) {
+      const h = 11, w = (logo.width / logo.height) * h
+      page.drawImage(logo, { x: (A4[0] - w) / 2, y: 24, width: w, height: h })
+    }
+  }
+}
+
 /** Bouwt de getekende afleverbon als pdf en geeft die terug als base64. */
 export async function signedNotePdf(s: Snapshot, deliveryId: string) {
   const d = s.deliveries.find((x) => x.id === deliveryId)!
   const o = s.sales_orders.find((x) => x.id === d.sales_order_id)!
   const c = s.customers.find((x) => x.id === o.customer_id)!
   const co = s.settings[0]
-  const t = NOTE_TEXT[documentLanguage(co?.language_delivery_note, c.language)]
+  const language = documentLanguage(co?.language_delivery_note, c.language)
+  const t = NOTE_TEXT[language]
   const doc = await PDFDocument.create()
   doc.setTitle(`${t.title} ${d.number}`)
   const regular = await doc.embedFont(StandardFonts.Helvetica)
@@ -85,5 +103,6 @@ export async function signedNotePdf(s: Snapshot, deliveryId: string) {
   }
   put(`${t.name}: ${d.signed_by}`)
   if (d.signed_at) put(`${t.when}: ${ymd(d.signed_at)} ${d.signed_at.slice(11, 16)} UTC`, { color: MUTED })
+  await drawDocMark(doc, regular, safe(DOC_MARK[language]))
   return { name: `${t.title} ${d.number}.pdf`, base64: await doc.saveAsBase64() }
 }

@@ -6,3 +6,10 @@ export const NOTE_TEXT: Record<Language, Record<string, string>> = {
   nl: { title: 'Afleverbon', date: 'Leverdatum', order: 'Order', ref: 'Uw referentie', to: 'Afleveren bij', bill: 'Klant', tel: 'Tel.', part: 'Deellevering', of: 'van', code: 'Artikelnummer', prod: 'Product', opts: 'Uitvoering', pkg: 'Colli', qty: 'Aantal', from: 'Magazijn', notes: 'Instructies', floor: 'Verdieping', lift: 'Lift', assembly: 'Montage', remove: 'Oude meubels meenemen', yes: 'ja', no: 'nee', confirm: 'De klant verklaart de genoemde producten in goede staat te hebben ontvangen.', remarks: 'Opmerkingen bij ontvangst', name: 'Naam', sign: 'Handtekening klant', when: 'Datum en tijd', stop: 'Stop' },
   en: { title: 'Delivery note', date: 'Delivery date', order: 'Order', ref: 'Your reference', to: 'Deliver to', bill: 'Customer', tel: 'Tel.', part: 'Part delivery', of: 'of', code: 'Item no.', prod: 'Product', opts: 'Finish', pkg: 'Packages', qty: 'Qty', from: 'Warehouse', notes: 'Instructions', floor: 'Floor', lift: 'Lift', assembly: 'Assembly', remove: 'Remove old furniture', yes: 'yes', no: 'no', confirm: 'The customer confirms receipt of the listed products in good condition.', remarks: 'Remarks on receipt', name: 'Name', sign: 'Customer signature', when: 'Date and time', stop: 'Stop' },
 }
+
+// Vermelding onderaan elk afgedrukt document, in de taal van het document.
+export const DOC_MARK: Record<Language, string> = {
+  es: 'Este documento ha sido generado con Bella Flow.',
+  nl: 'Dit document is opgesteld met Bella Flow.',
+  en: 'This document was prepared with Bella Flow.',
+}

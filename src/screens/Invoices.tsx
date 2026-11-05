@@ -4,7 +4,7 @@ import type { Language, Payment } from '../data/types'
 import { articleNo, deliveryValue, depositAvailable, documentLanguage, invoiceBalance, invoiceState, todayISO, uninvoicedDeliveries, vatBreakdown } from '../domain/calc'
 import { ensureProformas, invoiceProformas, payInvoice } from '../domain/services'
 import { go, useApp, useAutoPrint } from '../ui/app-context'
-import { Empty, eur, fmtDate, Head, Modal, NumberField, Pill, SelectField, Tabs, TextField } from '../ui/kit'
+import { Empty, eur, fmtDate, Head, Modal, NumberField, Pill, SelectField, Tabs, TextField, DocPaper } from '../ui/kit'
 import { tx } from '../i18n'
 
 const STATE = { betaald: ['Betaald', 'good'], open: ['Open', 'bill'], te_laat: ['Te laat', 'bad'] } as const
@@ -115,7 +115,8 @@ export function InvoiceDetail({ id, autoPrint = false }: { id: string; autoPrint
   const o = s.sales_orders.find((x) => x.id === inv.sales_order_id)!
   const lines = s.invoice_lines.filter((l) => l.invoice_id === id)
   const co = s.settings[0]
-  const t = T[documentLanguage(co.language_invoice, inv.language)]
+  const language = documentLanguage(co.language_invoice, inv.language)
+  const t = T[language]
   // Facturen van voor het artikelnummer op de factuurregel
   const articleOf = (dl: string | null) => articleNo(s, s.sales_order_lines.find((x) => x.id === s.delivery_lines.find((y) => y.id === dl)?.sales_order_line_id)?.product_id)
   const b = vatBreakdown(lines.map((l) => ({ total: l.line_total, vat_rate: l.vat_rate })))
@@ -130,7 +131,7 @@ export function InvoiceDetail({ id, autoPrint = false }: { id: string; autoPrint
         {canPrint && <button className="btn" onClick={() => window.print()}>{tx("Afdrukken of PDF")}</button>}
         {balance > 0 && <button className="btn primary" onClick={() => { setAmount(balance); setPay(true) }}>{tx("Betaling registreren")}</button>}
       </Head>
-      <div className="paper">
+      <DocPaper language={language}>
         <div className="paper-top">
           <div>
             <h2 style={{ fontSize: '1.3rem' }}>{co.company_name}</h2>
@@ -160,7 +161,7 @@ export function InvoiceDetail({ id, autoPrint = false }: { id: string; autoPrint
           <div className="grand"><span>{t.due_amt}</span><span>{eur(balance)}</span></div>
         </div>
         <p className="small muted" style={{ marginTop: 26, marginBottom: 0 }}>{t.pay}: {co.iban}{co.invoice_footer ? <><br />{co.invoice_footer}</> : ''}</p>
-      </div>
+      </DocPaper>
       {pay && (
         <Modal title={tx("Betaling registreren")} onClose={() => setPay(false)} footer={<>
           <button className="btn" onClick={() => setPay(false)}>{tx("Annuleren")}</button>

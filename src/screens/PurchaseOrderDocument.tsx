@@ -1,7 +1,7 @@
 import type { Language } from '../data/types'
 import { articleNo, round2 } from '../domain/calc'
 import { useApp, useAutoPrint } from '../ui/app-context'
-import { eur, fmtDate, Head } from '../ui/kit'
+import { eur, fmtDate, Head, DocPaper } from '../ui/kit'
 import { tx } from '../i18n'
 
 const T: Record<Language, Record<string, string>> = {
@@ -18,13 +18,14 @@ export function PurchaseOrderDocument({ id }: { id: string }) {
   if (!po) return <div className="panel">{tx("Inkooporder niet gevonden.")} <a href="#inkoop">{tx("Inkooporders")}</a>.</div>
   const sup = s.suppliers.find((x) => x.id === po.supplier_id)
   const co = s.settings[0]
-  const t = T[co.language_purchase_order ?? 'nl']
+  const language = co.language_purchase_order ?? 'nl'
+  const t = T[language]
   const lines = s.purchase_order_lines.filter((l) => l.purchase_order_id === id)
   const total = round2(lines.reduce((n, l) => n + l.qty * l.unit_cost, 0))
   return (
     <>
       <Head title={po.number} back={{ href: '#inkoop', label: tx("Inkooporders") }} />
-      <div className="paper">
+      <DocPaper language={language}>
         <div className="paper-top">
           <div>
             <h2 style={{ fontSize: '1.3rem' }}>{co.company_name}</h2>
@@ -56,7 +57,7 @@ export function PurchaseOrderDocument({ id }: { id: string }) {
         </table></div>
         <div className="totals" style={{ marginTop: 18 }}><div className="grand"><span>{t.grand}</span><span>{eur(total)}</span></div></div>
         {po.notes && <p className="small" style={{ marginTop: 18, marginBottom: 0 }}>{t.notes}: {po.notes}</p>}
-      </div>
+      </DocPaper>
     </>
   )
 }

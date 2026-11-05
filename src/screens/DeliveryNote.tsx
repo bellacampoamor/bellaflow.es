@@ -4,7 +4,7 @@ import { documentLanguage } from '../domain/calc'
 import { NOTE_TEXT } from '../domain/noteText'
 import { markNotePrinted } from '../domain/services'
 import { go, useApp, useAutoPrint } from '../ui/app-context'
-import { fmtDate, Head, Modal, Pill } from '../ui/kit'
+import { fmtDate, Head, Modal, Pill, DocPaper } from '../ui/kit'
 import { tx } from '../i18n'
 
 
@@ -17,7 +17,8 @@ export function DeliveryNote({ id, autoPrint = false, fromArchive = false }: { i
   const o = s.sales_orders.find((x) => x.id === d.sales_order_id)!
   const c = s.customers.find((x) => x.id === o.customer_id)!
   const co = s.settings[0]
-  const t = NOTE_TEXT[documentLanguage(co.language_delivery_note, c.language)]
+  const language = documentLanguage(co.language_delivery_note, c.language)
+  const t = NOTE_TEXT[language]
   const lines = s.delivery_lines.filter((l) => l.delivery_id === id).map((l) => {
     const sol = s.sales_order_lines.find((x) => x.id === l.sales_order_line_id)!
     return { ...l, sol, p: s.products.find((x) => x.id === sol.product_id)!, wh: s.warehouses.find((w) => w.id === l.warehouse_id)! }
@@ -51,7 +52,7 @@ export function DeliveryNote({ id, autoPrint = false, fromArchive = false }: { i
           ? <button className="btn primary" disabled={!ready} onClick={print}><Printer size={16} />{tx("Afleverbon afdrukken")}</button>
           : <span className="small muted">{tx("Afdrukken kan in de eigen app, niet in deze preview.")}</span>}
       </Head>
-      <div className="paper">
+      <DocPaper language={language}>
         <div className="paper-top">
           <div>
             <h2 style={{ fontSize: '1.3rem' }}>{co.company_name}</h2>
@@ -111,7 +112,7 @@ export function DeliveryNote({ id, autoPrint = false, fromArchive = false }: { i
           <div>{t.when}</div>
           <div className="sig">{t.sign}</div>
         </div>}
-      </div>
+      </DocPaper>
     </>
   )
 }

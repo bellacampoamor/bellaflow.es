@@ -2,8 +2,22 @@
 import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react'
 import { X } from 'lucide-react'
 import { locale, tx } from '../i18n'
+import { DOC_MARK } from '../domain/noteText'
+import type { Language } from '../data/types'
 
-const brandFile = (name: string) => `${import.meta.env.BASE_URL}assets/brand/${name}`/** Op smalle schermen het compacte logo. */
+const brandFile = (name: string) => `${import.meta.env.BASE_URL}assets/brand/${name}`/** Documentblad: bij afdrukken staat het merkje op elke pagina midden onderaan. Kop en voet houden daar ruimte voor vrij. */
+export const DocPaper = ({ language, children }: { language: Language; children: ReactNode }) => (
+  <div className="paper">
+    <div className="doc-frame">
+      <div className="doc-space-top" aria-hidden="true"><div /></div>
+      <div className="doc-body">{children}</div>
+      <div className="doc-space-bottom" aria-hidden="true"><div /></div>
+    </div>
+    <div className="doc-mark"><img src={brandFile('bellaflow-logo-small.png')} alt="Bella Flow" /><span>{DOC_MARK[language]}</span></div>
+  </div>
+)
+
+/** Op smalle schermen het compacte logo. */
 
 /** Op smalle schermen het compacte logo. */
 export const Logo = () => (

@@ -69,8 +69,13 @@ export function useAutoPrint(enabled: boolean, ready: boolean, backTo = 'archief
     if (!enabled || !ready) return
     const back = () => go(backTo)
     window.addEventListener('afterprint', back)
-    const timer = window.setTimeout(() => window.print(), 150)
-    return () => { window.clearTimeout(timer); window.removeEventListener('afterprint', back) }
+    let cancelled = false
+    const timer = window.setTimeout(async () => {
+      // Het logo moet geladen zijn, anders ontbreekt het op papier.
+      await Promise.all([...document.images].map((img) => img.decode().catch(() => undefined)))
+      if (!cancelled) window.print()
+    }, 150)
+    return () => { cancelled = true; window.clearTimeout(timer); window.removeEventListener('afterprint', back) }
   }, [enabled, ready, backTo])
 }
 

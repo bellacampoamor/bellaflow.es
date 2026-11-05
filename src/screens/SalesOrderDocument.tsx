@@ -1,7 +1,7 @@
 import type { Language } from '../data/types'
 import { articleNo, depositPaid, documentLanguage, lineTotal, orderLines, orderTotal, vatBreakdown } from '../domain/calc'
 import { useApp, useAutoPrint } from '../ui/app-context'
-import { eur, fmtDate, Head } from '../ui/kit'
+import { eur, fmtDate, Head, DocPaper } from '../ui/kit'
 import { tx } from '../i18n'
 
 const T: Record<Language, Record<string, string>> = {
@@ -18,7 +18,8 @@ export function SalesOrderDocument({ id }: { id: string }) {
   if (!o) return <div className="panel">{tx("Verkooporder niet gevonden.")} <a href="#orders">{tx("Verkooporders")}</a>.</div>
   const c = s.customers.find((x) => x.id === o.customer_id)!
   const co = s.settings[0]
-  const t = T[documentLanguage(co.language_sales_order, c.language)]
+  const language = documentLanguage(co.language_sales_order, c.language)
+  const t = T[language]
   const lines = orderLines(s, id)
   const b = vatBreakdown(lines.map((l) => ({ total: lineTotal(l), vat_rate: l.vat_rate })))
   const total = orderTotal(s, id)
@@ -27,7 +28,7 @@ export function SalesOrderDocument({ id }: { id: string }) {
   return (
     <>
       <Head title={o.number} back={{ href: '#orders', label: tx("Verkooporders") }} />
-      <div className="paper">
+      <DocPaper language={language}>
         <div className="paper-top">
           <div>
             <h2 style={{ fontSize: '1.3rem' }}>{co.company_name}</h2>
@@ -77,7 +78,7 @@ export function SalesOrderDocument({ id }: { id: string }) {
           <div className="grand"><span>{t.open}</span><span>{eur(Math.max(0, total - paid))}</span></div>
         </div>
         {o.notes && <p className="small" style={{ marginTop: 18, marginBottom: 0 }}>{t.notes}: {o.notes}</p>}
-      </div>
+      </DocPaper>
     </>
   )
 }
