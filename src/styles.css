@@ -436,3 +436,4 @@ body.route-dragging, body.route-dragging * { cursor: grabbing !important; user-s
 /* QR op de factuur: 30 x 30 mm is de kleinste toegestane maat */
 .tax-qr { flex: none; display: flex; flex-direction: column; gap: 2px; font-size: 7.5pt; color: var(--muted); }
 .tax-qr svg { display: block; width: 30mm; height: 30mm; }
+@media print, (min-width: 640px) { .invoice-top { flex-wrap: nowrap; } .invoice-top > :first-child { flex: 1; min-width: 0; } }

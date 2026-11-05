@@ -133,7 +133,7 @@ export function InvoiceDetail({ id, autoPrint = false }: { id: string; autoPrint
       </Head>
       {!hasTaxId(co.tax_id) && <div className="note warn no-print" style={{ marginBottom: 12 }}>{tx("De QR-code op deze factuur klopt pas als het CIF is ingevuld onder Beheer.")}</div>}
       <DocPaper language={language}>
-        <div className="paper-top">
+        <div className="paper-top invoice-top">
           <div>
             <h2 style={{ fontSize: '1.3rem' }}>{co.company_name}</h2>
             <div className="small muted">{[co.address, `${co.postal_code} ${co.city}`.trim(), co.province, co.phone, co.email].filter(Boolean).join(', ')}<br />{t.tax}: {co.tax_id}</div>
