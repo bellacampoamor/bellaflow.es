@@ -16,6 +16,7 @@ import { Stock } from './screens/Stock'
 import { Admin } from './screens/Admin'
 import { Driver } from './screens/Driver'
 import { SalesOrderDocument } from './screens/SalesOrderDocument'
+import { PurchaseOrderDocument } from './screens/PurchaseOrderDocument'
 import { Archive as ArchiveScreen } from './screens/Archive'
 import { getLanguage, setLanguage, tx } from './i18n'
 
@@ -149,7 +150,7 @@ export function App({ onResetDemo, onSignOut }: { onResetDemo?: () => Promise<vo
 function Route({ screen, param }: { screen: string; param: string }) {
   switch (screen) {
     case 'overzicht': return <Overview />
-    case 'inkoop': return param === 'nieuw' ? <PurchaseForm /> : param.startsWith('nieuw-order-') ? <PurchaseForm orderId={param.slice(12)} /> : param ? <PurchaseDetail id={param} /> : <Purchases />
+    case 'inkoop': return param.startsWith('print-') ? <PurchaseOrderDocument key={param} id={param.slice(6)} /> : param === 'nieuw' ? <PurchaseForm /> : param.startsWith('nieuw-order-') ? <PurchaseForm orderId={param.slice(12)} /> : param ? <PurchaseDetail id={param} /> : <Purchases />
     case 'inkomend': return <Inbound />
     case 'ontvangst': return param ? <ReceiptForm key={param} transportId={param} /> : <Receipts />
     case 'orders':

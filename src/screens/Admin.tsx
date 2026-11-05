@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Plus } from 'lucide-react'
-import type { Customer, DocumentLanguage, Product, Salesperson, Settings, Supplier, Warehouse } from '../data/types'
+import type { Customer, DocumentLanguage, Language, Product, Salesperson, Settings, Supplier, Warehouse } from '../data/types'
 import { saveRecord, saveSettings, type PrefixField } from '../domain/services'
 import { useApp } from '../ui/app-context'
 import { AreaField, Check, eur, Head, Modal, NumberField, Pill, SelectField, Tabs, TextField } from '../ui/kit'
@@ -92,6 +92,7 @@ export function Admin() {
         <h2 style={{ margin: '22px 0 4px' }}>{tx("Taal van documenten")}</h2>
         <p className="small muted" style={{ margin: '0 0 12px' }}>{tx("Kies per document in welke taal het wordt afgedrukt. Productnamen blijven zoals ze zijn ingevoerd.")}</p>
         <div className="form-grid">
+          <SelectField label={tx("Inkooporder")} value={co.language_purchase_order ?? 'nl'} onChange={(v: Language) => setCo({ ...co, language_purchase_order: v })} options={[{ value: 'nl', label: tx("Nederlands") }, { value: 'en', label: tx("Engels") }, { value: 'es', label: tx("Spaans") }]} />
           {([['language_sales_order', tx("Verkooporder")], ['language_delivery_note', tx("Afleverbon")], ['language_invoice', tx("Factuur")]] as const).map(([field, label]) => (
             <SelectField key={field} label={label} value={co[field] ?? 'klant'} onChange={(v: DocumentLanguage) => setCo({ ...co, [field]: v })} options={[{ value: 'klant', label: tx("Taal van de klant") }, { value: 'es', label: tx("Spaans") }, { value: 'en', label: tx("Engels") }, { value: 'nl', label: tx("Nederlands") }]} />
           ))}
