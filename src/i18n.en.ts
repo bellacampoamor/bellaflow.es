@@ -796,7 +796,6 @@ export const en: Record<string, string> = {
   "Gepland transport": "Planned transport",
   "Verkoop": "Sales",
   "op schema": "on schedule",
-  "{0} nog in te kopen": "{0} still to purchase",
   "Inkoop vereist": "Purchase required",
   "Verkooporders zonder Inkooporders": "Sales orders without purchase orders",
   "Vink aan wat je wilt inkopen. Per leverancier ontstaat één inkooporder.": "Tick what you want to purchase. Each supplier gets one purchase order.",
