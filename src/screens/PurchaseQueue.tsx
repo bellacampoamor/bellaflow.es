@@ -1,6 +1,6 @@
 import { useMemo, useState, type KeyboardEvent } from 'react'
 import { ArrowRight, Check as CheckIcon } from 'lucide-react'
-import { articleNo, linePurchaseStatus, linesToPurchase, round2, todayISO } from '../domain/calc'
+import { articleNo, inboundWarehouse, linePurchaseStatus, linesToPurchase, round2, todayISO } from '../domain/calc'
 import { convertLinesToPurchaseOrders } from '../domain/services'
 import { tx } from '../i18n'
 import { useApp } from '../ui/app-context'
@@ -108,15 +108,13 @@ export function PurchaseQueue({ onDone }: { onDone: () => void }) {
 function ConvertModal({ lines, onClose, onDone, run }: { lines: { id: string; qty: number; product_id: string; supplier_id: string }[]; onClose: () => void; onDone: () => void; run: ReturnType<typeof useApp>['run'] }) {
   const { s } = useApp()
   const today = todayISO()
-  const receivers = s.warehouses.filter((w) => w.is_active && w.receives_goods)
-  const [warehouse, setWarehouse] = useState(receivers.find((w) => w.is_route_origin)?.id ?? receivers[0]?.id ?? '')
   const [date, setDate] = useState(today)
   const perSupplier = [...new Set(lines.map((l) => l.supplier_id))].map((id) => {
     const rows = lines.filter((l) => l.supplier_id === id)
     return { id, name: s.suppliers.find((x) => x.id === id)?.name, count: rows.length, value: round2(rows.reduce((n, l) => n + l.qty * (s.products.find((p) => p.id === l.product_id)?.purchase_price ?? 0), 0)) }
   })
   const save = async () => {
-    const ok = await run((db) => convertLinesToPurchaseOrders(db, { lines: lines.map((l) => ({ sales_order_line_id: l.id })), order_date: date, warehouse_id: warehouse }), perSupplier.length === 1 ? tx("Inkooporder aangemaakt") : tx("{0} inkooporders aangemaakt", perSupplier.length))
+    const ok = await run((db) => convertLinesToPurchaseOrders(db, { lines: lines.map((l) => ({ sales_order_line_id: l.id })), order_date: date }), perSupplier.length === 1 ? tx("Inkooporder aangemaakt") : tx("{0} inkooporders aangemaakt", perSupplier.length))
     if (ok) onDone()
   }
   return (
@@ -129,7 +127,7 @@ function ConvertModal({ lines, onClose, onDone, run }: { lines: { id: string; qt
         <tbody>{perSupplier.map((x) => <tr key={x.id}><td className="strong">{x.name}</td><td className="num">{x.count}</td><td className="num">{eur(x.value)}</td></tr>)}</tbody>
       </table></div>
       <div className="form-grid">
-        <SelectField label={tx("Bestemming")} value={warehouse} onChange={setWarehouse} options={receivers.map((w) => ({ value: w.id, label: w.name }))} />
+        <div className="field"><span className="lbl">{tx("Bestemming")}</span><div style={{ minHeight: 38, display: 'flex', alignItems: 'center' }}>{inboundWarehouse(s.warehouses)?.name}</div></div>
         <TextField label={tx("Besteldatum")} type="date" value={date} onChange={setDate} />
       </div>
       <p className="small muted" style={{ margin: 0 }}>{tx("Koppel de regels aan een transport in stap 2 zodra de transportlijst bekend is.")}</p>

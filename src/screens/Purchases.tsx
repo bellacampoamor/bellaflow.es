@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { FileText, Plus, Trash2 } from 'lucide-react'
-import { linesToPurchase, round2, shipmentIsOpen, todayISO } from '../domain/calc'
-import { assignShipmentsToTransport, cancelPurchaseOrder, createPurchaseOrder, setPurchaseLabel, setShipmentWarehouse } from '../domain/services'
+import { inboundWarehouse, linesToPurchase, round2, shipmentDestination, shipmentIsOpen, todayISO } from '../domain/calc'
+import { assignShipmentsToTransport, cancelPurchaseOrder, createPurchaseOrder, setPurchaseLabel } from '../domain/services'
 import type { PurchaseLabel } from '../data/types'
 import { tx } from '../i18n'
 import { go, useApp } from '../ui/app-context'
@@ -119,11 +119,7 @@ export function PurchaseDetail({ id }: { id: string }) {
                       </select>
                     : t?.number ?? '–'}</td>
                   <td>{t ? fmtDate(x.expected_date) : <span className="muted">–</span>}</td>
-                  <td>{open
-                    ? <select aria-label={tx("Bestemming voor {0}", s.products.find((p) => p.id === l.product_id)?.name)} value={x.warehouse_id} onChange={(e) => run((db) => setShipmentWarehouse(db, x.id, e.target.value), tx("Bestemming aangepast"))}>
-                        {s.warehouses.filter((w) => w.is_active && w.receives_goods).map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
-                      </select>
-                    : <>{s.warehouses.find((w) => w.id === x.warehouse_id)?.name}{x.status === 'received' && <> <Pill tone="good">{tx("Ontvangen")}</Pill></>}</>}</td>
+                  <td>{shipmentDestination(s, x)}{x.status === 'received' && <> <Pill tone="good">{tx("Ontvangen")}</Pill></>}</td>
                 </tr>
               )
             })}</tbody>
@@ -147,7 +143,6 @@ let k = 1
 export function PurchaseForm({ orderId }: { orderId?: string } = {}) {
   const { s, run } = useApp()
   const suppliers = s.suppliers.filter((x) => x.is_active)
-  const receivers = s.warehouses.filter((w) => w.is_active && w.receives_goods)
   // Vanuit een verkooporder: wat nog ingekocht moet worden, per leverancier één inkooporder.
   const fromOrder = orderId ? linesToPurchase(s).filter((l) => l.sales_order_id === orderId) : []
   const productOf = (id: string) => s.products.find((p) => p.id === id)
@@ -157,8 +152,6 @@ export function PurchaseForm({ orderId }: { orderId?: string } = {}) {
   const [reference, setReference] = useState('')
   const [notes, setNotes] = useState('')
   const [label, setLabel] = useState<'showroom' | 'magazijn'>('magazijn')
-  const defaultFor = (l: 'showroom' | 'magazijn') => receivers.find((w) => (l === 'showroom' ? w.kind === 'winkel' : w.is_route_origin))?.id ?? receivers[0]?.id ?? ''
-  const [warehouse, setWarehouse] = useState(defaultFor('magazijn'))
   const [lines, setLines] = useState<PoLine[]>(() => fromOrder
     .filter((l) => !orderSupplier || productOf(l.product_id)?.supplier_id === orderSupplier)
     .map((l) => ({ key: k++, product_id: l.product_id, qty: l.qty, unit_cost: productOf(l.product_id)?.purchase_price ?? 0, sales_order_line_id: l.id })))
@@ -169,7 +162,7 @@ export function PurchaseForm({ orderId }: { orderId?: string } = {}) {
   const save = async () => {
     let id = ''
     const ok = await run(async (db) => {
-      id = await createPurchaseOrder(db, { supplier_id: supplier, order_date: orderDate, supplier_reference: reference, notes, warehouse_id: warehouse, label: isSale ? 'verkoop' : label, lines: lines.map(({ key: _k, ...l }) => l) })
+      id = await createPurchaseOrder(db, { supplier_id: supplier, order_date: orderDate, supplier_reference: reference, notes, label: isSale ? 'verkoop' : label, lines: lines.map(({ key: _k, ...l }) => l) })
     }, tx("Inkooporder aangemaakt"))
     if (ok) go(`inkoop-${id}`)
   }
@@ -185,8 +178,8 @@ export function PurchaseForm({ orderId }: { orderId?: string } = {}) {
             <TextField label={tx("Referentie leverancier")} value={reference} onChange={setReference} placeholder={tx("Ordernummer bij leverancier")} />
             {isSale
               ? <div className="field"><span className="lbl">{tx("Label")}</span><div style={{ minHeight: 38, display: 'flex', alignItems: 'center' }}><LabelPill label="verkoop" /></div></div>
-              : <SelectField label={tx("Label")} value={label} onChange={(v) => { setLabel(v); setWarehouse(defaultFor(v)) }} options={[{ value: 'magazijn', label: tx("Magazijn") }, { value: 'showroom', label: tx("Showroom") }]} />}
-            <SelectField className="span-2" label={tx("Bestemming")} value={warehouse} onChange={setWarehouse} options={receivers.map((w) => ({ value: w.id, label: w.name }))} hint={tx("Later per regel aan te passen.")} />
+              : <SelectField label={tx("Label")} value={label} onChange={setLabel} options={[{ value: 'magazijn', label: tx("Magazijn") }, { value: 'showroom', label: tx("Showroom") }]} />}
+            <div className="field span-2"><span className="lbl">{tx("Bestemming")}</span><div style={{ minHeight: 38, display: 'flex', alignItems: 'center' }}>{inboundWarehouse(s.warehouses)?.name}</div></div>
           </div>
         </section>
         <section className="panel">

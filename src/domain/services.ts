@@ -10,6 +10,7 @@ import type {
 import {
   addDays, depositAvailable, freeAt, linesToPurchase, invoicedDeliveryLineIds, lineTotal, onHandMap, orderLines, plannedQty, round2,
   shipmentLineOpen, shippedQty, stockKey, todayISO, vatBreakdown,
+  inboundWarehouse,
 } from './calc'
 
 export class FlowError extends Error {}
@@ -45,7 +46,7 @@ export async function saveSettings(db: Driver, patch: Partial<Settings>) {
 export interface PurchaseInput {
   supplier_id: string; order_date: string; supplier_reference: string; notes: string
   /** Bestemming en eventueel al bekend transport; per regel te overschrijven. */
-  warehouse_id: string; transport_id?: string | null; label?: PurchaseLabel
+  warehouse_id?: string; transport_id?: string | null; label?: PurchaseLabel
   lines: { product_id: string; qty: number; unit_cost: number; sales_order_line_id: string | null; warehouse_id?: string; transport_id?: string | null }[]
 }
 
@@ -53,11 +54,13 @@ export interface PurchaseInput {
 export async function createPurchaseOrder(db: Driver, input: PurchaseInput) {
   if (!input.supplier_id) fail(tx("Kies een leverancier."))
   if (!input.lines.length || input.lines.some((l) => !l.product_id || l.qty <= 0)) fail(tx("Voeg minimaal één regel toe met product en aantal."))
-  if (!input.warehouse_id) fail(tx("Kies een bestemming."))
+  const warehouses = await db.list('warehouses')
+  const warehouseId = input.warehouse_id ?? inboundWarehouse(warehouses)?.id
+  if (!warehouseId) fail(tx("Stel onder Beheer een actief magazijn in waar de route start."))
   const transports = await db.list('transports')
   const supplier = (await db.list('suppliers')).find((x) => x.id === input.supplier_id)
   // Regels voor een klant maken het altijd een verkoop-inkoop; anders volgt het label de keuze of de bestemming.
-  const destination = (await db.list('warehouses')).find((w) => w.id === input.warehouse_id)
+  const destination = warehouses.find((w) => w.id === warehouseId)
   const label: PurchaseLabel = input.lines.some((l) => l.sales_order_line_id) ? 'verkoop' : input.label ?? (destination?.kind === 'winkel' ? 'showroom' : 'magazijn')
   const id = newId()
   const number = await nextDocumentNumber(db, 'IO', 'prefix_purchase', yearOf(input.order_date))
@@ -70,7 +73,7 @@ export async function createPurchaseOrder(db: Driver, input: PurchaseInput) {
     const transport = transports.find((t) => t.id === (transport_id ?? input.transport_id))
     // Zonder transport is de datum alleen een interne schatting; het scherm toont hem pas na koppeling.
     const expected = transport?.arrival_date ?? addDays(input.order_date, supplier?.lead_time_days ?? 21)
-    await db.insert('inbound_shipments', [{ id: sid, purchase_order_id: id, sequence, expected_date: expected, original_date: expected, warehouse_id: warehouse_id ?? input.warehouse_id, carrier: transport?.carrier ?? '', status: 'expected', notes: '', transport_id: transport?.id ?? null }])
+    await db.insert('inbound_shipments', [{ id: sid, purchase_order_id: id, sequence, expected_date: expected, original_date: expected, warehouse_id: (warehouse_id ?? warehouseId)!, carrier: transport?.carrier ?? '', status: 'expected', notes: '', transport_id: transport?.id ?? null }])
     await db.insert('inbound_shipment_lines', [{ id: newId(), shipment_id: sid, purchase_order_line_id: polId, qty: line.qty }])
   }
   return id
@@ -87,13 +90,12 @@ export async function setPurchaseLabel(db: Driver, id: string, label: PurchaseLa
 
 export interface ConvertInput {
   lines: { sales_order_line_id: string }[]
-  order_date: string; warehouse_id: string
+  order_date: string
 }
 
 /** Zet aangevinkte regels van verkooporders door: per leverancier één inkooporder. */
 export async function convertLinesToPurchaseOrders(db: Driver, input: ConvertInput) {
   if (!input.lines.length) fail(tx("Vink minimaal één regel aan."))
-  if (!input.warehouse_id) fail(tx("Kies een bestemming."))
   const s = await loadSnapshot(db)
   const open = linesToPurchase(s)
   const rows = input.lines.map((l) => {
@@ -111,7 +113,6 @@ export async function convertLinesToPurchaseOrders(db: Driver, input: ConvertInp
       lines: rows.filter((r) => r.supplier_id === supplier_id).map(({ line }) => ({
         product_id: line.product_id, qty: line.qty, unit_cost: s.products.find((p) => p.id === line.product_id)?.purchase_price ?? 0, sales_order_line_id: line.id,
       })),
-      warehouse_id: input.warehouse_id,
     }))
   }
   return ids
@@ -187,24 +188,17 @@ export async function cancelTransport(db: Driver, id: string) {
   await db.update('transports', id, { status: 'cancelled' })
 }
 
-/** Bestemming van wat nog moet binnenkomen; ook achteraf aan te passen. */
-export async function setShipmentWarehouse(db: Driver, shipmentId: string, warehouseId: string) {
-  const s = await loadSnapshot(db)
-  const x = s.inbound_shipments.find((r) => r.id === shipmentId)
-  if (!x || (x.status !== 'expected' && x.status !== 'partial')) fail(tx("Deze regel is al ontvangen. Verhuis de goederen via Voorraad."))
-  await db.update('inbound_shipments', shipmentId, { warehouse_id: warehouseId })
-}
-
 // Goederenontvangst ------------------------------------------------------------
 
-export interface ReceiptRow { shipment_line_id: string; warehouse_id: string; qty_received: number; qty_damaged: number; location_bin: string }
+export interface ReceiptRow { shipment_line_id: string; warehouse_id?: string; qty_received: number; qty_damaged: number; location_bin: string }
 export interface ReceiptInput { transport_id?: string | null; received_date: string; delivery_note: string; received_by: string; notes: string; rows: ReceiptRow[] }
 
 export async function receiveGoods(db: Driver, input: ReceiptInput) {
   const s = await loadSnapshot(db)
-  const rows = input.rows.filter((r) => r.qty_received > 0 || r.qty_damaged > 0)
+  const standard = inboundWarehouse(s.warehouses)?.id
+  const rows = input.rows.filter((r) => r.qty_received > 0 || r.qty_damaged > 0).map((r) => ({ ...r, warehouse_id: r.warehouse_id ?? standard as string }))
   if (!rows.length) fail(tx("Vul bij minimaal één regel een ontvangen aantal in."))
-  if (rows.some((r) => !r.warehouse_id)) fail(tx("Kies per regel het magazijn waar de goederen binnenkomen."))
+  if (rows.some((r) => !r.warehouse_id)) fail(tx("Stel onder Beheer een actief magazijn in waar de route start."))
   const perLine = new Map<string, number>()
   for (const r of rows) perLine.set(r.shipment_line_id, (perLine.get(r.shipment_line_id) ?? 0) + r.qty_received)
   for (const [lineId, n] of perLine) {

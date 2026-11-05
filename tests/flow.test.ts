@@ -9,7 +9,7 @@ import { TABLES } from '../src/data/types'
 import { archiveRows, openLinesOnTransport, linePurchaseStatus, linesToPurchase, documentLanguage, flowCounts, freeAt, transportLoad, invoiceBalance, onHandMap, orderStage, orderTab, reservedMap, stockKey, vatBreakdown } from '../src/domain/calc'
 import { renameOldSuppliers, restoreSettings, restoreSuppliers, seedDemo } from '../src/domain/demo'
 import {
-  createDelivery, createInvoice, createOrder, createPurchaseOrder, invoiceProformas, lineFromProduct, markDelivered, assignShipmentsToTransport, cancelTransport, convertLinesToPurchaseOrders, createTransport, markReady, receiveGoods, rescheduleDelivery, rescheduleOrder, saveRouteOrder, saveSettings, mailSignedNote, setPurchaseLabel, signDelivery, splitLinesForStock, setDeliveryInTransit, setShipmentWarehouse, setTransportStatus, updateTransport, transferStock,
+  createDelivery, createInvoice, createOrder, createPurchaseOrder, invoiceProformas, lineFromProduct, markDelivered, assignShipmentsToTransport, cancelTransport, convertLinesToPurchaseOrders, createTransport, markReady, receiveGoods, rescheduleDelivery, rescheduleOrder, saveRouteOrder, saveSettings, mailSignedNote, setPurchaseLabel, signDelivery, splitLinesForStock, setDeliveryInTransit, setTransportStatus, updateTransport, transferStock,
 } from '../src/domain/services'
 import { estimateMatrix, parseRouterTable } from '../src/data/geo'
 import { dropIndex, googleMapsRouteUrl, moveItem, optimizeRoute, tourCost } from '../src/domain/route'
@@ -302,7 +302,7 @@ describe('doorzetten zonder leverancier op het artikel', () => {
     const s = await loadSnapshot(db)
     const [line] = linesToPurchase(s)
     await db.update('products', line.product_id, { supplier_id: null })
-    await expect(convertLinesToPurchaseOrders(db, { lines: [{ sales_order_line_id: line.id }], order_date: TODAY, warehouse_id: s.warehouses[1].id })).rejects.toThrow(/geen leverancier/)
+    await expect(convertLinesToPurchaseOrders(db, { lines: [{ sales_order_line_id: line.id }], order_date: TODAY })).rejects.toThrow(/geen leverancier/)
   })
 })
 
@@ -404,11 +404,19 @@ describe('transport en labels', () => {
     await expect(assignShipmentsToTransport(db, [shipment.id], null)).rejects.toThrow(/al vertrokken/)
     await expect(cancelTransport(db, transport)).rejects.toThrow(/al vertrokken/)
   })
-  it('bestemming wijzigt achteraf, ook na vertrek, en de ontvangst stelt die voor', async () => {
-    const { shipment, showroom, transport } = await setup()
-    await setTransportStatus(db, transport, 'departed')
-    await setShipmentWarehouse(db, shipment.id, showroom.id)
-    expect((await loadSnapshot(db)).inbound_shipments.find((x) => x.id === shipment.id)!.warehouse_id).toBe(showroom.id)
+  it('zonder keuze komt alle inkoop binnen op Magazijn Campoamor, ook de ontvangst', async () => {
+    const s = await loadSnapshot(db)
+    const campoamor = s.warehouses.find((w) => w.is_route_origin)!
+    expect(campoamor.name).toBe('Magazijn Campoamor')
+    const product = s.products[0]
+    const id = await createPurchaseOrder(db, { supplier_id: s.suppliers[0].id, order_date: TODAY, supplier_reference: '', notes: '', label: 'showroom', lines: [{ product_id: product.id, qty: 2, unit_cost: 1, sales_order_line_id: null }] })
+    const after = await loadSnapshot(db)
+    const shipment = after.inbound_shipments.find((x) => x.purchase_order_id === id)!
+    expect(shipment.warehouse_id).toBe(campoamor.id)
+    const line = after.inbound_shipment_lines.find((l) => l.shipment_id === shipment.id)!
+    await receiveGoods(db, { received_date: TODAY, delivery_note: '', received_by: '', notes: '', rows: [{ shipment_line_id: line.id, qty_received: 2, qty_damaged: 0, location_bin: '' }] })
+    const moves = (await loadSnapshot(db)).stock_movements.filter((m) => m.kind === 'ontvangst' && m.product_id === product.id && m.moved_at === TODAY)
+    expect(moves[moves.length - 1].warehouse_id).toBe(campoamor.id)
   })
   it('annuleren koppelt zendingen los', async () => {
     const { shipment, transport } = await setup()
@@ -490,7 +498,7 @@ describe('doorzetten naar inkoop', () => {
     const transport = s.transports.find((t) => t.status === 'planned')!
     const ids = await convertLinesToPurchaseOrders(db, {
       lines: queue.map((l) => ({ sales_order_line_id: l.id })),
-      order_date: TODAY, warehouse_id: s.warehouses[1].id,
+      order_date: TODAY,
     })
     expect(ids).toHaveLength(suppliersIn.size)
     const after = await loadSnapshot(db)
@@ -504,7 +512,7 @@ describe('doorzetten naar inkoop', () => {
     const linked = await loadSnapshot(db)
     expect(linked.inbound_shipments.find((x) => x.id === rows[0].id)).toMatchObject({ transport_id: transport.id, expected_date: transport.arrival_date })
     expect(linked.inbound_shipments.find((x) => x.id === rows[1].id)!.transport_id).toBeNull()
-    await expect(convertLinesToPurchaseOrders(db, { lines: [{ sales_order_line_id: queue[0].id }], order_date: TODAY, warehouse_id: s.warehouses[1].id })).rejects.toThrow(/al ingekocht/)
+    await expect(convertLinesToPurchaseOrders(db, { lines: [{ sales_order_line_id: queue[0].id }], order_date: TODAY })).rejects.toThrow(/al ingekocht/)
   })
 })
 

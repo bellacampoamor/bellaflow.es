@@ -1,6 +1,6 @@
 // Alles wat uit de gegevens afgeleid wordt: voorraad, orderstatus, bedragen. Geen opslag, geen UI.
 import type {
-  Delivery, DocumentLanguage, InboundShipment, Invoice, Language, SalesOrder, SalesOrderLine, Snapshot,
+  Delivery, DocumentLanguage, InboundShipment, Invoice, Language, SalesOrder, SalesOrderLine, Snapshot, Warehouse,
 } from '../data/types'
 
 export const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100
@@ -297,3 +297,10 @@ export function archiveRows(s: Snapshot): ArchiveRow[] {
 
 /** Artikelnummer van een product; leeg als het product niet bestaat. */
 export const articleNo = (s: Snapshot, productId: string | null | undefined) => s.products.find((p) => p.id === productId)?.sku ?? ''
+
+/** Voorlopig komt alle inkoop binnen op het magazijn waar de route start (Magazijn Campoamor). Verhuizen kan daarna via Voorraad. */
+export const inboundWarehouse = (warehouses: Warehouse[]) => warehouses.find((w) => w.is_route_origin && w.is_active && w.receives_goods)
+
+/** Waar een inkoopregel terechtkomt: nog open is altijd het vaste magazijn, ontvangen is waar hij is ingeboekt. */
+export const shipmentDestination = (s: Snapshot, x: InboundShipment) =>
+  (shipmentIsOpen(x) ? inboundWarehouse(s.warehouses) : s.warehouses.find((w) => w.id === x.warehouse_id))?.name ?? ''

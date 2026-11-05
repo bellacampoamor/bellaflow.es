@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { PackageCheck, Split, Trash2 } from 'lucide-react'
-import { articleNo, openLinesOnTransport, shipmentLineOpen, todayISO } from '../domain/calc'
+import { PackageCheck } from 'lucide-react'
+import { articleNo, inboundWarehouse, openLinesOnTransport, shipmentDestination, shipmentLineOpen, todayISO } from '../domain/calc'
 import { receiveGoods } from '../domain/services'
 import { tx } from '../i18n'
 import { go, useApp } from '../ui/app-context'
@@ -29,7 +29,7 @@ function SignalList({ transportId }: { transportId: string }) {
     const so = sol && s.sales_orders.find((o) => o.id === sol.sales_order_id)
     return {
       id: l.id, qty: l.qty, po: s.purchase_orders.find((p) => p.id === pol.purchase_order_id)!, product: s.products.find((p) => p.id === pol.product_id)?.name, sku: articleNo(s, pol.product_id),
-      sol, so, customer: so && s.customers.find((c) => c.id === so.customer_id), destination: s.warehouses.find((w) => w.id === x.warehouse_id)?.name, status: x.status,
+      sol, so, customer: so && s.customers.find((c) => c.id === so.customer_id), destination: shipmentDestination(s, x), status: x.status,
     }
   })).sort((a, b) => a.po.number.localeCompare(b.po.number))
   const sold = lines.filter((l) => l.so).length
@@ -110,7 +110,7 @@ export function Receipts() {
   )
 }
 
-interface Row { key: number; shipment_line_id: string; warehouse_id: string; qty_received: number; qty_damaged: number; location_bin: string }
+interface Row { key: number; shipment_line_id: string; qty_received: number; qty_damaged: number; location_bin: string }
 let k = 1
 
 export function ReceiptForm({ transportId }: { transportId: string }) {
@@ -118,23 +118,17 @@ export function ReceiptForm({ transportId }: { transportId: string }) {
   const transport = s.transports.find((t) => t.id === transportId)
   const [notes, setNotes] = useState('')
   const [rows, setRows] = useState<Row[]>(() => openLinesOnTransport(s, transportId).map((l) => ({
-    key: k++, shipment_line_id: l.id, warehouse_id: s.inbound_shipments.find((x) => x.id === l.shipment_id)?.warehouse_id ?? '', qty_received: shipmentLineOpen(s, l.id), qty_damaged: 0, location_bin: '',
+    key: k++, shipment_line_id: l.id, qty_received: shipmentLineOpen(s, l.id), qty_damaged: 0, location_bin: '',
   })))
   if (!transport) return <div className="panel">{tx("Transport niet gevonden.")} <a href="#ontvangst">{tx("Terug naar ontvangst")}</a>.</div>
-  const warehouses = s.warehouses.filter((w) => w.is_active && w.receives_goods)
+  const standard = inboundWarehouse(s.warehouses)?.name
   const lineInfo = (lineId: string) => {
     const sl = s.inbound_shipment_lines.find((l) => l.id === lineId)!
     const pol = s.purchase_order_lines.find((l) => l.id === sl.purchase_order_line_id)!
     return { p: s.products.find((y) => y.id === pol.product_id)!, pol, po: s.purchase_orders.find((x) => x.id === pol.purchase_order_id)! }
   }
   const patch = (key: number, p: Partial<Row>) => setRows((v) => v.map((r) => r.key === key ? { ...r, ...p } : r))
-  const split = (r: Row) => {
-    const other = warehouses.find((w) => w.id !== r.warehouse_id)?.id ?? r.warehouse_id
-    const half = Math.floor(r.qty_received / 2)
-    setRows((v) => v.flatMap((y) => y.key === r.key ? [{ ...y, qty_received: r.qty_received - half }, { key: k++, shipment_line_id: r.shipment_line_id, warehouse_id: other, qty_received: half, qty_damaged: 0, location_bin: '' }] : [y]))
-  }
-  const totals = new Map<string, number>()
-  for (const r of rows) totals.set(r.warehouse_id, (totals.get(r.warehouse_id) ?? 0) + r.qty_received)
+  const total = rows.reduce((n, r) => n + r.qty_received, 0)
   const received = new Map<string, number>()
   for (const r of rows) received.set(r.shipment_line_id, (received.get(r.shipment_line_id) ?? 0) + r.qty_received)
   const missing = [...received].reduce((n, [id, got]) => n + Math.max(0, shipmentLineOpen(s, id) - got), 0)
@@ -152,29 +146,24 @@ export function ReceiptForm({ transportId }: { transportId: string }) {
           <h2>{tx("Goederenontvangst")}</h2>
           <p className="muted small" style={{ marginTop: -6 }}>{tx("Vul per regel in wat er daadwerkelijk is ontvangen. Wat ontbreekt blijft open staan.")}</p>
           <div className="table-wrap"><table>
-            <thead><tr><th style={{ minWidth: 200 }}>{tx("Product")}</th><th>{tx("Inkooporder")}</th><th className="num">{tx("Besteld")}</th><th style={{ minWidth: 190 }}>{tx("Locatie")}</th><th>{tx("Ontvangen/Geteld")}</th><th></th></tr></thead>
-            <tbody>{rows.map((r, i) => {
+            <thead><tr><th style={{ minWidth: 200 }}>{tx("Product")}</th><th>{tx("Inkooporder")}</th><th className="num">{tx("Besteld")}</th><th style={{ minWidth: 190 }}>{tx("Locatie")}</th><th>{tx("Ontvangen/Geteld")}</th></tr></thead>
+            <tbody>{rows.map((r) => {
               const { p, pol, po } = lineInfo(r.shipment_line_id)
-              const first = rows.findIndex((y) => y.shipment_line_id === r.shipment_line_id) === i
               const sol = pol.sales_order_line_id && s.sales_order_lines.find((l) => l.id === pol.sales_order_line_id)
               const so = sol && s.sales_orders.find((o) => o.id === sol.sales_order_id)
               return (
                 <tr key={r.key}>
-                  <td>{first ? <><span className="strong">{p.name}</span><Sku code={p.sku} />{so && <div className="small"><Pill tone="sell">{tx("Voor {0}", so.number)}</Pill></div>}</> : <span className="muted small">{tx("zelfde product")}</span>}</td>
-                  <td className="muted">{first ? po.number : ''}</td>
-                  <td className="num">{first ? shipmentLineOpen(s, r.shipment_line_id) : ''}</td>
-                  <td><select aria-label={tx("Magazijn voor {0}", p.name)} value={r.warehouse_id} onChange={(e) => patch(r.key, { warehouse_id: e.target.value })}>{warehouses.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}</select></td>
+                  <td><span className="strong">{p.name}</span><Sku code={p.sku} />{so && <div className="small"><Pill tone="sell">{tx("Voor {0}", so.number)}</Pill></div>}</td>
+                  <td className="muted">{po.number}</td>
+                  <td className="num">{shipmentLineOpen(s, r.shipment_line_id)}</td>
+                  <td>{standard}</td>
                   <td><input className="qty" aria-label={tx("Ontvangen/Geteld {0}", p.name)} type="number" min={0} value={r.qty_received} onChange={(e) => patch(r.key, { qty_received: Number(e.target.value) })} /></td>
-                  <td style={{ whiteSpace: 'nowrap' }}>
-                    <button className="btn sm" onClick={() => split(r)}><Split size={14} />{tx("Verdelen")}</button>
-                    {!first && <button className="btn icon" aria-label={tx("Rij verwijderen")} onClick={() => setRows((v) => v.filter((y) => y.key !== r.key))}><Trash2 size={16} /></button>}
-                  </td>
                 </tr>
               )
             })}</tbody>
           </table></div>
           <div className="note" style={{ marginTop: 14 }}>
-            {tx("Wordt ingeboekt:")} {[...totals].filter(([, n]) => n > 0).map(([w, n]) => tx("{0} op {1}", n, s.warehouses.find((y) => y.id === w)?.name)).join(', ') || tx("nog niets")}.
+            {tx("Wordt ingeboekt:")} {total > 0 ? tx("{0} op {1}", total, standard) : tx("nog niets")}.
             {missing > 0 && tx(" {0} stuks niet ontvangen, die blijven open staan.", missing)}
           </div>
         </section>

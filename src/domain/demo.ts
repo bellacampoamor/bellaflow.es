@@ -5,7 +5,7 @@ import type { Customer, Product, Salesperson, Settings, Supplier, Warehouse } fr
 import { addDays, openLinesOnTransport, todayISO } from './calc'
 import {
   closeShipment, createDelivery, createInvoice, createTransport, createOrder, createPurchaseOrder, lineFromProduct, markDelivered, markNotePrinted, markReady, payInvoice,
-  receiveGoods, rescheduleOrder, setTransportStatus, type OrderHeader, type OrderLineInput,
+  receiveGoods, rescheduleOrder, setTransportStatus, transferStock, type OrderHeader, type OrderLineInput,
 } from './services'
 import { loadSnapshot } from '../data/driver'
 
@@ -110,46 +110,44 @@ export async function seedDemo(db: Driver, today = todayISO()) {
   const po0 = await createPurchaseOrder(db, {
     supplier_id: lounge.id, order_date: d(-48), supplier_reference: 'NZ-88120', notes: 'Eerste voorjaarslevering',
     lines: lines.map((l) => ({ product_id: l.p.id, qty: l.qty, unit_cost: l.p.purchase_price, sales_order_line_id: null })),
-    warehouse_id: north.id, transport_id: trFirst,
+    transport_id: trFirst,
   })
   let s = await loadSnapshot(db)
   const linesOn = (transport: string) => openLinesOnTransport(s, transport)
   const pOf = (lid: string) => s.purchase_order_lines.find((l) => l.id === s.inbound_shipment_lines.find((i) => i.id === lid)!.purchase_order_line_id)!.product_id
   await receiveGoods(db, {
     transport_id: trFirst, received_date: d(-34), delivery_note: 'PB-44871', received_by: 'Magazijn', notes: '',
-    rows: linesOn(trFirst).flatMap((l) => {
-      const showroom = Math.min(2, Math.floor(l.qty / 3))
-      return [
-        { shipment_line_id: l.id, warehouse_id: north.id, qty_received: l.qty - showroom, qty_damaged: 0, location_bin: 'A-12' },
-        { shipment_line_id: l.id, warehouse_id: shop.id, qty_received: showroom, qty_damaged: 0, location_bin: 'Toonzaal' },
-      ]
-    }),
+    rows: linesOn(trFirst).map((l) => ({ shipment_line_id: l.id, qty_received: l.qty, qty_damaged: 0, location_bin: '' })),
   })
+  // Alles komt binnen op Magazijn Campoamor en wordt daarna verhuisd.
+  for (const l of lines) {
+    const qty = Math.min(2, Math.floor(l.qty / 3))
+    if (qty) await transferStock(db, { product_id: l.p.id, from_id: north.id, to_id: shop.id, qty, note: 'Naar de showroom', date: d(-34) })
+  }
 
-  // Eén inkooporder waarvan de regels op verschillende transporten staan, en ontvangst over twee magazijnen.
+  // Eén inkooporder waarvan de regels op verschillende transporten staan.
   await createPurchaseOrder(db, {
-    supplier_id: oak.id, order_date: d(-26), supplier_reference: 'EH-2291', notes: '', warehouse_id: north.id,
+    supplier_id: oak.id, order_date: d(-26), supplier_reference: 'EH-2291', notes: '',
     lines: [
       { product_id: table.id, qty: 2, unit_cost: table.purchase_price, sales_order_line_id: null, transport_id: trSecond },
       { product_id: dining.id, qty: 12, unit_cost: dining.purchase_price, sales_order_line_id: null, transport_id: trSecond },
       { product_id: cabinet.id, qty: 2, unit_cost: cabinet.purchase_price, sales_order_line_id: null, transport_id: trSecond },
-      { product_id: table.id, qty: 2, unit_cost: table.purchase_price, sales_order_line_id: null, transport_id: trNext, warehouse_id: south.id },
-      { product_id: dining.id, qty: 12, unit_cost: dining.purchase_price, sales_order_line_id: null, transport_id: trNext, warehouse_id: south.id },
-      { product_id: cabinet.id, qty: 2, unit_cost: cabinet.purchase_price, sales_order_line_id: null, transport_id: trNext, warehouse_id: south.id },
+      { product_id: table.id, qty: 2, unit_cost: table.purchase_price, sales_order_line_id: null, transport_id: trNext },
+      { product_id: dining.id, qty: 12, unit_cost: dining.purchase_price, sales_order_line_id: null, transport_id: trNext },
+      { product_id: cabinet.id, qty: 2, unit_cost: cabinet.purchase_price, sales_order_line_id: null, transport_id: trNext },
     ],
   })
   s = await loadSnapshot(db)
+  const secondLines = linesOn(trSecond).map((l) => ({ line: l, product: pOf(l.id) }))
   await receiveGoods(db, {
     transport_id: trSecond, received_date: d(-8), delivery_note: 'PB-45102', received_by: 'Magazijn', notes: 'Eén stoel niet ontvangen, gemeld bij leverancier',
-    rows: linesOn(trSecond).flatMap((l) => {
-      const isChair = pOf(l.id) === dining.id
-      const good = isChair ? l.qty - 1 : l.qty
-      return [
-        { shipment_line_id: l.id, warehouse_id: north.id, qty_received: Math.ceil(good / 2), qty_damaged: 0, location_bin: 'B-03' },
-        { shipment_line_id: l.id, warehouse_id: south.id, qty_received: Math.floor(good / 2), qty_damaged: 0, location_bin: 'C-01' },
-      ]
-    }),
+    rows: secondLines.map(({ line: l, product }) => ({ shipment_line_id: l.id, qty_received: product === dining.id ? l.qty - 1 : l.qty, qty_damaged: 0, location_bin: '' })),
   })
+  for (const { line: l, product } of secondLines) {
+    const good = product === dining.id ? l.qty - 1 : l.qty
+    const qty = Math.floor(good / 2)
+    if (qty) await transferStock(db, { product_id: product, from_id: north.id, to_id: south.id, qty, note: 'Naar Almoradí', date: d(-8) })
+  }
   s = await loadSnapshot(db)
   for (const x of s.inbound_shipments.filter((y) => y.transport_id === trSecond && y.status === 'partial')) await closeShipment(db, x.id, 'Gecrediteerd door leverancier')
 
@@ -237,7 +235,7 @@ export async function seedDemo(db: Driver, today = todayISO()) {
       { product_id: sofa.id, qty: 1, unit_cost: 940, sales_order_line_id: o5l.id },
       { product_id: chair.id, qty: 6, unit_cost: chair.purchase_price, sales_order_line_id: null },
     ],
-    warehouse_id: shop.id, transport_id: trLate,
+    transport_id: trLate,
   })
 
   // De verkoop van vandaag: regels die nog doorgezet moeten worden naar inkoop, bij twee leveranciers.
@@ -254,12 +252,11 @@ export async function seedDemo(db: Driver, today = todayISO()) {
   await createPurchaseOrder(db, {
     supplier_id: lounge.id, order_date: d(-2), supplier_reference: 'NZ-88402', notes: 'Showroom aanvullen',
     lines: [{ product_id: parasol.id, qty: 6, unit_cost: parasol.purchase_price, sales_order_line_id: null }, { product_id: bed.id, qty: 10, unit_cost: bed.purchase_price, sales_order_line_id: null }],
-    warehouse_id: shop.id, transport_id: trNext,
+    label: 'showroom', transport_id: trNext,
   })
   await createPurchaseOrder(db, {
     supplier_id: oak.id, order_date: today, supplier_reference: 'EH-2340', notes: '',
     lines: [{ product_id: dining.id, qty: 8, unit_cost: dining.purchase_price, sales_order_line_id: null }],
-    warehouse_id: south.id,
   })
   await setTransportStatus(db, trLate, 'departed')
 }

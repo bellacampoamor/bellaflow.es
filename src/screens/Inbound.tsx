@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import { Plus, Truck } from 'lucide-react'
 import type { InboundShipment, Snapshot, Transport } from '../data/types'
-import { addDays, ordersAffectedByShipment, shipmentIsOpen, shipmentLoad, todayISO, transportLoad } from '../domain/calc'
-import { assignShipmentsToTransport, cancelTransport, closeShipment, createTransport, setShipmentWarehouse, setTransportStatus, updateTransport, type TransportInput } from '../domain/services'
+import { addDays, ordersAffectedByShipment, shipmentDestination, shipmentIsOpen, shipmentLoad, todayISO, transportLoad } from '../domain/calc'
+import { assignShipmentsToTransport, cancelTransport, closeShipment, createTransport, setTransportStatus, updateTransport, type TransportInput } from '../domain/services'
 import { tx } from '../i18n'
 import { useApp } from '../ui/app-context'
 import { AreaField, Empty, fmtDate, fmtShort, Head, Modal, NumberField, Pill, Sku, Tabs, TextField, type Tone } from '../ui/kit'
@@ -50,7 +50,6 @@ export function Inbound() {
   const done = s.transports.filter((t) => t.status === 'arrived').sort((a, b) => b.arrival_date.localeCompare(a.arrival_date))
   const planned = active.filter((t) => t.status === 'planned')
   const unassigned = s.inbound_shipments.filter((x) => shipmentIsOpen(x) && !x.transport_id)
-  const receivers = s.warehouses.filter((w) => w.is_active && w.receives_goods)
   const chosenTarget = target || planned[0]?.id || ''
   const pickedIds = unassigned.filter((x) => picked.has(x.id)).map((x) => x.id)
 
@@ -59,11 +58,6 @@ export function Inbound() {
     const dep = last && last.departure_date >= today ? addDays(last.departure_date, 7) : addDays(today, 7)
     setEdit({ departure_date: dep, arrival_date: addDays(dep, 3), carrier: last?.carrier ?? '', reference: '', capacity_m3: last?.capacity_m3 ?? DEFAULT_CAPACITY, notes: '' })
   }
-  const destination = (x: InboundShipment, label: string) => (
-    <select aria-label={label} value={x.warehouse_id} onChange={(e) => run((db) => setShipmentWarehouse(db, x.id, e.target.value), tx("Bestemming aangepast"))}>
-      {receivers.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
-    </select>
-  )
 
   return (
     <>
@@ -86,7 +80,7 @@ export function Inbound() {
                     <td><input type="checkbox" aria-label={tx("{0} aanvinken", i.product?.name)} checked={picked.has(x.id)} onChange={(e) => setPicked((v) => { const n = new Set(v); if (e.target.checked) n.add(x.id); else n.delete(x.id); return n })} /></td>
                     <td><a className="rowlink" href={`#inkoop-${i.po.id}`}>{i.po.number}</a></td><td>{i.supplier}</td><td className="strong">{i.product?.name}<Sku code={i.product?.sku} /></td><td className="num">{i.qty}</td><td className="num">{round1(shipmentLoad(s, x.id).m3)}</td>
                     <td>{i.salesOrder ? <a className="rowlink" href={`#orders-${i.salesOrder.id}`}>{i.salesOrder.number}</a> : <LabelPill label={i.po.label} />}</td>
-                    <td>{destination(x, tx("Bestemming voor {0}", i.product?.name))}</td>
+                    <td>{shipmentDestination(s, x)}</td>
                   </tr>
                 )
               })}</tbody>
@@ -110,7 +104,6 @@ export function Inbound() {
           const [label, tone] = TRANSPORT_STATE[t.status]
           const late = t.status === 'departed' && t.arrival_date < today && lines.some(shipmentIsOpen)
           const missed = t.status === 'planned' && t.departure_date < today
-          const perWarehouse = receivers.map((w) => ({ w, m3: lines.filter((x) => x.warehouse_id === w.id).reduce((n, x) => n + shipmentLoad(s, x.id).m3, 0) })).filter((r) => r.m3 > 0)
           return (
             <section className="panel" key={t.id}>
               <div className="panel-head">
@@ -127,7 +120,7 @@ export function Inbound() {
               </div>
               <div className="load-row">
                 <FillBar used={load.m3} capacity={t.capacity_m3} />
-                <div className="small muted">{tx("{0} colli, {1} kg", load.colli, Math.round(load.kg))}{perWarehouse.length > 0 && <>. {perWarehouse.map((r) => tx("{0} m³ naar {1}", round1(r.m3), r.w.name)).join(', ')}</>}</div>
+                <div className="small muted">{tx("{0} colli, {1} kg", load.colli, Math.round(load.kg))}</div>
               </div>
               {lines.length === 0 && <Empty>{tx("Nog leeg. Koppel hierboven de inkoopregels.")}</Empty>}
               {lines.length > 0 && <div className="table-wrap"><table>
@@ -139,7 +132,7 @@ export function Inbound() {
                     <tr key={x.id}>
                       <td><a className="rowlink" href={`#inkoop-${i.po.id}`}>{i.po.number}</a></td><td>{i.supplier}</td><td className="strong">{i.product?.name}<Sku code={i.product?.sku} /></td><td className="num">{i.qty}</td><td className="num">{round1(shipmentLoad(s, x.id).m3)}</td>
                       <td>{i.salesOrder ? <a className="rowlink" href={`#orders-${i.salesOrder.id}`}>{i.salesOrder.number}</a> : <LabelPill label={i.po.label} />}</td>
-                      <td>{isOpen ? destination(x, tx("Bestemming voor {0}", i.product?.name)) : <>{s.warehouses.find((w) => w.id === x.warehouse_id)?.name} <Pill tone="good">{tx("Ontvangen")}</Pill></>}</td>
+                      <td>{shipmentDestination(s, x)}{!isOpen && <> <Pill tone="good">{tx("Ontvangen")}</Pill></>}</td>
                       <td className="num">
                         {t.status === 'planned' && <button className="btn sm" onClick={() => run((db) => assignShipmentsToTransport(db, [x.id], null), tx("Regel losgekoppeld"))}>{tx("Loskoppelen")}</button>}
                         {x.status === 'partial' && <button className="btn sm" onClick={() => { setClose(x); setReason('') }}>{tx("Rest afsluiten")}</button>}
