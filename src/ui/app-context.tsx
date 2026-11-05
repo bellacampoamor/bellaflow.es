@@ -63,15 +63,15 @@ export function AppProvider({ db, children, fallback }: { db: Driver; children: 
   )
 }
 
-/** Opent na het tonen van het document meteen het afdrukvenster en keert daarna terug naar het archief. */
-export function useAutoPrint(enabled: boolean, ready: boolean) {
+/** Opent na het tonen van het document meteen het afdrukvenster en keert daarna terug. */
+export function useAutoPrint(enabled: boolean, ready: boolean, backTo = 'archief') {
   useEffect(() => {
     if (!enabled || !ready) return
-    const back = () => go('archief')
+    const back = () => go(backTo)
     window.addEventListener('afterprint', back)
     const timer = window.setTimeout(() => window.print(), 150)
     return () => { window.clearTimeout(timer); window.removeEventListener('afterprint', back) }
-  }, [enabled, ready])
+  }, [enabled, ready, backTo])
 }
 
 export function useHash() {

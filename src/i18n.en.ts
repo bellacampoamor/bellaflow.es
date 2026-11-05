@@ -32,6 +32,7 @@ export const en: Record<string, string> = {
   "Afdrukken of PDF": "Print or PDF",
   "Afgedrukt": "Printed",
   "Afgerond": "Completed",
+  "Verkooporder {0} afdrukken als PDF": "Print sales order {0} as PDF",
   "Klik op een regel om die te selecteren. De driehoek klapt een verkooporder open of dicht. Per leverancier ontstaat één inkooporder.": "Click a row to select it. The triangle opens or closes a sales order. One purchase order is created per supplier.",
   "Niets selecteren": "Select none",
   "Alles selecteren": "Select all",

@@ -33,9 +33,10 @@ export function Orders() {
         </div>
         {shown.length === 0 && <Empty>{tx("Geen verkooporders in dit overzicht.")}</Empty>}
         {shown.length > 0 && <div className="table-wrap"><table>
-          <thead><tr><th>{tx("Verkooporder")}</th><th>{tx("Datum")}</th><th>{tx("Klant")}</th><th>{tx("Soort")}</th><th>{tx("Leverdatum")}</th><th className="num">{tx("Totaal")}</th><th className="num">{tx("Nog te betalen")}</th><th>{tx("Status")}</th></tr></thead>
+          <thead><tr><th aria-label="PDF" /><th>{tx("Verkooporder")}</th><th>{tx("Datum")}</th><th>{tx("Klant")}</th><th>{tx("Soort")}</th><th>{tx("Leverdatum")}</th><th className="num">{tx("Totaal")}</th><th className="num">{tx("Nog te betalen")}</th><th>{tx("Status")}</th></tr></thead>
           <tbody>{shown.map(({ o, stage, cust }) => (
             <tr key={o.id} className="click" onClick={() => go(`orders-${o.id}`)}>
+              <td><a className="pdf-ic" href={`#orders-print-${o.id}`} title={tx("Verkooporder {0} afdrukken als PDF", o.number)} aria-label={tx("Verkooporder {0} afdrukken als PDF", o.number)} onClick={(e) => e.stopPropagation()}><FileText size={18} /><span>PDF</span></a></td>
               <td><a className="rowlink" href={`#orders-${o.id}`}>{o.number}</a></td>
               <td>{fmtDate(o.order_date)}</td>
               <td>{cust?.company || cust?.name}<div className="muted small">{tx(o.channel[0].toUpperCase() + o.channel.slice(1))}</div></td>

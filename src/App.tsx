@@ -15,25 +15,26 @@ import { InvoiceDetail, Invoices } from './screens/Invoices'
 import { Stock } from './screens/Stock'
 import { Admin } from './screens/Admin'
 import { Driver } from './screens/Driver'
+import { SalesOrderDocument } from './screens/SalesOrderDocument'
 import { Archive as ArchiveScreen } from './screens/Archive'
 import { getLanguage, setLanguage, tx } from './i18n'
 
 // Twee gescheiden processen, elk met eigen menu-optie en eigen stappen.
 const FLOWS = {
-  inkoop: {
-    label: 'Inkoop', icon: ShoppingCart, home: 'inkoop',
-    steps: [
-      { key: 'inkoop', label: '1. Inkooporders', sub: (n: number) => tx("{0} door te zetten", n), icon: ShoppingCart, tint: '' },
-      { key: 'inkomend', label: '2. Gepland transport', sub: (n: number) => (n ? tx("{0} te laat", n) : tx("op schema")), icon: Truck, tint: '' },
-      { key: 'ontvangst', label: '3. Ontvangst', sub: (n: number) => tx("{0} binnen 7 dagen", n), icon: PackageCheck, tint: '' },
-    ],
-  },
   verkoop: {
     label: 'Verkoop', icon: Store, home: 'orders',
     steps: [
       { key: 'orders', label: '4. Verkooporders', sub: (n: number) => tx("{0} te plannen", n), icon: ClipboardList, tint: 'sell' },
       { key: 'levering', label: '5. Levering', sub: (n: number) => tx("{0} vandaag", n), icon: Truck, tint: 'ship' },
       { key: 'facturatie', label: '6. Facturatie', sub: (n: number) => tx("{0} te factureren", n), icon: FileText, tint: 'bill' },
+    ],
+  },
+  inkoop: {
+    label: 'Inkoop', icon: ShoppingCart, home: 'inkoop',
+    steps: [
+      { key: 'inkoop', label: '1. Inkooporders', sub: (n: number) => tx("{0} door te zetten", n), icon: ShoppingCart, tint: '' },
+      { key: 'inkomend', label: '2. Gepland transport', sub: (n: number) => (n ? tx("{0} te laat", n) : tx("op schema")), icon: Truck, tint: '' },
+      { key: 'ontvangst', label: '3. Ontvangst', sub: (n: number) => tx("{0} binnen 7 dagen", n), icon: PackageCheck, tint: '' },
     ],
   },
 } as const
@@ -153,6 +154,7 @@ function Route({ screen, param }: { screen: string; param: string }) {
     case 'ontvangst': return param ? <ReceiptForm key={param} transportId={param} /> : <Receipts />
     case 'orders':
       if (param === 'nieuw') return <OrderForm />
+      if (param.startsWith('print-')) return <SalesOrderDocument key={param} id={param.slice(6)} />
       if (param.startsWith('wijzig-')) return <OrderForm id={param.slice(7)} />
       return param ? <OrderDetail id={param} /> : <Orders />
     case 'levering': return param.startsWith('print-') ? <DeliveryNote key={param} id={param.slice(6)} autoPrint /> : param.startsWith('archief-') ? <DeliveryNote key={param} id={param.slice(8)} fromArchive /> : param ? <DeliveryNote key={param} id={param} /> : <Deliveries />

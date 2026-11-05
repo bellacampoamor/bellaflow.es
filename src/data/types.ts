@@ -5,7 +5,7 @@ export interface Settings {
   province: string; phone: string; email: string; iban: string
   payment_days: number; invoice_footer: string
   prefix_sales_order: string; prefix_purchase: string; prefix_receipt: string; prefix_delivery: string; prefix_invoice: string; prefix_transport: string; prefix_proforma: string
-  delivery_note_mode: 'papier' | 'digitaal'; shop_email: string; language_delivery_note: DocumentLanguage; language_invoice: DocumentLanguage
+  delivery_note_mode: 'papier' | 'digitaal'; shop_email: string; language_sales_order: DocumentLanguage; language_delivery_note: DocumentLanguage; language_invoice: DocumentLanguage
 }
 export interface Warehouse {
   id: string; code: string; name: string; kind: 'winkel' | 'magazijn' | 'extern'
