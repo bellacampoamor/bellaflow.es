@@ -68,8 +68,10 @@ export function Admin() {
         <tbody>{s.salespeople.map((x) => <tr key={x.id} className="click" onClick={() => setSe(x)}><td className="strong">{x.name}</td><td className="muted">{x.email || '–'}</td><td className="muted">{x.phone || '–'}</td><td>{x.is_active ? <Pill tone="good">{tx("Actief")}</Pill> : <Pill>{tx("Inactief")}</Pill>}</td></tr>)}</tbody>
       </table></div></section>}
 
-      {tab === 'bedrijf' && <section className="panel">
-        <h2>{tx("Bedrijf en factuur")}</h2>
+      {tab === 'bedrijf' && <div className="stack">
+        <div className="cols-even same-height">
+        <section className="panel section">
+        <h2>{tx("Bedrijfsgegevens")}</h2>
         <div className="form-grid">
           <TextField className="span-2" label={tx("Bedrijfsnaam")} value={co.company_name} onChange={(v) => setCo({ ...co, company_name: v })} />
           <TextField label={tx("CIF")} value={co.tax_id} onChange={(v) => setCo({ ...co, tax_id: v })} />
@@ -79,33 +81,48 @@ export function Admin() {
           <TextField label={tx("Provincie")} value={co.province} onChange={(v) => setCo({ ...co, province: v })} />
           <TextField label={tx("Telefoon")} value={co.phone} onChange={(v) => setCo({ ...co, phone: v })} />
           <TextField label={tx("E-mail")} value={co.email} onChange={(v) => setCo({ ...co, email: v })} />
+        </div>
+        </section>
+        <section className="panel section">
+        <h2>{tx("Factuur")}</h2>
+        <div className="form-grid">
           <TextField className="span-2" label={tx("IBAN")} value={co.iban} onChange={(v) => setCo({ ...co, iban: v })} />
           <NumberField label={tx("Betaaltermijn (dagen)")} value={co.payment_days} min={0} step="1" onChange={(v) => setCo({ ...co, payment_days: v })} />
           <AreaField className="span-all" label={tx("Tekst onderaan de factuur")} value={co.invoice_footer} onChange={(v) => setCo({ ...co, invoice_footer: v })} />
         </div>
-        <h2 style={{ margin: '22px 0 4px' }}>{tx("Afleverbon")}</h2>
-        <p className="small muted" style={{ margin: '0 0 12px' }}>{tx("Bij Digitaal tekent de klant in de chauffeursapp en wordt de bezorging daarmee afgemeld. Dit geldt voor het eigen bezorgteam; bij een vervoerder blijft de bon op papier.")}</p>
+        </section>
+        </div>
+        <div className="cols-even same-height">
+        <section className="panel section">
+        <h2>{tx("Afleverbon")}</h2>
+        <p className="small muted">{tx("Bij Digitaal tekent de klant in de chauffeursapp en wordt de bezorging daarmee afgemeld. Dit geldt voor het eigen bezorgteam; bij een vervoerder blijft de bon op papier.")}</p>
         <div className="form-grid">
           <SelectField label={tx("Soort afleverbon")} value={co.delivery_note_mode ?? 'papier'} onChange={(v: Settings['delivery_note_mode']) => setCo({ ...co, delivery_note_mode: v })} options={[{ value: 'papier', label: tx("Papier, geprint") }, { value: 'digitaal', label: tx("Digitaal, in de chauffeursapp") }]} />
           <TextField label={tx("Winkel e-mail")} type="email" value={co.shop_email ?? ''} onChange={(v) => setCo({ ...co, shop_email: v })} hint={tx("Krijgt een bcc van elke digitaal getekende afleverbon.")} />
         </div>
-        <h2 style={{ margin: '22px 0 4px' }}>{tx("Taal van documenten")}</h2>
-        <p className="small muted" style={{ margin: '0 0 12px' }}>{tx("Kies per document in welke taal het wordt afgedrukt. Productnamen blijven zoals ze zijn ingevoerd.")}</p>
+        </section>
+        <section className="panel section">
+        <h2>{tx("Taal van documenten")}</h2>
+        <p className="small muted">{tx("Kies per document in welke taal het wordt afgedrukt. Productnamen blijven zoals ze zijn ingevoerd.")}</p>
         <div className="form-grid">
           <SelectField label={tx("Inkooporder")} value={co.language_purchase_order ?? 'nl'} onChange={(v: Language) => setCo({ ...co, language_purchase_order: v })} options={[{ value: 'nl', label: tx("Nederlands") }, { value: 'en', label: tx("Engels") }, { value: 'es', label: tx("Spaans") }]} />
           {([['language_sales_order', tx("Verkooporder")], ['language_delivery_note', tx("Afleverbon")], ['language_invoice', tx("Factuur")]] as const).map(([field, label]) => (
             <SelectField key={field} label={label} value={co[field] ?? 'klant'} onChange={(v: DocumentLanguage) => setCo({ ...co, [field]: v })} options={[{ value: 'klant', label: tx("Taal van de klant") }, { value: 'es', label: tx("Spaans") }, { value: 'en', label: tx("Engels") }, { value: 'nl', label: tx("Nederlands") }]} />
           ))}
         </div>
-        <h2 style={{ margin: '22px 0 4px' }}>{tx("Documentnummers")}</h2>
-        <p className="small muted" style={{ margin: '0 0 12px' }}>{tx("Nummers bestaan uit voorvoegsel, jaar en teller. Een nieuw voorvoegsel geldt voor nieuwe documenten en de teller loopt door. Bestaande documenten houden hun nummer.")}</p>
+        </section>
+        </div>
+        <section className="panel section">
+        <h2>{tx("Documentnummers")}</h2>
+        <p className="small muted">{tx("Nummers bestaan uit voorvoegsel, jaar en teller. Een nieuw voorvoegsel geldt voor nieuwe documenten en de teller loopt door. Bestaande documenten houden hun nummer.")}</p>
         <div className="form-grid">
           {([['prefix_purchase', tx("Inkooporders")], ['prefix_delivery', tx("Afleverbonnen")], ['prefix_proforma', tx("Proforma's")], ['prefix_invoice', tx("Facturen")], ['prefix_sales_order', tx("Verkooporders")], ['prefix_receipt', tx("Goederenontvangsten")], ['prefix_transport', tx("Transporten")]] as [PrefixField, string][]).map(([field, label]) => (
             <TextField key={field} label={label} value={co[field] ?? ''} onChange={(v) => setCo({ ...co, [field]: v.toUpperCase() })} hint={tx("Bijvoorbeeld {0}", `${co[field] || (field === 'prefix_proforma' ? 'PF' : '…')}-${new Date().getFullYear()}-0001`)} />
           ))}
         </div>
-        <button className="btn primary" style={{ marginTop: 14 }} onClick={() => { const { id: _i, ...patch } = co; run((db) => saveSettings(db, patch), tx("Bedrijfsgegevens opgeslagen")) }}>{tx("Opslaan")}</button>
-      </section>}
+        </section>
+        <div className="sticky-save"><button className="btn primary" onClick={() => { const { id: _i, ...patch } = co; run((db) => saveSettings(db, patch), tx("Bedrijfsgegevens opgeslagen")) }}>{tx("Opslaan")}</button></div>
+      </div>}
 
       {se && <Modal title={se.id ? se.name : tx("Verkoper toevoegen")} onClose={() => setSe(null)} footer={<>
         <button className="btn" onClick={() => setSe(null)}>{tx("Annuleren")}</button>

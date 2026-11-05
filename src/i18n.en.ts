@@ -712,6 +712,7 @@ export const en: Record<string, string> = {
   "Gemengd": "Mixed",
   "Transport": "Transport",
   "Bestemming": "Destination",
+  "Bedrijfsgegevens": "Company details",
   "Magazijn voor {0}": "Warehouse for {0}",
   "Stel onder Beheer een actief magazijn in waar de route start.": "Set an active warehouse where the route starts under Admin.",
   "Transport voor zending {0}": "Transport for shipment {0}",

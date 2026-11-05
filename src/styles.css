@@ -403,3 +403,8 @@ body.route-dragging, body.route-dragging * { cursor: grabbing !important; user-s
   .doc-space-bottom > div { height: 20mm; }
   .doc-mark { position: fixed; left: 0; right: 0; bottom: 6mm; margin: 0; }
 }
+
+/* Secties met eigen paneel en duidelijke titel */
+.panel.section > h2 { font-size: 1.22rem; font-weight: 700; color: var(--link); padding-bottom: 8px; margin-bottom: 14px; border-bottom: 2px solid var(--brand-line); }
+.panel.section > h2 + p { margin: -4px 0 14px; }
+.cols-even.same-height { align-items: stretch; }
