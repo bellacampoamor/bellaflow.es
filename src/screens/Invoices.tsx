@@ -4,7 +4,7 @@ import type { Language, Payment } from '../data/types'
 import { articleNo, deliveryValue, depositAvailable, documentLanguage, invoiceBalance, invoiceState, todayISO, uninvoicedDeliveries, vatBreakdown } from '../domain/calc'
 import { ensureProformas, invoiceProformas, payInvoice } from '../domain/services'
 import { go, useApp, useAutoPrint } from '../ui/app-context'
-import { Empty, eur, fmtDate, Head, Modal, NumberField, Pill, SelectField, Tabs, TextField, DocPaper } from '../ui/kit'
+import { Empty, eur, fmtDate, Head, Modal, NumberField, Pill, SelectField, Tabs, TextField, DocPaper, pickRow, PickMark } from '../ui/kit'
 import { tx } from '../i18n'
 
 const STATE = { betaald: ['Betaald', 'good'], open: ['Open', 'bill'], te_laat: ['Te laat', 'bad'] } as const
@@ -23,26 +23,26 @@ export function Invoices() {
   useEffect(() => { if (missing) void run((db) => ensureProformas(db)) }, [missing, run])
   return (
     <>
-      <Head title={tx("Facturatie")} sub={tx("Elke afgemelde levering krijgt een proforma. Vink aan wat je wilt factureren: pas dan ontstaat de factuur. Vooruitbetalingen worden verrekend.")} />
+      <Head title={tx("Facturatie")} sub={tx("Elke afgemelde levering krijgt een proforma. Klik op de regels die je wilt factureren: pas dan ontstaat de factuur. Vooruitbetalingen worden verrekend.")} />
       <div className="stack">
         <section className="panel">
           <div className="panel-head">
             <h2>{tx("Proforma's, klaar om te factureren")}</h2>
             {proformas.length > 0 && <div className="btn-row">
-              <button className="btn sm" onClick={() => setTicked(allTicked ? new Set() : new Set(proformas.map((p) => p.d.id)))}>{allTicked ? tx("Niets aanvinken") : tx("Alles aanvinken")}</button>
+              <button className="btn sm" onClick={() => setTicked(allTicked ? new Set() : new Set(proformas.map((p) => p.d.id)))}>{allTicked ? tx("Niets selecteren") : tx("Alles selecteren")}</button>
               <button className="btn sm primary" disabled={!chosen.length} onClick={() => setConfirm(true)}>{tx("Factureren")}{chosen.length ? ` (${chosen.length})` : ''}</button>
             </div>}
           </div>
           {proformas.length === 0 && <Empty>{tx("Er staan geen proforma's klaar.")}</Empty>}
           {proformas.length > 0 && <div className="table-wrap"><table className="queue">
-            <thead><tr><th aria-label={tx("Aanvinken")} /><th>{tx("Proforma")}</th><th>{tx("Verkooporder")}</th><th>{tx("Klant")}</th><th>{tx("Levering")}</th><th>{tx("Geleverd")}</th><th className="num">{tx("Bedrag")}</th><th className="num">{tx("Te verrekenen")}</th></tr></thead>
+            <thead><tr><th>{tx("Proforma")}</th><th>{tx("Verkooporder")}</th><th>{tx("Klant")}</th><th>{tx("Levering")}</th><th>{tx("Geleverd")}</th><th className="num">{tx("Bedrag")}</th><th className="num">{tx("Te verrekenen")}</th><th aria-label={tx("Selectie")} /></tr></thead>
             <tbody>{proformas.map(({ d, o, c }) => {
               const dep = depositAvailable(s, o.id)
               return (
-                <tr key={d.id}>
-                  <td><input type="checkbox" aria-label={tx("{0} aanvinken", d.proforma_number ?? d.number)} checked={ticked.has(d.id)} onChange={(e) => toggle(d.id, e.target.checked)} /></td>
+                <tr key={d.id} {...pickRow(ticked.has(d.id), () => toggle(d.id, !ticked.has(d.id)))}>
                   <td className="strong">{d.proforma_number ?? '…'}</td><td><a className="rowlink" href={`#orders-${o.id}`}>{o.number}</a></td><td>{c.company || c.name}</td><td>{d.number}</td><td>{fmtDate(d.delivered_at)}</td>
                   <td className="num">{eur(deliveryValue(s, d.id))}</td><td className="num">{dep > 0 ? eur(dep) : <span className="zero">–</span>}</td>
+                  <PickMark on={ticked.has(d.id)} />
                 </tr>
               )
             })}</tbody>

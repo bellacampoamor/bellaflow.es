@@ -1,6 +1,6 @@
 // Gedeelde bouwstenen voor alle schermen.
-import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react'
-import { X } from 'lucide-react'
+import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent, type ReactNode } from 'react'
+import { Check as CheckIcon, X } from 'lucide-react'
 import { locale, tx } from '../i18n'
 import { DOC_MARK } from '../domain/noteText'
 import type { Language } from '../data/types'
@@ -83,6 +83,17 @@ export function SelectField<T extends string>({ label, hint, className, value, o
     )}</Field>
   )
 }
+/** Selecteerbare tabelrij: klik of Enter/spatie op de rij wisselt de selectie. Links en knoppen in de rij blijven gewoon werken. */
+export const pickRow = (selected: boolean, onToggle: () => void, className = '') => ({
+  className: `pick${selected ? ' sel' : ''}${className ? ` ${className}` : ''}`,
+  tabIndex: 0,
+  'aria-selected': selected,
+  onClick: (e: ReactMouseEvent) => { if (!(e.target as Element).closest('a, button, input, select')) onToggle() },
+  onKeyDown: (e: ReactKeyboardEvent) => { if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); onToggle() } },
+})
+/** Vinkje achteraan een geselecteerde rij. */
+export const PickMark = ({ on }: { on: boolean }) => <td style={{ width: 32 }}>{on && <CheckIcon size={16} />}</td>
+
 export const Check = ({ label, checked, onChange }: { label: string; checked: boolean; onChange: (v: boolean) => void }) => (
   <label className="check"><input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} />{label}</label>
 )

@@ -7,7 +7,7 @@ import { googleMapsRouteUrl, MAPS_MAX_WAYPOINTS, optimizeRoute, tourCost, type P
 import { cancelDelivery, markDelivered, markReady, rescheduleDelivery, saveRouteOrder, setDeliveryInTransit, setOrderCoordinates } from '../domain/services'
 import { go, useApp } from '../ui/app-context'
 import { useRouteDrag } from '../ui/useRouteDrag'
-import { Check, Empty, fmtDate, fmtShort, Head, Modal, Pill, Tabs, TextField } from '../ui/kit'
+import { Check, Empty, fmtDate, fmtShort, Head, Modal, Pill, Tabs, TextField, pickRow, PickMark } from '../ui/kit'
 import { tx } from '../i18n'
 
 const METHOD = { meenemen: 'Klant haalt op', vervoerder: 'Vervoerder' }
@@ -220,13 +220,12 @@ function PrepareModal({ d, onClose }: { d: Delivery; onClose: () => void }) {
         if (await run((db) => markReady(db, d.id, { approved_by: approver, date: todayISO() }), digital ? tx("Klaargezet. De bezorging staat klaar in de chauffeursapp") : tx("Akkoord. Druk nu de afleverbon af"))) { onClose(); if (!digital) go(`levering-${d.id}`) }
       }}>{digital ? tx("Akkoord") : tx("Akkoord en naar afleverbon")}</button>
     </>}>
-      <p className="small muted" style={{ margin: 0 }}>{tx("Vink af wat klaarstaat en is gecontroleerd.")}</p>
-      <div className="stack" style={{ gap: 2 }}>{lines.map((l) => {
+      <p className="small muted" style={{ margin: 0 }}>{tx("Klik op de regels die klaarstaan en zijn gecontroleerd.")}</p>
+      <div className="table-wrap flush"><table className="queue"><tbody>{lines.map((l) => {
         const sol = s.sales_order_lines.find((x) => x.id === l.sales_order_line_id)!
         const have = hand.get(stockKey(sol.product_id, l.warehouse_id)) ?? 0
-        return <Check key={l.id} checked={!!checked[l.id]} onChange={(v) => setChecked((c) => ({ ...c, [l.id]: v }))}
-          label={tx("{0} × {1}{2}, {3}: {4} aanwezig", l.qty, `${articleNo(s, sol.product_id)} ${sol.description}`.trim(), sol.options ? ` (${sol.options})` : '', s.warehouses.find((w) => w.id === l.warehouse_id)?.name, have)} />
-      })}</div>
+        return <tr key={l.id} {...pickRow(!!checked[l.id], () => setChecked((c) => ({ ...c, [l.id]: !c[l.id] })))}><td>{tx("{0} × {1}{2}, {3}: {4} aanwezig", l.qty, `${articleNo(s, sol.product_id)} ${sol.description}`.trim(), sol.options ? ` (${sol.options})` : '', s.warehouses.find((w) => w.id === l.warehouse_id)?.name, have)}</td><PickMark on={!!checked[l.id]} /></tr>
+      })}</tbody></table></div>
       <TextField label={tx("Akkoord bevonden door")} value={approver} onChange={setApprover} />
     </Modal>
   )

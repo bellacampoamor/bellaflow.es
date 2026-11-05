@@ -1,10 +1,10 @@
-import { useMemo, useState, type KeyboardEvent } from 'react'
+import { useMemo, useState } from 'react'
 import { ArrowRight, Check as CheckIcon } from 'lucide-react'
 import { articleNo, inboundWarehouse, linePurchaseStatus, linesToPurchase, round2, todayISO } from '../domain/calc'
 import { convertLinesToPurchaseOrders } from '../domain/services'
 import { tx } from '../i18n'
 import { useApp } from '../ui/app-context'
-import { Empty, eur, fmtDate, Modal, SelectField, Sku, TextField } from '../ui/kit'
+import { Empty, eur, fmtDate, Modal, pickRow, Sku, TextField } from '../ui/kit'
 
 /** Regels van verkooporders die nog ingekocht moeten worden, klaar om door te zetten naar een leverancier. */
 export function PurchaseQueue({ onDone }: { onDone: () => void }) {
@@ -29,7 +29,6 @@ export function PurchaseQueue({ onDone }: { onDone: () => void }) {
 
   const chosen = queue.filter((l) => selected.has(l.id))
   const toggleOpen = (id: string) => setOpen((v) => { const next = new Set(v); if (next.has(id)) next.delete(id); else next.add(id); return next })
-  const onKey = (e: KeyboardEvent, fn: () => void) => { if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); fn() } }
   const shownIds = shown.map((l) => l.id)
   const allShown = shownIds.length > 0 && shownIds.every((id) => selected.has(id))
   const toggle = (ids: string[], on: boolean) => setSelected((v) => {
@@ -67,9 +66,9 @@ export function PurchaseQueue({ onDone }: { onDone: () => void }) {
           const customer = s.customers.find((c) => c.id === order.customer_id)
           return (
             <tbody key={order.id}>
-              <tr className={`queue-head pick${all ? ' sel' : count ? ' partly' : ''}`} tabIndex={0} aria-selected={all} onClick={() => toggle(ids, !all)} onKeyDown={(e) => onKey(e, () => toggle(ids, !all))}>
+              <tr {...pickRow(all, () => toggle(ids, !all), `queue-head${!all && count ? ' partly' : ''}`)}>
                 <td><button type="button" className={`tri${isOpen ? ' open' : ''}`} aria-expanded={isOpen} aria-label={isOpen ? tx("{0} dichtklappen", order.number) : tx("{0} openklappen", order.number)} onClick={(e) => { e.stopPropagation(); toggleOpen(order.id) }}><svg viewBox="0 0 12 12" width="12" height="12" aria-hidden="true"><path d="M1 3h10L6 10z" fill="currentColor" /></svg></button></td>
-                <td colSpan={2}><a className="rowlink" href={`#orders-${order.id}`} onClick={(e) => e.stopPropagation()}>{order.number}</a> <span className="muted small">{customer?.company || customer?.name}, {fmtDate(order.order_date)}{order.promised_date ? tx(", beloofd {0}", fmtDate(order.promised_date)) : ''}</span></td>
+                <td colSpan={2}><a className="rowlink" href={`#orders-${order.id}`}>{order.number}</a> <span className="muted small">{customer?.company || customer?.name}, {fmtDate(order.order_date)}{order.promised_date ? tx(", beloofd {0}", fmtDate(order.promised_date)) : ''}</span></td>
                 <td colSpan={3} className="muted small">{count && !all ? tx("{0} van {1} regels geselecteerd", count, ids.length) : ids.length === 1 ? tx("1 regel") : tx("{0} regels", ids.length)}</td>
                 <td>{all && <CheckIcon size={16} />}</td>
               </tr>
@@ -77,7 +76,7 @@ export function PurchaseQueue({ onDone }: { onDone: () => void }) {
                 const bought = linePurchaseStatus(s, l.id).purchased
                 const on = selected.has(l.id)
                 return (
-                  <tr key={l.id} className={`pick${on ? ' sel' : ''}`} tabIndex={0} aria-selected={on} onClick={() => toggle([l.id], !on)} onKeyDown={(e) => onKey(e, () => toggle([l.id], !on))}>
+                  <tr key={l.id} {...pickRow(on, () => toggle([l.id], !on))}>
                     <td></td>
                     <td className="strong">{l.description}<Sku code={articleNo(s, l.product_id)} /></td>
                     <td className="muted">{l.options || '–'}</td>

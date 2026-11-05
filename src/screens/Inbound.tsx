@@ -5,7 +5,7 @@ import { addDays, ordersAffectedByShipment, shipmentDestination, shipmentIsOpen,
 import { assignShipmentsToTransport, cancelTransport, closeShipment, createTransport, setTransportStatus, updateTransport, type TransportInput } from '../domain/services'
 import { tx } from '../i18n'
 import { useApp } from '../ui/app-context'
-import { AreaField, Empty, fmtDate, fmtShort, Head, Modal, NumberField, Pill, Sku, Tabs, TextField, type Tone } from '../ui/kit'
+import { AreaField, Empty, fmtDate, fmtShort, Head, Modal, NumberField, pickRow, PickMark, Pill, Sku, Tabs, TextField, type Tone } from '../ui/kit'
 import { LabelPill } from './Purchases'
 
 const DEFAULT_CAPACITY = 90
@@ -68,25 +68,31 @@ export function Inbound() {
 
       {tab === 'plan' && <div className="stack">
         <section className="panel">
-          <h2>{tx("Ingekocht, nog niet ingepland")}</h2>
+          <div className="panel-head">
+            <div>
+              <h2>{tx("Ingekocht, nog niet ingepland")}</h2>
+              {unassigned.length > 0 && <div className="small muted">{tx("Klik op een regel om die te selecteren.")}</div>}
+            </div>
+            {unassigned.length > 0 && <button className="btn sm" onClick={() => setPicked(new Set(pickedIds.length === unassigned.length ? [] : unassigned.map((x) => x.id)))}>{pickedIds.length === unassigned.length ? tx("Niets selecteren") : tx("Alles selecteren")}</button>}
+          </div>
           {unassigned.length === 0 && <Empty>{tx("Alle ingekochte regels staan op een transport.")}</Empty>}
           {unassigned.length > 0 && <>
             <div className="table-wrap"><table className="queue">
-              <thead><tr><th style={{ width: 34 }}><input type="checkbox" aria-label={tx("Alles aanvinken")} checked={pickedIds.length === unassigned.length} onChange={(e) => setPicked(new Set(e.target.checked ? unassigned.map((x) => x.id) : []))} /></th><th>{tx("Inkooporder")}</th><th>{tx("Leverancier")}</th><th>{tx("Product")}</th><th className="num">{tx("Aantal")}</th><th className="num">m³</th><th>{tx("Voor")}</th><th style={{ minWidth: 180 }}>{tx("Bestemming")}</th></tr></thead>
+              <thead><tr><th>{tx("Inkooporder")}</th><th>{tx("Leverancier")}</th><th>{tx("Product")}</th><th className="num">{tx("Aantal")}</th><th className="num">m³</th><th>{tx("Voor")}</th><th style={{ minWidth: 180 }}>{tx("Bestemming")}</th><th aria-label={tx("Selectie")} /></tr></thead>
               <tbody>{unassigned.map((x) => {
                 const i = lineInfo(s, x)
                 return (
-                  <tr key={x.id}>
-                    <td><input type="checkbox" aria-label={tx("{0} aanvinken", i.product?.name)} checked={picked.has(x.id)} onChange={(e) => setPicked((v) => { const n = new Set(v); if (e.target.checked) n.add(x.id); else n.delete(x.id); return n })} /></td>
+                  <tr key={x.id} {...pickRow(picked.has(x.id), () => setPicked((v) => { const n = new Set(v); if (n.has(x.id)) n.delete(x.id); else n.add(x.id); return n }))}>
                     <td><a className="rowlink" href={`#inkoop-${i.po.id}`}>{i.po.number}</a></td><td>{i.supplier}</td><td className="strong">{i.product?.name}<Sku code={i.product?.sku} /></td><td className="num">{i.qty}</td><td className="num">{round1(shipmentLoad(s, x.id).m3)}</td>
                     <td>{i.salesOrder ? <a className="rowlink" href={`#orders-${i.salesOrder.id}`}>{i.salesOrder.number}</a> : <LabelPill label={i.po.label} />}</td>
                     <td>{shipmentDestination(s, x)}</td>
+                    <PickMark on={picked.has(x.id)} />
                   </tr>
                 )
               })}</tbody>
             </table></div>
             <div className="queue-bar">
-              <span>{tx("{0} regels aangevinkt", pickedIds.length)}</span>
+              <span>{pickedIds.length ? tx("{0} geselecteerd", pickedIds.length) : tx("Nog niets geselecteerd")}</span>
               <div className="btn-row">
                 <select style={{ width: 'auto' }} aria-label={tx("Koppelen aan transport")} value={chosenTarget} onChange={(e) => setTarget(e.target.value)}>
                   {planned.map((t) => <option key={t.id} value={t.id}>{tx("{0}, vertrek {1}", t.number, fmtDate(t.departure_date))}</option>)}
