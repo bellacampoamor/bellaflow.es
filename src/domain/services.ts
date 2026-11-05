@@ -449,6 +449,19 @@ export async function markReady(db: Driver, id: string, input: { approved_by: st
   await db.insert('order_events', [event(d.sales_order_id, 'levering', `${d.number} klaargezet en akkoord bevonden door ${input.approved_by}.`)])
 }
 
+/** Meerdere leveringen tegelijk klaarzetten: alles of niets, eerst wordt alles gecontroleerd. */
+export async function markDeliveriesReady(db: Driver, ids: string[], input: { approved_by: string; date: string }) {
+  if (!ids.length) fail(tx("Selecteer minimaal één levering."))
+  if (!input.approved_by.trim()) fail(tx("Noteer wie de levering akkoord heeft bevonden."))
+  const s = await loadSnapshot(db)
+  for (const id of ids) {
+    const d = s.deliveries.find((x) => x.id === id) ?? (fail(tx("Levering niet gevonden.")) as never)
+    if (d.status !== 'planned') fail(tx("Deze levering is al klaargezet."))
+    assertStockForDelivery(s, id)
+  }
+  for (const id of ids) await markReady(db, id, input)
+}
+
 export async function markNotePrinted(db: Driver, id: string) {
   await db.update('deliveries', id, { note_printed_at: new Date().toISOString() })
 }

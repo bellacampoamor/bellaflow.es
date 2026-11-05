@@ -1,10 +1,10 @@
-import { useState } from 'react'
-import { CalendarClock, ChevronDown, ChevronUp, ClipboardCheck, FileText, GripVertical, Map as MapIcon, PackageCheck, Route, Smartphone, Truck } from 'lucide-react'
+import { useRef, useState, type MouseEvent, type PointerEvent } from 'react'
+import { CalendarClock, Check as CheckIcon, ChevronDown, ChevronUp, ClipboardCheck, FileText, GripVertical, Map as MapIcon, PackageCheck, Route, Smartphone, Truck } from 'lucide-react'
 import { geocodeAddress, travelMatrix, type TravelMatrix } from '../data/geo'
 import type { Delivery, SalesOrder } from '../data/types'
 import { articleNo, deliveryIsOpen, onHandMap, stockKey, todayISO } from '../domain/calc'
 import { googleMapsRouteUrl, MAPS_MAX_WAYPOINTS, optimizeRoute, tourCost, type Point } from '../domain/route'
-import { cancelDelivery, markDelivered, markReady, rescheduleDelivery, saveRouteOrder, setDeliveryInTransit, setOrderCoordinates } from '../domain/services'
+import { cancelDelivery, markDeliveriesReady, markDelivered, rescheduleDelivery, saveRouteOrder, setDeliveryInTransit, setOrderCoordinates } from '../domain/services'
 import { go, useApp } from '../ui/app-context'
 import { useRouteDrag } from '../ui/useRouteDrag'
 import { Check, Empty, fmtDate, fmtShort, Head, Modal, Pill, Tabs, TextField, pickRow, PickMark } from '../ui/kit'
@@ -21,7 +21,10 @@ export function Deliveries() {
   const [tab, setTab] = useState<'planning' | 'done'>('planning')
   const [finish, setFinish] = useState<Delivery | null>(null)
   const [move, setMove] = useState<Delivery | null>(null)
-  const [prepare, setPrepare] = useState<Delivery | null>(null)
+  const [picked, setPicked] = useState<Set<string>>(new Set())
+  const [preparing, setPreparing] = useState(false)
+  // Na slepen in de route telt de klik niet als selectie.
+  const pressY = useRef(0)
   const [routes, setRoutes] = useState<Record<string, DayRoute>>({})
   const [busy, setBusy] = useState('')
   const [notFound, setNotFound] = useState<string[]>([])
@@ -92,6 +95,18 @@ export function Deliveries() {
 
   const digital = s.settings[0]?.delivery_note_mode === 'digitaal'
   const usesApp = (d: Delivery) => digital && d.method === 'eigen_team'
+  const canPrepare = (d: Delivery) => d.status === 'planned' && d.method !== 'meenemen'
+  const chosen = planning.filter((d) => canPrepare(d) && picked.has(d.id)).sort((a, b) => a.planned_date.localeCompare(b.planned_date) || byPosition(a, b))
+  const togglePick = (id: string) => setPicked((v) => { const n = new Set(v); if (n.has(id)) n.delete(id); else n.add(id); return n })
+  const pickProps = (d: Delivery) => {
+    if (!canPrepare(d)) return { className: '' }
+    const props = pickRow(picked.has(d.id), () => togglePick(d.id), 'pick-card')
+    return {
+      ...props,
+      onPointerDownCapture: (e: PointerEvent<HTMLElement>) => { pressY.current = e.clientY },
+      onClick: (e: MouseEvent<HTMLElement>) => { if (Math.abs(e.clientY - pressY.current) < 5) props.onClick(e) },
+    }
+  }
 
   const renderCard = (d: Delivery, position?: { day: string; index: number; ids: string[] }) => {
     const o = orderOf(d)
@@ -102,7 +117,7 @@ export function Deliveries() {
     const card = (
       <div className="task" style={{ alignItems: 'flex-start', flexWrap: 'wrap' }}>
         <div style={{ flex: '1 1 320px' }}>
-          <div className="task-t">{d.number} <a className="small" href={`#orders-${o.id}`} style={{ fontWeight: 500 }}>{o.number}</a> {total > 1 && <Pill>{tx("Deellevering")} {d.sequence} {tx("van")} {total}</Pill>}{' '}
+          <div className="task-t">{picked.has(d.id) && canPrepare(d) && <CheckIcon size={15} style={{ verticalAlign: -2, marginRight: 4 }} />}{d.number} <a className="small" href={`#orders-${o.id}`} style={{ fontWeight: 500 }}>{o.number}</a> {total > 1 && <Pill>{tx("Deellevering")} {d.sequence} {tx("van")} {total}</Pill>}{' '}
             {d.status === 'ready' && <Pill tone="good">{tx("Klaargezet")}</Pill>} {d.status === 'in_transit' && <Pill tone="info">{tx("Onderweg")}</Pill>}{' '}
             {d.status !== 'planned' && needsNote && !usesApp(d) && !d.note_printed_at && <Pill tone="warn">{tx("Bon nog niet afgedrukt")}</Pill>}
           </div>
@@ -130,17 +145,17 @@ export function Deliveries() {
         <div className="btn-row">
           <button className="btn sm" onClick={() => setMove(d)}><CalendarClock size={14} />{tx("Verschuiven")}</button>
           {d.status !== 'planned' && needsNote && <a className="btn sm" href={`#levering-${d.id}`}><FileText size={14} />{tx("Afleverbon")}</a>}
-          {d.status === 'planned' && needsNote && <button className="btn sm primary" onClick={() => setPrepare(d)}><ClipboardCheck size={14} />{tx("Klaarzetten")}</button>}
           {d.status === 'ready' && needsNote && !usesApp(d) && <button className="btn sm" onClick={() => run((db) => setDeliveryInTransit(db, d.id), tx("{0} is onderweg", d.number))}><Truck size={14} />{tx("Onderweg")}</button>}
           {(d.status !== 'planned' || !needsNote) && <button className="btn sm primary" onClick={() => setFinish(d)}><PackageCheck size={14} />{tx("Afmelden als geleverd")}</button>}
         </div>
       </div>
     )
-    if (!position) return <div key={d.id}>{card}</div>
+    const pick = pickProps(d)
+    if (!position) return <div key={d.id} {...pick}>{card}</div>
     const { day, index, ids } = position
     const row = rowState(day, d.id, index)
     return (
-      <div className={`stop${row.dragging ? ' dragging' : ''}${row.active ? ' shifting' : ''}`} key={d.id} style={row.active ? { transform: `translateY(${row.y}px)` } : undefined} onPointerDown={(e) => begin(e, day, d.id, ids)}>
+      <div {...pick} className={`stop${row.dragging ? ' dragging' : ''}${row.active ? ' shifting' : ''}${pick.className ? ` ${pick.className}` : ''}`} key={d.id} style={row.active ? { transform: `translateY(${row.y}px)` } : undefined} onPointerDown={(e) => begin(e, day, d.id, ids)}>
         {ids.length > 1 && <span className="stop-grip" title={tx("Sleep om de volgorde in de route te wijzigen")} aria-hidden="true"><GripVertical size={16} /></span>}
         <div className="stop-nr">
           <button className="btn icon" aria-label={tx("{0} eerder in de route", d.number)} disabled={index === 0} onClick={() => shift(day, d.id, -1)}><ChevronUp size={16} /></button>
@@ -162,10 +177,12 @@ export function Deliveries() {
           const stops = dayStops(day)
           const others = planning.filter((d) => d.planned_date === day && d.method !== 'eigen_team').sort(byPosition)
           const sum = summary(day)
+          const selectable = [...stops, ...others].filter(canPrepare)
+          const allPicked = selectable.length > 0 && selectable.every((d) => picked.has(d.id))
           const mapPoints = stops.map((d) => coords(orderOf(d))).filter(Boolean) as Point[]
           return (
             <section className="panel" key={day}>
-              <div className="panel-head"><h2>{fmtShort(day)}</h2>{day < today ? <Pill tone="bad">{tx("Te laat")}</Pill> : day === today ? <Pill tone="warn">{tx("Vandaag")}</Pill> : null}</div>
+              <div className="panel-head"><h2>{fmtShort(day)}</h2><div className="btn-row" style={{ alignItems: 'center' }}>{day < today ? <Pill tone="bad">{tx("Te laat")}</Pill> : day === today ? <Pill tone="warn">{tx("Vandaag")}</Pill> : null}{selectable.length > 0 && <button className="btn sm" onClick={() => setPicked((v) => { const n = new Set(v); for (const d of selectable) { if (allPicked) n.delete(d.id); else n.add(d.id) } return n })}>{allPicked ? tx("Niets selecteren") : tx("Alles selecteren")}</button>}</div></div>
               {stops.length > 0 && (
                 <div className="route-bar">
                   <div>
@@ -184,6 +201,10 @@ export function Deliveries() {
             </section>
           )
         })}
+        {planning.some(canPrepare) && <div className="queue-bar panel-bar">
+          <span>{chosen.length ? tx("{0} geselecteerd", chosen.length) : tx("Klik op een levering om die te selecteren.")}</span>
+          <button className="btn primary" disabled={!chosen.length} onClick={() => setPreparing(true)}><ClipboardCheck size={16} />{tx("Klaarzetten")}{chosen.length ? ` (${chosen.length})` : ''}</button>
+        </div>}
       </div>}
       {tab === 'done' && <section className="panel">
         {done.length === 0 && <Empty>{tx("Nog geen afgeronde leveringen.")}</Empty>}
@@ -198,34 +219,53 @@ export function Deliveries() {
           })}</tbody>
         </table></div>}
       </section>}
-      {prepare && <PrepareModal d={prepare} onClose={() => setPrepare(null)} />}
+      {preparing && <PrepareModal deliveries={chosen} onClose={() => setPreparing(false)} onDone={() => setPicked(new Set())} />}
       {finish && <FinishModal d={finish} onClose={() => setFinish(null)} />}
       {move && <MoveModal d={move} onClose={() => setMove(null)} />}
     </>
   )
 }
 
-function PrepareModal({ d, onClose }: { d: Delivery; onClose: () => void }) {
+function PrepareModal({ deliveries, onClose, onDone }: { deliveries: Delivery[]; onClose: () => void; onDone: () => void }) {
   const { s, run } = useApp()
-  const digital = s.settings[0]?.delivery_note_mode === 'digitaal' && d.method === 'eigen_team'
-  const lines = s.delivery_lines.filter((l) => l.delivery_id === d.id)
+  const digitalMode = s.settings[0]?.delivery_note_mode === 'digitaal'
+  const usesApp = (d: Delivery) => digitalMode && d.method === 'eigen_team'
+  const groups = deliveries.map((d) => ({ d, lines: s.delivery_lines.filter((l) => l.delivery_id === d.id) }))
+  const lineIds = groups.flatMap((g) => g.lines.map((l) => l.id))
   const hand = onHandMap(s)
   const [checked, setChecked] = useState<Record<string, boolean>>({})
   const [approver, setApprover] = useState('')
-  const all = lines.every((l) => checked[l.id])
+  const all = lineIds.every((id) => checked[id])
+  const single = deliveries.length === 1 ? deliveries[0] : null
+  const allDigital = deliveries.every(usesApp)
+  const confirm = async () => {
+    const done = allDigital ? (single ? tx("Klaargezet. De bezorging staat klaar in de chauffeursapp") : tx("{0} klaargezet. De bezorgingen staan klaar in de chauffeursapp", deliveries.length))
+      : single ? tx("Akkoord. Druk nu de afleverbon af") : tx("{0} klaargezet. Druk nu de afleverbonnen af", deliveries.length)
+    if (!await run((db) => markDeliveriesReady(db, deliveries.map((d) => d.id), { approved_by: approver, date: todayISO() }), done)) return
+    onDone(); onClose()
+    if (single && !allDigital) go(`levering-${single.id}`)
+  }
   return (
-    <Modal title={tx("{0} klaarzetten", d.number)} onClose={onClose} footer={<>
+    <Modal wide={!single} title={single ? tx("{0} klaarzetten", single.number) : tx("{0} leveringen klaarzetten", deliveries.length)} onClose={onClose} footer={<>
       <button className="btn" onClick={onClose}>{tx("Annuleren")}</button>
-      <button className="btn primary" disabled={!all} onClick={async () => {
-        if (await run((db) => markReady(db, d.id, { approved_by: approver, date: todayISO() }), digital ? tx("Klaargezet. De bezorging staat klaar in de chauffeursapp") : tx("Akkoord. Druk nu de afleverbon af"))) { onClose(); if (!digital) go(`levering-${d.id}`) }
-      }}>{digital ? tx("Akkoord") : tx("Akkoord en naar afleverbon")}</button>
+      <button className="btn primary" disabled={!all} onClick={confirm}>{single && !allDigital ? tx("Akkoord en naar afleverbon") : tx("Akkoord")}</button>
     </>}>
-      <p className="small muted" style={{ margin: 0 }}>{tx("Klik op de regels die klaarstaan en zijn gecontroleerd.")}</p>
-      <div className="table-wrap flush"><table className="queue"><tbody>{lines.map((l) => {
-        const sol = s.sales_order_lines.find((x) => x.id === l.sales_order_line_id)!
-        const have = hand.get(stockKey(sol.product_id, l.warehouse_id)) ?? 0
-        return <tr key={l.id} {...pickRow(!!checked[l.id], () => setChecked((c) => ({ ...c, [l.id]: !c[l.id] })))}><td>{tx("{0} × {1}{2}, {3}: {4} aanwezig", l.qty, `${articleNo(s, sol.product_id)} ${sol.description}`.trim(), sol.options ? ` (${sol.options})` : '', s.warehouses.find((w) => w.id === l.warehouse_id)?.name, have)}</td><PickMark on={!!checked[l.id]} /></tr>
-      })}</tbody></table></div>
+      <div className="panel-head" style={{ margin: 0 }}>
+        <p className="small muted" style={{ margin: 0 }}>{tx("Klik op de regels die klaarstaan en zijn gecontroleerd.")}</p>
+        {lineIds.length > 1 && <button className="btn sm" onClick={() => setChecked(all ? {} : Object.fromEntries(lineIds.map((id) => [id, true])))}>{all ? tx("Niets selecteren") : tx("Alles selecteren")}</button>}
+      </div>
+      <div className="table-wrap flush convert-list"><table className="queue">{groups.map(({ d, lines }) => {
+        const o = s.sales_orders.find((x) => x.id === d.sales_order_id)
+        const c = s.customers.find((x) => x.id === o?.customer_id)
+        return <tbody key={d.id}>
+          {!single && <tr className="queue-head"><td colSpan={2}><span className="strong">{d.number}</span> <span className="muted small">{o?.number}, {c?.company || c?.name}</span></td></tr>}
+          {lines.map((l) => {
+            const sol = s.sales_order_lines.find((x) => x.id === l.sales_order_line_id)!
+            const have = hand.get(stockKey(sol.product_id, l.warehouse_id)) ?? 0
+            return <tr key={l.id} {...pickRow(!!checked[l.id], () => setChecked((v) => ({ ...v, [l.id]: !v[l.id] })))}><td>{tx("{0} × {1}{2}, {3}: {4} aanwezig", l.qty, `${articleNo(s, sol.product_id)} ${sol.description}`.trim(), sol.options ? ` (${sol.options})` : '', s.warehouses.find((w) => w.id === l.warehouse_id)?.name, have)}</td><PickMark on={!!checked[l.id]} /></tr>
+          })}
+        </tbody>
+      })}</table></div>
       <TextField label={tx("Akkoord bevonden door")} value={approver} onChange={setApprover} />
     </Modal>
   )

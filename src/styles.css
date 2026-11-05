@@ -437,3 +437,12 @@ body.route-dragging, body.route-dragging * { cursor: grabbing !important; user-s
 .tax-qr { flex: none; display: flex; flex-direction: column; gap: 2px; font-size: 7.5pt; color: var(--muted); }
 .tax-qr svg { display: block; width: 30mm; height: 30mm; }
 @media print, (min-width: 640px) { .invoice-top { flex-wrap: nowrap; } .invoice-top > :first-child { flex: 1; min-width: 0; } }
+
+/* Leveringen selecteren */
+.pick-card { border-radius: 8px; }
+.pick-card:not(.stop) { cursor: pointer; padding-inline: 8px; }
+.stop.pick-card:hover, .pick-card:hover { background: var(--sell); }
+.stop.pick-card.sel, .pick-card.sel { background: var(--sell); color: var(--sell-fg); box-shadow: inset 3px 0 0 var(--brand-line); }
+.pick-card:focus-visible { outline: 2px solid var(--brand-line); outline-offset: -2px; }
+.queue-bar.panel-bar { background: var(--surface); border: 1px solid var(--line-strong); border-radius: 10px; padding: 10px 18px; margin-top: 0; z-index: 10; }
+.pick-card { user-select: none; }

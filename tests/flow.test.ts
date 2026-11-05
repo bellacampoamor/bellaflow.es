@@ -9,7 +9,7 @@ import { TABLES } from '../src/data/types'
 import { archiveRows, openLinesOnTransport, linePurchaseStatus, linesToPurchase, documentLanguage, flowCounts, freeAt, transportLoad, invoiceBalance, onHandMap, orderStage, orderTab, reservedMap, stockKey, vatBreakdown , invoiceReport, periodRange, invoiceQrUrl, hasTaxId } from '../src/domain/calc'
 import { renameOldSuppliers, restoreSettings, restoreSuppliers, seedDemo } from '../src/domain/demo'
 import {
-  createDelivery, createInvoice, createOrder, createPurchaseOrder, invoiceProformas, lineFromProduct, markDelivered, assignShipmentsToTransport, cancelTransport, convertLinesToPurchaseOrders, createTransport, markReady, receiveGoods, rescheduleDelivery, rescheduleOrder, saveRouteOrder, saveSettings, mailSignedNote, setPurchaseLabel, signDelivery, splitLinesForStock, setDeliveryInTransit, setTransportStatus, updateTransport, transferStock,
+  createDelivery, createInvoice, markDeliveriesReady, createOrder, createPurchaseOrder, invoiceProformas, lineFromProduct, markDelivered, assignShipmentsToTransport, cancelTransport, convertLinesToPurchaseOrders, createTransport, markReady, receiveGoods, rescheduleDelivery, rescheduleOrder, saveRouteOrder, saveSettings, mailSignedNote, setPurchaseLabel, signDelivery, splitLinesForStock, setDeliveryInTransit, setTransportStatus, updateTransport, transferStock,
 } from '../src/domain/services'
 import { estimateMatrix, parseRouterTable } from '../src/data/geo'
 import { dropIndex, googleMapsRouteUrl, moveItem, optimizeRoute, tourCost } from '../src/domain/route'
@@ -635,6 +635,22 @@ describe('route', () => {
   it('zet alle stops en de terugweg in de kaartlink', () => {
     const url = decodeURIComponent(googleMapsRouteUrl({ latitude: 1, longitude: 2 }, [{ latitude: 3, longitude: 4 }, { latitude: 5, longitude: 6 }]).replace(/\+/g, ' '))
     expect(url).toContain('origin=1,2'); expect(url).toContain('destination=1,2'); expect(url).toContain('waypoints=3,4|5,6')
+  })
+})
+
+describe('meerdere leveringen klaarzetten', () => {
+  it('zet alles klaar, of niets als er één niet kan', async () => {
+    const s = await loadSnapshot(db)
+    const planned = s.deliveries.filter((d) => d.status === 'planned' && d.method !== 'meenemen').map((d) => d.id)
+    expect(planned.length).toBeGreaterThan(1)
+    const [a, b] = planned
+    const ready = s.deliveries.find((d) => d.status === 'ready')!
+    await expect(markDeliveriesReady(db, [a, ready.id], { approved_by: 'X', date: TODAY })).rejects.toThrow(/al klaargezet/)
+    await expect(markDeliveriesReady(db, [a, b], { approved_by: ' ', date: TODAY })).rejects.toThrow(/akkoord/)
+    expect((await loadSnapshot(db)).deliveries.find((d) => d.id === a)!.status).toBe('planned')
+    await markDeliveriesReady(db, [a, b], { approved_by: 'X', date: TODAY })
+    const after = await loadSnapshot(db)
+    expect([a, b].map((id) => after.deliveries.find((d) => d.id === id)!.status)).toEqual(['ready', 'ready'])
   })
 })
 
