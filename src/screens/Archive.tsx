@@ -4,7 +4,7 @@ import type { EmailStatus } from '../data/types'
 import { archiveRows } from '../domain/calc'
 import { mailSignedNote } from '../domain/services'
 import { useApp } from '../ui/app-context'
-import { Empty, fmtDate, Head, Pill, Tabs, type Tone } from '../ui/kit'
+import { Empty, fmtDate, Pill, Tabs, type Tone } from '../ui/kit'
 import { tx } from '../i18n'
 
 type Tab = 'alles' | 'compleet' | 'factureren'
@@ -24,7 +24,6 @@ export function Archive() {
   const rows = all.filter((r) => (tab === 'alles' || (tab === 'compleet') === r.complete) && (!t || `${r.order.number} ${customer(r.order.customer_id)} ${r.delivery.number} ${r.delivery.proforma_number ?? ''} ${r.invoice?.number ?? ''}`.toLowerCase().includes(t)))
   return (
     <>
-      <Head title={tx("Archief")} sub={tx("Alle afgeleverde leveringen met hun afleverbonnen en facturen.")} />
       <section className="panel">
         <div className="panel-head" style={{ alignItems: 'flex-end' }}>
           <Tabs<Tab> value={tab} onChange={setTab} tabs={[{ value: 'alles', label: tx("Alles"), n: all.length }, { value: 'compleet', label: tx("Compleet afgewerkt"), n: all.filter((r) => r.complete).length }, { value: 'factureren', label: tx("Nog niet compleet"), n: all.filter((r) => !r.complete).length }]} />

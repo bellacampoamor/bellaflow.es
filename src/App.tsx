@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Archive, Headset, Languages, Moon, Store, Sun, Boxes, ClipboardList, FileText, LayoutDashboard, PackageCheck, Settings2, ShoppingCart, Truck, Warehouse as WarehouseIcon } from 'lucide-react'
+import { FileBarChart, Headset, Languages, Moon, Store, Sun, Boxes, ClipboardList, FileText, LayoutDashboard, PackageCheck, Settings2, ShoppingCart, Truck, Warehouse as WarehouseIcon } from 'lucide-react'
 import { flowCounts } from './domain/calc'
 import { useApp, useHash } from './ui/app-context'
 import { Logo, Modal } from './ui/kit'
@@ -17,7 +17,7 @@ import { Admin } from './screens/Admin'
 import { Driver } from './screens/Driver'
 import { SalesOrderDocument } from './screens/SalesOrderDocument'
 import { PurchaseOrderDocument } from './screens/PurchaseOrderDocument'
-import { Archive as ArchiveScreen } from './screens/Archive'
+import { Reports } from './screens/Reports'
 import { getLanguage, setLanguage, tx, type UiLanguage } from './i18n'
 
 // Twee gescheiden processen, elk met eigen menu-optie en eigen stappen.
@@ -109,7 +109,7 @@ export function App({ onResetDemo, onSignOut }: { onResetDemo?: () => Promise<vo
               const F = FLOWS[k], Icon = F.icon
               return <a key={k} href={`#${F.home}`} className={flow === k ? 'on flow-link' : 'flow-link'}><Icon size={16} />{tx(F.label)}</a>
             })}
-            <a href="#archief" className={screen === 'archief' ? 'on' : ''}><Archive size={16} />{tx("Archief")}</a>
+            <a href="#rapportage" className={screen === 'rapportage' || screen === 'archief' ? 'on' : ''}><FileBarChart size={16} />{tx("Rapportage")}</a>
             <a href="#voorraad" className={screen === 'voorraad' ? 'on' : ''}><Boxes size={16} />{tx("Voorraad")}</a>
             <a href="#beheer" className={screen === 'beheer' ? 'on' : ''}><Settings2 size={16} />{tx("Beheer")}</a>
             <label className="lang-pick"><Languages size={16} /><select aria-label={tx("Taal")} value={language} onChange={(e) => switchLanguage(e.target.value as UiLanguage)}><option value="nl">Nederlands</option><option value="en">English</option><option value="es">Español</option></select></label>
@@ -170,7 +170,8 @@ function Route({ screen, param }: { screen: string; param: string }) {
       return param ? <OrderDetail id={param} /> : <Orders />
     case 'levering': return param.startsWith('print-') ? <DeliveryNote key={param} id={param.slice(6)} autoPrint /> : param.startsWith('archief-') ? <DeliveryNote key={param} id={param.slice(8)} fromArchive /> : param ? <DeliveryNote key={param} id={param} /> : <Deliveries />
     case 'facturatie': return param.startsWith('print-') ? <InvoiceDetail key={param} id={param.slice(6)} autoPrint /> : param ? <InvoiceDetail key={param} id={param} /> : <Invoices />
-    case 'archief': return <ArchiveScreen />
+    case 'rapportage': return <Reports tab="facturen" />
+    case 'archief': return <Reports tab="archief" />
     case 'voorraad': return <Stock />
     case 'beheer': return <Admin />
     default: return (

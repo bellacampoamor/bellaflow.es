@@ -391,16 +391,11 @@ body.route-dragging, body.route-dragging * { cursor: grabbing !important; user-s
 @media (max-height: 560px) { .ribbon-wrap { position: static; } }
 
 /* Merkje op documenten */
-.doc-space-top, .doc-space-bottom { display: none; }
 .doc-mark { display: flex; flex-direction: column; align-items: center; gap: 3px; margin-top: 26px; color: var(--muted); font-size: 7.5pt; text-align: center; }
 .doc-mark img { display: block; height: 15px; width: auto; }
 @media print {
-  .doc-frame { display: table; width: 100%; table-layout: fixed; }
-  .doc-body { display: table-row-group; }
-  .doc-space-top { display: table-header-group; }
-  .doc-space-bottom { display: table-footer-group; }
-  .doc-space-top > div { height: 15mm; }
-  .doc-space-bottom > div { height: 20mm; }
+  /* Elke pagina houdt boven en onder ruimte vrij; onderaan staat het merkje. */
+  .doc-body { padding: 15mm 0 20mm; -webkit-box-decoration-break: clone; box-decoration-break: clone; }
   .doc-mark { position: fixed; left: 0; right: 0; bottom: 6mm; margin: 0; }
 }
 
@@ -421,3 +416,19 @@ body.route-dragging, body.route-dragging * { cursor: grabbing !important; user-s
 .lang-pick:hover { background: var(--surface-2); color: var(--fg); }
 .lang-pick select { width: auto; min-height: 34px; padding: 4px 4px; border: 0; background: transparent; color: inherit; font: 500 .9rem var(--body); cursor: pointer; }
 .lang-pick select option { background: var(--surface); color: var(--fg); }
+
+/* Rapportage */
+.report-filter { display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: flex-end; justify-content: space-between; }
+.report-dates { display: flex; flex-wrap: wrap; gap: 12px; }
+.report-dates .field { width: 170px; }
+.report-table td:nth-child(-n+3) { white-space: nowrap; }
+.report-table { font-size: .86rem; }
+.report-table tr.report-total td { border-top: 2px solid var(--fg); border-bottom: 0; font-weight: 700; white-space: nowrap; }
+.paper tbody tr { break-inside: avoid; }
+@media print { .stack { display: block; } .stack > .paper { width: 100%; } .report-table { font-size: 9.5pt; } }
+.report-table th { white-space: normal; vertical-align: bottom; }
+.report-table th, .report-table td { padding-inline: 6px; }
+@media print {
+  .paper .table-wrap { overflow: visible; margin: 0; padding: 0; }
+  .report-table { font-size: 8.5pt; }
+}

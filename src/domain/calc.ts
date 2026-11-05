@@ -304,3 +304,30 @@ export const inboundWarehouse = (warehouses: Warehouse[]) => warehouses.find((w)
 /** Waar een inkoopregel terechtkomt: nog open is altijd het vaste magazijn, ontvangen is waar hij is ingeboekt. */
 export const shipmentDestination = (s: Snapshot, x: InboundShipment) =>
   (shipmentIsOpen(x) ? inboundWarehouse(s.warehouses) : s.warehouses.find((w) => w.id === x.warehouse_id))?.name ?? ''
+
+// Rapportage -------------------------------------------------------------------
+
+export type ReportPeriod = 'maand' | 'kwartaal' | 'jaar' | 'vrij'
+
+/** Periode t/m vandaag. Laatste 3 maanden loopt vanaf dezelfde dag drie maanden terug. */
+export function periodRange(period: ReportPeriod, today: string, from = '', to = '') {
+  if (period === 'vrij') return { from, to }
+  if (period === 'maand') return { from: `${today.slice(0, 7)}-01`, to: today }
+  if (period === 'jaar') return { from: `${today.slice(0, 4)}-01-01`, to: today }
+  const [y, m, d] = today.split('-').map(Number)
+  const lastDay = new Date(Date.UTC(y, m - 3, 0)).getUTCDate()
+  return { from: new Date(Date.UTC(y, m - 4, Math.min(d, lastDay))).toISOString().slice(0, 10), to: today }
+}
+
+/** Facturen binnen de periode, op factuurnummer, met totalen. Lege grens betekent geen grens. */
+export function invoiceReport(s: Snapshot, from: string, to: string) {
+  const invoices = s.invoices
+    .filter((i) => { const day = i.invoice_date.slice(0, 10); return (!from || day >= from) && (!to || day <= to) })
+    .sort((a, b) => a.number.localeCompare(b.number))
+  const rows = invoices.map((invoice) => {
+    const customer = s.customers.find((c) => c.id === invoice.customer_id)
+    return { invoice, order: s.sales_orders.find((o) => o.id === invoice.sales_order_id), customer: customer?.company || customer?.name || '' }
+  })
+  const sum = (pick: (i: Invoice) => number) => round2(invoices.reduce((n, i) => n + pick(i), 0))
+  return { rows, base: sum((i) => i.base_amount), vat: sum((i) => i.vat_amount), total: sum((i) => i.total) }
+}

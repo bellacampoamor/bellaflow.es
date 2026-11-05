@@ -6,7 +6,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { loadSnapshot } from '../src/data/driver'
 import { LocalDriver } from '../src/data/localDriver'
 import { TABLES } from '../src/data/types'
-import { archiveRows, openLinesOnTransport, linePurchaseStatus, linesToPurchase, documentLanguage, flowCounts, freeAt, transportLoad, invoiceBalance, onHandMap, orderStage, orderTab, reservedMap, stockKey, vatBreakdown } from '../src/domain/calc'
+import { archiveRows, openLinesOnTransport, linePurchaseStatus, linesToPurchase, documentLanguage, flowCounts, freeAt, transportLoad, invoiceBalance, onHandMap, orderStage, orderTab, reservedMap, stockKey, vatBreakdown , invoiceReport, periodRange } from '../src/domain/calc'
 import { renameOldSuppliers, restoreSettings, restoreSuppliers, seedDemo } from '../src/domain/demo'
 import {
   createDelivery, createInvoice, createOrder, createPurchaseOrder, invoiceProformas, lineFromProduct, markDelivered, assignShipmentsToTransport, cancelTransport, convertLinesToPurchaseOrders, createTransport, markReady, receiveGoods, rescheduleDelivery, rescheduleOrder, saveRouteOrder, saveSettings, mailSignedNote, setPurchaseLabel, signDelivery, splitLinesForStock, setDeliveryInTransit, setTransportStatus, updateTransport, transferStock,
@@ -635,6 +635,30 @@ describe('route', () => {
   it('zet alle stops en de terugweg in de kaartlink', () => {
     const url = decodeURIComponent(googleMapsRouteUrl({ latitude: 1, longitude: 2 }, [{ latitude: 3, longitude: 4 }, { latitude: 5, longitude: 6 }]).replace(/\+/g, ' '))
     expect(url).toContain('origin=1,2'); expect(url).toContain('destination=1,2'); expect(url).toContain('waypoints=3,4|5,6')
+  })
+})
+
+describe('rapportage', () => {
+  it('rekent de periodes uit', () => {
+    expect(periodRange('maand', '2026-11-05')).toEqual({ from: '2026-11-01', to: '2026-11-05' })
+    expect(periodRange('kwartaal', '2026-11-05')).toEqual({ from: '2026-08-05', to: '2026-11-05' })
+    expect(periodRange('kwartaal', '2026-05-31')).toEqual({ from: '2026-02-28', to: '2026-05-31' })
+    expect(periodRange('kwartaal', '2026-01-15')).toEqual({ from: '2025-10-15', to: '2026-01-15' })
+    expect(periodRange('jaar', '2026-11-05')).toEqual({ from: '2026-01-01', to: '2026-11-05' })
+    expect(periodRange('vrij', '2026-11-05', '2026-03-01', '2026-03-31')).toEqual({ from: '2026-03-01', to: '2026-03-31' })
+  })
+  it('factuuroverzicht filtert op factuurdatum, sorteert op nummer en telt op', async () => {
+    const s = await loadSnapshot(db)
+    expect(s.invoices.length).toBeGreaterThan(0)
+    const dates = s.invoices.map((i) => i.invoice_date.slice(0, 10)).sort()
+    const all = invoiceReport(s, '', '')
+    expect(all.rows.length).toBe(s.invoices.length)
+    expect(all.total).toBe(s.invoices.reduce((n, i) => Math.round((n + i.total) * 100) / 100, 0))
+    expect(all.rows.map((r) => r.invoice.number)).toEqual([...s.invoices.map((i) => i.number)].sort())
+    const oneDay = invoiceReport(s, dates[0], dates[0])
+    expect(oneDay.rows.every((r) => r.invoice.invoice_date.slice(0, 10) === dates[0])).toBe(true)
+    expect(invoiceReport(s, '1999-01-01', '1999-12-31')).toMatchObject({ rows: [], base: 0, vat: 0, total: 0 })
+    expect(all.base + all.vat).toBeCloseTo(all.total, 2)
   })
 })
 
