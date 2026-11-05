@@ -19,7 +19,7 @@ export function poProgress(s: Snap, poId: string) {
 export function Purchases() {
   const { s } = useApp()
   const waiting = linesToPurchase(s)
-  const [tab, setTab] = useState<'queue' | 'orders'>(waiting.length ? 'queue' : 'orders')
+  const [tab, setTab] = useState<'queue' | 'orders'>('orders')
   const [labelFilter, setLabelFilter] = useState<PurchaseLabel | ''>('')
   const [supplierFilter, setSupplierFilter] = useState('')
   const all = [...s.purchase_orders].sort((a, b) => b.order_date.localeCompare(a.order_date) || b.number.localeCompare(a.number))
@@ -33,7 +33,7 @@ export function Purchases() {
       <Head title={tx("Inkooporders")} sub={tx("Gedurende de dag ontstaan verkooporders. Zet de regels die ingekocht moeten worden door naar een inkooporder bij de leverancier.")}>
         <a className="btn primary" href="#inkoop-nieuw"><Plus size={16} />{tx("Nieuwe inkooporder")}</a>
       </Head>
-      <Tabs<'queue' | 'orders'> value={tab} onChange={setTab} tabs={[{ value: 'queue', label: tx("Inkoop vereist"), n: waiting.length }, { value: 'orders', label: tx("Inkooporders"), n: all.length }]} />
+      <Tabs<'queue' | 'orders'> value={tab} onChange={setTab} tabs={[{ value: 'orders', label: tx("Inkooporders"), n: all.length }, { value: 'queue', label: tx("Inkoop vereist"), n: waiting.length }]} />
       {tab === 'queue' && <PurchaseQueue onDone={() => setTab('orders')} />}
       {tab === 'orders' && <section className="panel">
         <div className="panel-head">
