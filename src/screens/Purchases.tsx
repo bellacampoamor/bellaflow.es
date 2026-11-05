@@ -50,17 +50,22 @@ export function Purchases() {
         </div>
         {rows.length === 0 && <Empty>{all.length ? tx("Geen inkooporders met dit filter.") : tx("Nog geen inkooporders. Maak de eerste met de knop rechtsboven.")}</Empty>}
         <div className="table-wrap"><table>
-          <thead><tr><th aria-label="PDF" /><th>{tx("Nummer")}</th><th>{tx("Leverancier")}</th><th>{tx("Besteld")}</th><th>{tx("Label")}</th><th>{tx("Referentie")}</th><th className="num">{tx("Op transport")}</th><th className="num">{tx("Waarde")}</th><th>{tx("Status")}</th></tr></thead>
+          <thead><tr><th aria-label="PDF" /><th>{tx("Nummer")}</th><th>{tx("Leverancier")}</th><th>{tx("Besteld")}</th><th>{tx("Label")}</th><th>{tx("Verkooporder")}</th><th>{tx("Referentie")}</th><th className="num">{tx("Op transport")}</th><th className="num">{tx("Waarde")}</th><th>{tx("Status")}</th></tr></thead>
           <tbody>{rows.map((po) => {
             const { total, planned, received } = poProgress(s, po.id)
             const value = round2(s.purchase_order_lines.filter((l) => l.purchase_order_id === po.id).reduce((n, l) => n + l.qty * l.unit_cost, 0))
+            // Een inkooporder kan regels voor meerdere verkooporders hebben.
+            const orderIds = new Set(s.purchase_order_lines.filter((l) => l.purchase_order_id === po.id && l.sales_order_line_id).map((l) => s.sales_order_lines.find((x) => x.id === l.sales_order_line_id)?.sales_order_id))
+            const salesOrders = s.sales_orders.filter((o) => orderIds.has(o.id)).sort((a, b) => a.number.localeCompare(b.number))
             const [label, tone]: [string, Tone] = po.status === 'cancelled' ? [tx("Geannuleerd"), ''] : received === total ? [tx("Ontvangen"), 'good'] : planned === total ? [tx("Ingepland"), 'info'] : [tx("Besteld"), 'warn']
             return (
               <tr key={po.id} className="click" onClick={() => go(`inkoop-${po.id}`)}>
                 <td><a className="pdf-ic" href={`#inkoop-print-${po.id}`} title={tx("Inkooporder {0} afdrukken als PDF", po.number)} aria-label={tx("Inkooporder {0} afdrukken als PDF", po.number)} onClick={(e) => e.stopPropagation()}><FileText size={18} /><span>PDF</span></a></td>
                 <td><a className="rowlink" href={`#inkoop-${po.id}`}>{po.number}</a></td>
                 <td>{s.suppliers.find((x) => x.id === po.supplier_id)?.name}</td>
-                <td>{fmtDate(po.order_date)}</td><td><LabelPill label={po.label} /></td><td className="muted">{po.supplier_reference || '–'}</td>
+                <td>{fmtDate(po.order_date)}</td><td><LabelPill label={po.label} /></td>
+                <td>{salesOrders.length ? salesOrders.map((o) => <div key={o.id}><a className="rowlink" href={`#orders-${o.id}`} onClick={(e) => e.stopPropagation()}>{o.number}</a></div>) : <span className="muted">–</span>}</td>
+                <td className="muted">{po.supplier_reference || '–'}</td>
                 <td className="num">{tx("{0} van {1} regels", planned, total)}</td><td className="num">{eur(value)}</td>
                 <td><Pill tone={tone}>{label}</Pill></td>
               </tr>
