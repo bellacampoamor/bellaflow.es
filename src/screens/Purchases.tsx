@@ -28,7 +28,7 @@ export function Purchases() {
       <Head title={tx("Inkooporders")} sub={tx("Gedurende de dag ontstaan verkooporders. Zet de regels die ingekocht moeten worden door naar een inkooporder bij de leverancier.")}>
         <a className="btn primary" href="#inkoop-nieuw"><Plus size={16} />{tx("Nieuwe inkooporder")}</a>
       </Head>
-      <Tabs<'queue' | 'orders'> value={tab} onChange={setTab} tabs={[{ value: 'queue', label: tx("Door te zetten"), n: waiting.length }, { value: 'orders', label: tx("Inkooporders"), n: all.length }]} />
+      <Tabs<'queue' | 'orders'> value={tab} onChange={setTab} tabs={[{ value: 'queue', label: tx("Inkoop vereist"), n: waiting.length }, { value: 'orders', label: tx("Inkooporders"), n: all.length }]} />
       {tab === 'queue' && <PurchaseQueue onDone={() => setTab('orders')} />}
       {tab === 'orders' && <section className="panel">
         <div className="panel-head">
@@ -126,7 +126,7 @@ export function PurchaseDetail({ id }: { id: string }) {
         <Modal title={tx("{0} annuleren?", po.number)} onClose={() => setConfirm(false)} footer={<>
           <button className="btn" onClick={() => setConfirm(false)}>{tx("Terug")}</button>
           <button className="btn danger" onClick={async () => { await run((db) => cancelPurchaseOrder(db, id), tx("Inkooporder geannuleerd")); setConfirm(false) }}>{tx("Inkooporder annuleren")}</button>
-        </>}><p style={{ margin: 0 }}>{tx("De regels vervallen. Verkooporders die hierop wachten, verschijnen weer bij Door te zetten.")}</p></Modal>
+        </>}><p style={{ margin: 0 }}>{tx("De regels vervallen. Verkooporders die hierop wachten, verschijnen weer bij Inkoop vereist.")}</p></Modal>
       )}
     </>
   )

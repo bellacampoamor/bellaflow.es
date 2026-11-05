@@ -44,7 +44,7 @@ export function PurchaseQueue({ onDone }: { onDone: () => void }) {
     <section className="panel">
       <div className="panel-head">
         <div>
-          <h2>{tx("Door te zetten vanuit verkooporders")}</h2>
+          <h2>{tx("Verkooporders zonder Inkooporders")}</h2>
           <div className="small muted">{tx("Klik op een regel om die te selecteren. De driehoek klapt een verkooporder open of dicht. Per leverancier ontstaat één inkooporder.")}</div>
         </div>
         <div className="btn-row" style={{ alignItems: 'center' }}>
