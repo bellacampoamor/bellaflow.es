@@ -880,7 +880,7 @@ export const en: Record<string, string> = {
   "Filter op label": "Filter by label",
   "Alle labels": "All labels",
   "{0} van {1} inkooporders": "{0} of {1} purchase orders",
-  "Geen inkooporders met dit label.": "No purchase orders with this label.",
+  "Geen inkooporders met dit filter.": "No purchase orders with this filter.",
   "Label aangepast": "Label changed",
   "Vul per regel in wat er daadwerkelijk is ontvangen. Wat ontbreekt blijft open staan.": "Enter per line what was actually received. Anything missing stays open.",
   " {0} stuks niet ontvangen, die blijven open staan.": " {0} pcs not received, they stay open.",

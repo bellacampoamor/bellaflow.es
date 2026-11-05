@@ -362,3 +362,11 @@ body.route-dragging, body.route-dragging * { cursor: grabbing !important; user-s
 .paper table th:last-child, .paper table td:last-child { padding-right: 0; }
 .paper .totals > div { font-variant-numeric: tabular-nums; }
 .paper table td.num, .paper table th.num { font-variant-numeric: tabular-nums; }
+
+/* Filterknoppen */
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { min-height: 34px; padding: 4px 12px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); color: var(--fg); font: inherit; font-size: .9rem; cursor: pointer; }
+.chip span { color: var(--muted); margin-left: 3px; }
+.chip:hover { background: var(--sell); }
+.chip.on { background: var(--primary); border-color: var(--primary); color: var(--on-primary); font-weight: 600; }
+.chip.on span { color: inherit; }

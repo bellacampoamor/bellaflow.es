@@ -21,8 +21,13 @@ export function Purchases() {
   const waiting = linesToPurchase(s)
   const [tab, setTab] = useState<'queue' | 'orders'>(waiting.length ? 'queue' : 'orders')
   const [labelFilter, setLabelFilter] = useState<PurchaseLabel | ''>('')
+  const [supplierFilter, setSupplierFilter] = useState('')
   const all = [...s.purchase_orders].sort((a, b) => b.order_date.localeCompare(a.order_date) || b.number.localeCompare(a.number))
-  const rows = all.filter((po) => !labelFilter || (po.label ?? 'magazijn') === labelFilter)
+  // De aantallen op de labels volgen de gekozen leverancier, zodat ze kloppen met wat je te zien krijgt.
+  const forSupplier = all.filter((po) => !supplierFilter || po.supplier_id === supplierFilter)
+  const rows = forSupplier.filter((po) => !labelFilter || (po.label ?? 'magazijn') === labelFilter)
+  const labelCount = (l: PurchaseLabel | '') => forSupplier.filter((po) => !l || (po.label ?? 'magazijn') === l).length
+  const usedSuppliers = s.suppliers.filter((x) => all.some((po) => po.supplier_id === x.id)).sort((a, b) => a.name.localeCompare(b.name))
   return (
     <>
       <Head title={tx("Inkooporders")} sub={tx("Gedurende de dag ontstaan verkooporders. Zet de regels die ingekocht moeten worden door naar een inkooporder bij de leverancier.")}>
@@ -32,15 +37,18 @@ export function Purchases() {
       {tab === 'queue' && <PurchaseQueue onDone={() => setTab('orders')} />}
       {tab === 'orders' && <section className="panel">
         <div className="panel-head">
-          <select style={{ width: 'auto' }} aria-label={tx("Filter op label")} value={labelFilter} onChange={(e) => setLabelFilter(e.target.value as PurchaseLabel | '')}>
-            <option value="">{tx("Alle labels")}</option>
-            <option value="showroom">{tx("Showroom")}</option>
-            <option value="magazijn">{tx("Magazijn")}</option>
-            <option value="verkoop">{tx("Verkoop")}</option>
+          <div className="chips" role="group" aria-label={tx("Filter op label")}>
+            {([['', tx("Alle labels")], ['verkoop', tx("Verkoop")], ['magazijn', tx("Magazijn")], ['showroom', tx("Showroom")]] as [PurchaseLabel | '', string][]).map(([value, text]) => (
+              <button key={value || 'alle'} type="button" className={`chip${labelFilter === value ? ' on' : ''}`} aria-pressed={labelFilter === value} onClick={() => setLabelFilter(value)}>{text} <span>{labelCount(value)}</span></button>
+            ))}
+          </div>
+          <select id="inkoop-leverancier" style={{ width: 'auto', maxWidth: 340 }} aria-label={tx("Filter op leverancier")} value={supplierFilter} onChange={(e) => setSupplierFilter(e.target.value)}>
+            <option value="">{tx("Alle leveranciers")}</option>
+            {usedSuppliers.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
           </select>
           <span className="small muted">{tx("{0} van {1} inkooporders", rows.length, all.length)}</span>
         </div>
-        {rows.length === 0 && <Empty>{all.length ? tx("Geen inkooporders met dit label.") : tx("Nog geen inkooporders. Maak de eerste met de knop rechtsboven.")}</Empty>}
+        {rows.length === 0 && <Empty>{all.length ? tx("Geen inkooporders met dit filter.") : tx("Nog geen inkooporders. Maak de eerste met de knop rechtsboven.")}</Empty>}
         <div className="table-wrap"><table>
           <thead><tr><th aria-label="PDF" /><th>{tx("Nummer")}</th><th>{tx("Leverancier")}</th><th>{tx("Besteld")}</th><th>{tx("Label")}</th><th>{tx("Referentie")}</th><th className="num">{tx("Op transport")}</th><th className="num">{tx("Waarde")}</th><th>{tx("Status")}</th></tr></thead>
           <tbody>{rows.map((po) => {
