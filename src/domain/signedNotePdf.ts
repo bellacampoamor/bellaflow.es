@@ -5,8 +5,8 @@ import { NOTE_TEXT } from './noteText'
 
 const A4: [number, number] = [595.28, 841.89]
 const MARGIN = 48
-const INK = rgb(0.08, 0.23, 0.3)
-const MUTED = rgb(0.36, 0.44, 0.49)
+const INK = rgb(0.067, 0.184, 0.271) // Midnight Navy
+const MUTED = rgb(0.353, 0.29, 0.298) // Smoky Taupe
 
 /** De standaardlettertypen kennen alleen West-Europese tekens; de rest mag de pdf niet laten mislukken. */
 const safe = (text: string) => text.replace(/[^\x20-\x7e\xa0-\xff]/g, (c) => c.normalize('NFD').replace(/[^\x20-\x7e]/g, '') || '?')

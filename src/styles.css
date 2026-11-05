@@ -1,61 +1,66 @@
-/* Bella Flow. Kleuren uit het logo: petrolblauw en roestrood, met een eigen tint per processtap.
+/* Bella Flow. Kleuren volgens de kleurenkaart (claude/bella-flow-kleurenkaart.md).
+   Palet: Midnight Navy #112F45, Deep Ink #0B182A, Blue Slate #40444E, Smoky Taupe #5A4A4C, Burnished Copper #915442,
+   Terracotta #AC5F41, Warm Copper #CE8D61, Soft Sand #F2E8DF, Porcelain #FAF8F5.
+   Vooral de middenkleuren; Deep Ink, Midnight Navy en Porcelain alleen als klein accent, tekst op een knop of papier.
    Lay-out: procesbalk als hoofdnavigatie bovenaan, werkvlak eronder. */
 :root {
-  --petrol: #123f55;
-  --petrol-soft: #2c6079;
-  --ochre: #ab5236;
-  --ochre-strong: #8f4329;
-  --bg: #f6f7f5;
-  --surface: #ffffff;
-  --surface-2: #eff2f0;
-  --fg: #16303d;
-  --muted: #5c717c;
-  --line: #d8e0e1;
-  --line-strong: #b4c2c6;
-  --on-primary: #ffffff;
-  --primary: #123f55;
-  --primary-hover: #0c2f40;
-  --accent: #8f4329;
-  --buy: #dcebf3;      --buy-fg: #1a506b;
-  --sell: #f7e4db;     --sell-fg: #8a4026;
-  --ship: #e1efdf;     --ship-fg: #2f6b34;
-  --bill: #eae4f6;     --bill-fg: #5b4296;
-  --good: #24743a;     --good-bg: #e0f1e3;
-  --warn: #8f5d07;     --warn-bg: #fbeed0;
-  --bad: #ae2f25;      --bad-bg: #fbe3e0;
-  --info: #1f5f80;     --info-bg: #dcebf3;
-  --neutral-bg: #e8ecec;
-  --shadow: 0 12px 40px rgba(18, 63, 85, .18);
+  --heading: #40444E;
+  --link: #915442;
+  --brand-line: #AC5F41;
+  --brand-strong: #915442;
+  --bg: #F2E8DF;
+  --surface: #FAF8F5;
+  --surface-2: #EDE2D8;
+  --fg: #40444E;
+  --muted: #6D5D5F;
+  --line: #E3D7CC;
+  --line-strong: #C7B6A9;
+  --on-primary: #FFFFFF;
+  --primary: #AC5F41;
+  --primary-hover: #915442;
+  --selected: #40444E;
+  --on-selected: #FFFFFF;
+  --buy: #DFDFE0;      --buy-fg: #40444E;
+  --sell: #F0D9C8;     --sell-fg: #7E4737;
+  --ship: #E5DAD5;     --ship-fg: #5A4A4C;
+  --bill: #D5DEE4;     --bill-fg: #112F45;
+  --good: #36603F;     --good-bg: #DDE6D5;
+  --warn: #7C5310;     --warn-bg: #F6E4C2;
+  --bad: #9E2B2B;      --bad-bg: #F6DAD4;
+  --info: #2A5068;     --info-bg: #D9E2E7;
+  --neutral-bg: #E6DBD1;
+  --overlay: rgb(64 68 78 / .55);
+  --shadow: 0 12px 40px rgb(64 68 78 / .22);
   --logo-plate: transparent;
   --logo-pad: 0;
   --display: 'Outfit', 'Avenir Next', 'Segoe UI', sans-serif;
   --body: 'Figtree', 'Segoe UI', system-ui, sans-serif;
 }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
-  --petrol: #cfe6f1; --petrol-soft: #8fbdd2; --ochre: #e0937a; --ochre-strong: #eaa992;
-  --bg: #0f1d24; --surface: #16272f; --surface-2: #1d323b; --fg: #e4edf0; --muted: #94a9b3;
-  --line: #2a424d; --line-strong: #41606d; --on-primary: #0f1d24; --primary: #e0937a; --primary-hover: #eaa992; --accent: #eaa992;
-  --buy: #1d3b4b; --buy-fg: #a7d3e8; --sell: #44261b; --sell-fg: #f1bda8; --ship: #21392a; --ship-fg: #a8d8ad; --bill: #322a4b; --bill-fg: #c9baf0;
-  --good: #8fd89f; --good-bg: #1c3a26; --warn: #eec26b; --warn-bg: #413212; --bad: #f4a79f; --bad-bg: #4a211d; --info: #a7d3e8; --info-bg: #1d3b4b;
-  --neutral-bg: #26393f; --shadow: 0 12px 40px rgba(0, 0, 0, .5); --logo-plate: #f6f7f5; --logo-pad: 5px 10px; color-scheme: dark;
+  --heading: #F2E8DF; --link: #E0AC87; --brand-line: #CE8D61; --brand-strong: #CE8D61;
+  --bg: #252A33; --surface: #30343E; --surface-2: #40444E; --fg: #F2E8DF; --muted: #CDBFB4;
+  --line: #4D4C53; --line-strong: #6E6264; --on-primary: #0B182A; --primary: #CE8D61; --primary-hover: #BD7A52; --selected: #CE8D61; --on-selected: #0B182A;
+  --buy: #4A505C; --buy-fg: #E0E3E8; --sell: #5F4235; --sell-fg: #F2D6C2; --ship: #54484A; --ship-fg: #EADCD8; --bill: #1F3D54; --bill-fg: #C9DBE7;
+  --good: #AFD6B3; --good-bg: #2F463A; --warn: #E9C786; --warn-bg: #4D3D22; --bad: #F4B0A8; --bad-bg: #57302D; --info: #BAD2E1; --info-bg: #2B4354;
+  --neutral-bg: #4A4E59; --overlay: rgb(11 24 42 / .62); --shadow: 0 12px 40px rgb(11 24 42 / .5); --logo-plate: #F2E8DF; --logo-pad: 5px 10px; color-scheme: dark;
 } }
 :root[data-theme="dark"] {
-  --petrol: #cfe6f1; --petrol-soft: #8fbdd2; --ochre: #e0937a; --ochre-strong: #eaa992;
-  --bg: #0f1d24; --surface: #16272f; --surface-2: #1d323b; --fg: #e4edf0; --muted: #94a9b3;
-  --line: #2a424d; --line-strong: #41606d; --on-primary: #0f1d24; --primary: #e0937a; --primary-hover: #eaa992; --accent: #eaa992;
-  --buy: #1d3b4b; --buy-fg: #a7d3e8; --sell: #44261b; --sell-fg: #f1bda8; --ship: #21392a; --ship-fg: #a8d8ad; --bill: #322a4b; --bill-fg: #c9baf0;
-  --good: #8fd89f; --good-bg: #1c3a26; --warn: #eec26b; --warn-bg: #413212; --bad: #f4a79f; --bad-bg: #4a211d; --info: #a7d3e8; --info-bg: #1d3b4b;
-  --neutral-bg: #26393f; --shadow: 0 12px 40px rgba(0, 0, 0, .5); --logo-plate: #f6f7f5; --logo-pad: 5px 10px; color-scheme: dark;
+  --heading: #F2E8DF; --link: #E0AC87; --brand-line: #CE8D61; --brand-strong: #CE8D61;
+  --bg: #252A33; --surface: #30343E; --surface-2: #40444E; --fg: #F2E8DF; --muted: #CDBFB4;
+  --line: #4D4C53; --line-strong: #6E6264; --on-primary: #0B182A; --primary: #CE8D61; --primary-hover: #BD7A52; --selected: #CE8D61; --on-selected: #0B182A;
+  --buy: #4A505C; --buy-fg: #E0E3E8; --sell: #5F4235; --sell-fg: #F2D6C2; --ship: #54484A; --ship-fg: #EADCD8; --bill: #1F3D54; --bill-fg: #C9DBE7;
+  --good: #AFD6B3; --good-bg: #2F463A; --warn: #E9C786; --warn-bg: #4D3D22; --bad: #F4B0A8; --bad-bg: #57302D; --info: #BAD2E1; --info-bg: #2B4354;
+  --neutral-bg: #4A4E59; --overlay: rgb(11 24 42 / .62); --shadow: 0 12px 40px rgb(11 24 42 / .5); --logo-plate: #F2E8DF; --logo-pad: 5px 10px; color-scheme: dark;
 }
 
 * { box-sizing: border-box; }
 body { margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.5 var(--body); }
-h1, h2, h3 { font-family: var(--display); color: var(--petrol); margin: 0; text-wrap: balance; line-height: 1.2; }
+h1, h2, h3 { font-family: var(--display); color: var(--heading); margin: 0; text-wrap: balance; line-height: 1.2; }
 h1 { font-size: 1.75rem; font-weight: 700; }
 h2 { font-size: 1.12rem; font-weight: 600; }
 h3 { font-size: .98rem; font-weight: 600; }
-a { color: var(--accent); }
-:focus-visible { outline: 2px solid var(--ochre); outline-offset: 2px; }
+a { color: var(--link); }
+:focus-visible { outline: 2px solid var(--brand-line); outline-offset: 2px; }
 .num { font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
 .muted { color: var(--muted); }
 .small { font-size: .85rem; }
@@ -77,7 +82,7 @@ a { color: var(--accent); }
 .util { display: flex; gap: 2px; flex-wrap: wrap; }
 .util a { display: inline-flex; gap: 7px; align-items: center; padding: 7px 12px; border-radius: 8px; color: var(--muted); text-decoration: none; font-weight: 500; }
 .util a:hover { background: var(--surface-2); color: var(--fg); }
-.util a.on { background: var(--surface-2); color: var(--petrol); font-weight: 600; }
+.util a.on { background: var(--surface-2); color: var(--heading); font-weight: 600; }
 
 /* Procesbalk: de zes stappen uit de illustratie */
 .ribbon-wrap { background: var(--surface); border-bottom: 1px solid var(--line); padding-block: 12px; position: sticky; top: env(safe-area-inset-top, 0px); z-index: 20; }
@@ -133,7 +138,7 @@ tr:last-child td { border-bottom: 0; }
 tr.click { cursor: pointer; }
 tr.click:hover td { background: var(--surface-2); }
 tfoot td { font-weight: 600; border-top: 1px solid var(--line-strong); border-bottom: 0; }
-td a.rowlink { color: var(--petrol); font-weight: 600; text-decoration: none; }
+td a.rowlink { color: var(--heading); font-weight: 600; text-decoration: none; }
 td a.rowlink:hover { text-decoration: underline; }
 
 .pill { display: inline-flex; align-items: center; gap: 5px; padding: 2px 9px; border-radius: 99px; font-size: .79rem; font-weight: 600; white-space: nowrap; background: var(--neutral-bg); color: var(--fg); }
@@ -146,7 +151,7 @@ td a.rowlink:hover { text-decoration: underline; }
 
 .tabs { display: flex; gap: 4px; margin-bottom: 14px; overflow-x: auto; scrollbar-width: thin; }
 .tabs button { background: none; border: 0; border-bottom: 2px solid transparent; padding: 6px 11px; font: 500 .9rem var(--body); color: var(--muted); cursor: pointer; white-space: nowrap; }
-.tabs button.on { color: var(--petrol); border-bottom-color: var(--ochre); font-weight: 600; }
+.tabs button.on { color: var(--heading); border-bottom-color: var(--brand-line); font-weight: 600; }
 .tabs .n { font-variant-numeric: tabular-nums; opacity: .75; margin-left: 4px; }
 
 /* Formulieren */
@@ -159,19 +164,19 @@ td a.rowlink:hover { text-decoration: underline; }
 .field .hint { font-size: .78rem; color: var(--muted); }
 input, select, textarea { width: 100%; min-height: 38px; padding: 7px 10px; border: 1px solid var(--line-strong); border-radius: 7px; background: var(--surface); color: var(--fg); font: inherit; }
 textarea { min-height: 72px; resize: vertical; }
-input:focus, select:focus, textarea:focus { outline: 2px solid var(--ochre); outline-offset: 0; border-color: var(--ochre); }
+input:focus, select:focus, textarea:focus { outline: 2px solid var(--brand-line); outline-offset: 0; border-color: var(--brand-line); }
 input[type="number"] { font-variant-numeric: tabular-nums; }
 .check { display: inline-flex; align-items: center; gap: 8px; font-weight: 500; font-size: .92rem; min-height: 38px; cursor: pointer; }
-.check input { width: 18px; min-height: 18px; height: 18px; accent-color: var(--ochre-strong); }
+.check input { width: 18px; min-height: 18px; height: 18px; accent-color: var(--brand-strong); }
 td input, td select { min-width: 72px; }
 td input.qty { width: 78px; }
 td input.price { width: 104px; }
 
 .choice { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px; }
 .choice button { text-align: left; padding: 11px 13px; border-radius: 9px; border: 1px solid var(--line-strong); background: var(--surface); color: var(--fg); font: inherit; cursor: pointer; display: flex; gap: 10px; align-items: flex-start; }
-.choice button strong { display: block; font-family: var(--display); font-weight: 600; color: var(--petrol); }
+.choice button strong { display: block; font-family: var(--display); font-weight: 600; color: var(--heading); }
 .choice button small { color: var(--muted); }
-.choice button.on { border-color: var(--ochre-strong); box-shadow: inset 0 0 0 1px var(--ochre-strong); background: var(--sell); }
+.choice button.on { border-color: var(--brand-strong); box-shadow: inset 0 0 0 1px var(--brand-strong); background: var(--sell); }
 
 .combo { position: relative; min-width: 0; }
 .combo-list { position: fixed; z-index: 70; max-width: calc(100vw - 16px); background: var(--surface); border: 1px solid var(--line-strong); border-radius: 8px; box-shadow: var(--shadow); max-height: 260px; overflow-y: auto; }
@@ -181,7 +186,7 @@ td input.price { width: 104px; }
 
 .totals { display: grid; gap: 5px; margin-left: auto; max-width: 340px; font-variant-numeric: tabular-nums; }
 .totals div { display: flex; justify-content: space-between; gap: 24px; }
-.totals .grand { font-family: var(--display); font-weight: 700; font-size: 1.15rem; color: var(--petrol); border-top: 1px solid var(--line-strong); padding-top: 6px; margin-top: 3px; }
+.totals .grand { font-family: var(--display); font-weight: 700; font-size: 1.15rem; color: var(--heading); border-top: 1px solid var(--line-strong); padding-top: 6px; margin-top: 3px; }
 .sticky-save { position: sticky; bottom: 0; z-index: 10; display: flex; justify-content: flex-end; gap: 8px; padding: 12px 0; background: var(--bg); flex-wrap: wrap; }
 
 .dl { display: grid; grid-template-columns: minmax(96px, auto) minmax(0, 1fr); gap: 4px 14px; margin: 0; }
@@ -195,7 +200,7 @@ td input.price { width: 104px; }
 .track div::after { content: ''; position: absolute; top: 11px; left: 0; right: 0; height: 2px; background: var(--line); }
 .track div:first-child::after { left: 50%; } .track div:last-child::after { right: 50%; }
 .track div.done { color: var(--fg); } .track div.done::before { background: var(--good); }
-.track div.now { color: var(--petrol); font-weight: 600; } .track div.now::before { background: var(--ochre); box-shadow: 0 0 0 3px var(--sell); }
+.track div.now { color: var(--heading); font-weight: 600; } .track div.now::before { background: var(--brand-line); box-shadow: 0 0 0 3px var(--sell); }
 
 .timeline { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
 .timeline li { display: grid; grid-template-columns: 74px minmax(0, 1fr); gap: 8px; font-size: .88rem; }
@@ -206,12 +211,12 @@ td input.price { width: 104px; }
 .task { display: flex; justify-content: space-between; gap: 12px; align-items: center; padding: 9px 0; border-bottom: 1px solid var(--line); text-decoration: none; color: inherit; }
 .task:last-child { border-bottom: 0; }
 .task:hover .task-t { text-decoration: underline; }
-.task-t { font-weight: 600; color: var(--petrol); }
+.task-t { font-weight: 600; color: var(--heading); }
 .task > div { min-width: 0; }
 .empty { color: var(--muted); padding: 14px 0; font-size: .92rem; }
 .figures { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; margin-bottom: 16px; }
 .figures > div { background: var(--surface); padding: 12px 16px; }
-.figures b { display: block; font: 700 1.35rem var(--display); color: var(--petrol); font-variant-numeric: tabular-nums; }
+.figures b { display: block; font: 700 1.35rem var(--display); color: var(--heading); font-variant-numeric: tabular-nums; }
 
 /* Voorraad */
 .split-bar { display: flex; height: 7px; border-radius: 4px; overflow: hidden; background: var(--neutral-bg); }
@@ -220,10 +225,10 @@ td input.price { width: 104px; }
 .zero { color: var(--line-strong); }
 
 /* Dialoog */
-.overlay { position: fixed; inset: 0; background: rgba(9, 30, 41, .5); z-index: 50; display: flex; align-items: flex-start; justify-content: center; overflow-y: auto; padding: 5vh max(16px, env(safe-area-inset-right, 0px)) 5vh max(16px, env(safe-area-inset-left, 0px)); }
+.overlay { position: fixed; inset: 0; background: var(--overlay); z-index: 50; display: flex; align-items: flex-start; justify-content: center; overflow-y: auto; padding: 5vh max(16px, env(safe-area-inset-right, 0px)) 5vh max(16px, env(safe-area-inset-left, 0px)); }
 .modal { background: var(--surface); border-radius: 12px; box-shadow: var(--shadow); width: 100%; max-width: 620px; padding: 22px; display: flex; flex-direction: column; gap: 14px; }
 .modal.wide { max-width: 860px; }
-.modal.center { margin-block: auto; border: 1px solid var(--ochre); box-shadow: 0 0 22px 2px rgb(255 255 255 / .28); }
+.modal.center { margin-block: auto; border: 1px solid var(--brand-line); box-shadow: 0 0 22px 2px rgb(255 255 255 / .28); }
 .modal-foot { display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
 .note { background: var(--surface-2); border-radius: 8px; padding: 9px 12px; font-size: .88rem; }
 .note.warn { background: var(--warn-bg); color: var(--warn); }
@@ -232,13 +237,8 @@ td input.price { width: 104px; }
 .toast.err { background: var(--bad-bg); color: var(--bad); }
 
 /* Factuur */
-.paper { background: #fff; color: #16303d; border-radius: 6px; padding: clamp(18px, 4vw, 44px); border: 1px solid var(--line); max-width: 820px; }
-.paper h2, .paper h1 { color: #123f55; }
-.paper th { color: #5c717c; border-color: #b4c2c6; }
-.paper td { border-color: #d8e0e1; }
-.paper .muted { color: #5c717c; }
+.paper { --heading: #112F45; --fg: #0B182A; --muted: #5A4A4C; --line: #E3D7CC; --line-strong: #C7B6A9; background: #fff; color: var(--fg); border-radius: 6px; padding: clamp(18px, 4vw, 44px); border: 1px solid var(--line); max-width: 820px; }
 .paper-top { display: flex; justify-content: space-between; gap: 22px; flex-wrap: wrap; margin-bottom: 26px; }
-.paper .totals .grand { color: #123f55; border-color: #b4c2c6; }
 @media print {
   /* Zonder paginamarge heeft de browser geen ruimte voor titel, url en paginanummer; de witruimte zit op het document zelf. */
   @page { margin: 0; }
@@ -251,8 +251,7 @@ td input.price { width: 104px; }
 .login form { width: min(380px, 100%); display: grid; gap: 12px; }
 
 /* Routeplanning */
-.pdf-ic { display: inline-flex; align-items: center; gap: 3px; color: #b3261e; font-size: .68rem; font-weight: 700; text-decoration: none; vertical-align: middle; }
-:root[data-theme="dark"] .pdf-ic { color: #f2857c; }
+.pdf-ic { display: inline-flex; align-items: center; gap: 3px; color: var(--bad); font-size: .68rem; font-weight: 700; text-decoration: none; vertical-align: middle; }
 .route-bar { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; justify-content: space-between; background: var(--surface-2); border-radius: 8px; padding: 9px 12px; margin-bottom: 8px; font-size: .9rem; }
 .stop { position: relative; display: grid; grid-template-columns: 32px minmax(0, 1fr); gap: 10px; align-items: start; border-bottom: 1px solid var(--line); padding: 10px 14px; margin-inline: -14px; border-radius: 8px; background: var(--surface); }
 @media (hover: hover) {
@@ -263,7 +262,7 @@ td input.price { width: 104px; }
 .stop-grip { position: absolute; left: 0; top: 0; bottom: 0; width: 16px; display: grid; place-items: center; color: var(--muted); opacity: 0; cursor: grab; touch-action: none; }
 @media (hover: none) { .stop-grip { opacity: 1; } }
 .stop.shifting { transition: transform .16s ease; }
-.stop.dragging { z-index: 5; transition: none; cursor: grabbing; background: var(--surface); box-shadow: 0 10px 28px rgb(0 0 0 / .22); }
+.stop.dragging { z-index: 5; transition: none; cursor: grabbing; background: var(--surface); box-shadow: var(--shadow); }
 .stop.dragging .stop-grip { opacity: 1; }
 body.route-dragging, body.route-dragging * { cursor: grabbing !important; user-select: none; }
 .stop:last-child { border-bottom: 0; }
@@ -277,11 +276,11 @@ body.route-dragging, body.route-dragging * { cursor: grabbing !important; user-s
 /* Afleverbon */
 .note-meta { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 18px; margin-bottom: 20px; }
 .note-sign { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 22px; margin-top: 34px; break-inside: avoid; }
-.note-sign div { border-top: 1px solid #16303d; padding-top: 5px; min-height: 66px; font-size: .84rem; }
+.note-sign div { border-top: 1px solid #0B182A; padding-top: 5px; min-height: 66px; font-size: .84rem; }
 .note-sign div.sig { min-height: 96px; }
 .note-sign .pre { border-top: 0; padding-top: 0; font-size: .95rem; font-weight: 600; }
-.paper .note-box { border: 1px solid #b4c2c6; border-radius: 6px; padding: 9px 12px; font-size: .9rem; margin-top: 14px; }
-.paper .check-box { display: inline-block; width: 15px; height: 15px; border: 1px solid #16303d; vertical-align: -2px; margin-right: 7px; }
+.paper .note-box { border: 1px solid var(--line-strong); border-radius: 6px; padding: 9px 12px; font-size: .9rem; margin-top: 14px; }
+.paper .check-box { display: inline-block; width: 15px; height: 15px; border: 1px solid #0B182A; vertical-align: -2px; margin-right: 7px; }
 @media print { .paper table { font-size: 11pt; } }
 
 .util .btn-toggle { background: none; border: 0; display: inline-flex; gap: 7px; align-items: center; padding: 7px 10px; border-radius: 8px; color: var(--muted); font: 500 .9rem var(--body); cursor: pointer; }
@@ -294,15 +293,15 @@ body.route-dragging, body.route-dragging * { cursor: grabbing !important; user-s
 
 /* Inkoop en verkoop als aparte flows */
 .ribbon { grid-template-columns: repeat(3, minmax(190px, 1fr)); }
-.util a.flow-link { color: var(--petrol); font-weight: 600; }
-.util a.flow-link.on { background: var(--primary); color: var(--on-primary); }
+.util a.flow-link { color: var(--heading); font-weight: 600; }
+.util a.flow-link.on { background: var(--selected); color: var(--on-selected); }
 .queue-head td { background: var(--surface-2); }
-.queue input[type="checkbox"] { min-width: 18px; width: 18px; min-height: 18px; height: 18px; accent-color: var(--ochre-strong); display: block; }
+.queue input[type="checkbox"] { min-width: 18px; width: 18px; min-height: 18px; height: 18px; accent-color: var(--brand-strong); display: block; }
 .queue-bar { position: sticky; bottom: 0; display: flex; flex-wrap: wrap; gap: 10px; justify-content: space-between; align-items: center; background: var(--surface); padding-top: 12px; margin-top: 6px; border-top: 1px solid var(--line-strong); }
 @media (max-width: 600px) { .queue-bar { position: static; } }
 
 /* Signaallijst */
-.signal th.signal-group { color: var(--petrol); font-family: var(--display); font-size: .86rem; border-bottom: 1px solid var(--line); }
+.signal th.signal-group { color: var(--heading); font-family: var(--display); font-size: .86rem; border-bottom: 1px solid var(--line); }
 .signal .sold { border-left: 2px solid var(--line-strong); }
 
 /* Chauffeursapp */
@@ -345,9 +344,9 @@ body.route-dragging, body.route-dragging * { cursor: grabbing !important; user-s
 /* Inkoop vereist: klik selecteert, driehoek klapt */
 .queue tr.pick { cursor: pointer; }
 .queue tr.pick:hover td { background: var(--sell); }
-.queue tr.pick:focus-visible { outline: 2px solid var(--ochre); outline-offset: -2px; }
+.queue tr.pick:focus-visible { outline: 2px solid var(--brand-line); outline-offset: -2px; }
 .queue tr.pick.sel td, .queue tr.pick.partly td:first-child { background: var(--sell); color: var(--sell-fg); }
-.queue tr.pick.sel td:first-child { box-shadow: inset 3px 0 0 var(--ochre); }
+.queue tr.pick.sel td:first-child { box-shadow: inset 3px 0 0 var(--brand-line); }
 .tri { display: grid; place-items: center; width: 32px; height: 32px; padding: 0; border: 0; border-radius: 6px; background: none; color: var(--fg); cursor: pointer; }
 .tri:hover { background: var(--surface); }
 .tri svg { transition: transform .12s; }
@@ -368,5 +367,13 @@ body.route-dragging, body.route-dragging * { cursor: grabbing !important; user-s
 .chip { min-height: 34px; padding: 4px 12px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); color: var(--fg); font: inherit; font-size: .9rem; cursor: pointer; }
 .chip span { color: var(--muted); margin-left: 3px; }
 .chip:hover { background: var(--sell); }
-.chip.on { background: var(--primary); border-color: var(--primary); color: var(--on-primary); font-weight: 600; }
+.chip.on { background: var(--selected); border-color: var(--selected); color: var(--on-selected); font-weight: 600; }
 .chip.on span { color: inherit; }
+
+/* Nachtstand: de actieve stap in Warm Copper in plaats van een bijna witte vlak */
+:root[data-theme="dark"] .step.on { background: var(--selected); color: var(--on-selected); }
+:root[data-theme="dark"] .step.on .ico { background: var(--surface); color: var(--selected); }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .step.on { background: var(--selected); color: var(--on-selected); }
+  :root:not([data-theme="light"]) .step.on .ico { background: var(--surface); color: var(--selected); }
+}

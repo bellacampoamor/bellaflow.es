@@ -42,7 +42,7 @@ export const SignaturePad = forwardRef<SignaturePadHandle, { label: string; onIn
   const line = (c: HTMLCanvasElement, a: { x: number; y: number }, b: { x: number; y: number }) => {
     const g = c.getContext('2d')
     if (!g) return
-    g.strokeStyle = '#10222c'
+    g.strokeStyle = '#0B182A'
     g.lineWidth = 2.4 * (c.width / c.getBoundingClientRect().width)
     g.lineCap = 'round'
     g.lineJoin = 'round'
