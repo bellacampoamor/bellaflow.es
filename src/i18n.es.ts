@@ -718,6 +718,7 @@ export const es: Record<string, string> = {
   "Van t/m": "Desde - hasta",
   "T/m": "Hasta",
   "Lijsten (factuuroverzicht)": "Listas (resumen de facturas)",
+  "De QR-code op deze factuur klopt pas als het CIF is ingevuld onder Beheer.": "El código QR de esta factura solo será correcto cuando se indique el CIF en Administración.",
   "Bestemming": "Destino",
   "Klik op de regels die klaarstaan en zijn gecontroleerd.": "Haga clic en las líneas que están listas y revisadas.",
   "{0} geselecteerd": "{0} seleccionadas",

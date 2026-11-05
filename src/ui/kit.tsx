@@ -2,10 +2,22 @@
 import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent, type ReactNode } from 'react'
 import { Check as CheckIcon, X } from 'lucide-react'
 import { locale, tx } from '../i18n'
+import qrcode from 'qrcode-generator'
 import { DOC_MARK } from '../domain/noteText'
 import type { Language } from '../data/types'
 
-const brandFile = (name: string) => `${import.meta.env.BASE_URL}assets/brand/${name}`/** Documentblad: bij afdrukken staat het merkje op elke pagina midden onderaan. De ruimte daarvoor zit op elke pagina in .doc-body. */
+const brandFile = (name: string) => `${import.meta.env.BASE_URL}assets/brand/${name}`/** QR als scherpe vector, foutcorrectie M en altijd 30 x 30 mm, de kleinste toegestane maat (Orden HAC/1177/2024, art. 21). */
+export function TaxQr({ url }: { url: string }) {
+  const svg = useMemo(() => {
+    const qr = qrcode(0, 'M')
+    qr.addData(url, 'Byte')
+    qr.make()
+    return qr.createSvgTag({ scalable: true, margin: 0 })
+  }, [url])
+  return <div className="tax-qr"><span>QR tributario:</span><div dangerouslySetInnerHTML={{ __html: svg }} /></div>
+}
+
+/** Documentblad: bij afdrukken staat het merkje op elke pagina midden onderaan. De ruimte daarvoor zit op elke pagina in .doc-body. */
 export const DocPaper = ({ language, children }: { language: Language; children: ReactNode }) => (
   <div className="paper">
     <div className="doc-body">{children}</div>

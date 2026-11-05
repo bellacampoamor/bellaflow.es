@@ -331,3 +331,19 @@ export function invoiceReport(s: Snapshot, from: string, to: string) {
   const sum = (pick: (i: Invoice) => number) => round2(invoices.reduce((n, i) => n + pick(i), 0))
   return { rows, base: sum((i) => i.base_amount), vat: sum((i) => i.vat_amount), total: sum((i) => i.total) }
 }
+
+// Factuur-QR -------------------------------------------------------------------
+
+/**
+ * Adres in de QR op de factuur (Orden HAC/1177/2024, art. 21). Zolang Bella Flow geen registros naar de AEAT stuurt,
+ * is dit het adres voor niet-verifieerbare systemen. Productie alleen bij een echte database, anders de testomgeving.
+ */
+export function invoiceQrUrl(input: { nif: string; number: string; date: string; total: number }, production: boolean) {
+  const [y, m, d] = input.date.slice(0, 10).split('-')
+  const base = production ? 'https://www2.agenciatributaria.gob.es' : 'https://prewww2.aeat.es'
+  const q = [`nif=${encodeURIComponent(input.nif.trim().toUpperCase())}`, `numserie=${encodeURIComponent(input.number)}`, `fecha=${d}-${m}-${y}`, `importe=${input.total.toFixed(2)}`]
+  return `${base}/wlpl/TIKE-CONT/ValidarQRNoVerifactu?${q.join('&')}`
+}
+
+/** Een Spaans NIF of CIF is negen tekens; de tijdelijke tekst uit de voorbeeldgegevens telt niet. */
+export const hasTaxId = (nif: string) => /^[A-Z0-9]{9}$/i.test(nif.trim())

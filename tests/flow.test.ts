@@ -6,7 +6,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { loadSnapshot } from '../src/data/driver'
 import { LocalDriver } from '../src/data/localDriver'
 import { TABLES } from '../src/data/types'
-import { archiveRows, openLinesOnTransport, linePurchaseStatus, linesToPurchase, documentLanguage, flowCounts, freeAt, transportLoad, invoiceBalance, onHandMap, orderStage, orderTab, reservedMap, stockKey, vatBreakdown , invoiceReport, periodRange } from '../src/domain/calc'
+import { archiveRows, openLinesOnTransport, linePurchaseStatus, linesToPurchase, documentLanguage, flowCounts, freeAt, transportLoad, invoiceBalance, onHandMap, orderStage, orderTab, reservedMap, stockKey, vatBreakdown , invoiceReport, periodRange, invoiceQrUrl, hasTaxId } from '../src/domain/calc'
 import { renameOldSuppliers, restoreSettings, restoreSuppliers, seedDemo } from '../src/domain/demo'
 import {
   createDelivery, createInvoice, createOrder, createPurchaseOrder, invoiceProformas, lineFromProduct, markDelivered, assignShipmentsToTransport, cancelTransport, convertLinesToPurchaseOrders, createTransport, markReady, receiveGoods, rescheduleDelivery, rescheduleOrder, saveRouteOrder, saveSettings, mailSignedNote, setPurchaseLabel, signDelivery, splitLinesForStock, setDeliveryInTransit, setTransportStatus, updateTransport, transferStock,
@@ -635,6 +635,18 @@ describe('route', () => {
   it('zet alle stops en de terugweg in de kaartlink', () => {
     const url = decodeURIComponent(googleMapsRouteUrl({ latitude: 1, longitude: 2 }, [{ latitude: 3, longitude: 4 }, { latitude: 5, longitude: 6 }]).replace(/\+/g, ' '))
     expect(url).toContain('origin=1,2'); expect(url).toContain('destination=1,2'); expect(url).toContain('waypoints=3,4|5,6')
+  })
+})
+
+describe('factuur-QR', () => {
+  it('bevat NIF, nummer, datum en totaal in het voorgeschreven formaat', () => {
+    expect(invoiceQrUrl({ nif: ' b12345678 ', number: 'F-2026&1', date: '2026-11-05', total: 1234.5 }, true))
+      .toBe('https://www2.agenciatributaria.gob.es/wlpl/TIKE-CONT/ValidarQRNoVerifactu?nif=B12345678&numserie=F-2026%261&fecha=05-11-2026&importe=1234.50')
+    expect(invoiceQrUrl({ nif: 'B12345678', number: 'F-1', date: '2026-01-02', total: 10 }, false)).toContain('https://prewww2.aeat.es/')
+  })
+  it('herkent een ontbrekend CIF', () => {
+    expect(hasTaxId('(CIF invullen in Beheer)')).toBe(false)
+    expect(hasTaxId('B12345678')).toBe(true)
   })
 })
 

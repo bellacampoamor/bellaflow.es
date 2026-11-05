@@ -718,6 +718,7 @@ export const en: Record<string, string> = {
   "Van t/m": "From - to",
   "T/m": "To",
   "Lijsten (factuuroverzicht)": "Lists (invoice overview)",
+  "De QR-code op deze factuur klopt pas als het CIF is ingevuld onder Beheer.": "The QR code on this invoice is only correct once the tax ID is filled in under Admin.",
   "Bestemming": "Destination",
   "Klik op de regels die klaarstaan en zijn gecontroleerd.": "Click the lines that are ready and checked.",
   "{0} geselecteerd": "{0} selected",
