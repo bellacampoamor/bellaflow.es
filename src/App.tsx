@@ -32,7 +32,7 @@ const FLOWS = {
   inkoop: {
     label: 'Inkoop', icon: ShoppingCart, home: 'inkoop',
     steps: [
-      { key: 'inkoop', label: '1. Inkooporders', sub: (n: number) => tx("{0} inkoop vereist", n), icon: ShoppingCart, tint: '' },
+      { key: 'inkoop', label: '1. Inkooporders', sub: (n: number) => tx("{0} nog in te kopen", n), icon: ShoppingCart, tint: '' },
       { key: 'inkomend', label: '2. Gepland transport', sub: (n: number) => (n ? tx("{0} te laat", n) : tx("op schema")), icon: Truck, tint: '' },
       { key: 'ontvangst', label: '3. Ontvangst', sub: (n: number) => tx("{0} binnen 7 dagen", n), icon: PackageCheck, tint: '' },
     ],
