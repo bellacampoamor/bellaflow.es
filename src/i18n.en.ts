@@ -708,6 +708,7 @@ export const en: Record<string, string> = {
   "Verhuizen": "Move",
   "Gemengd": "Mixed",
   "Transport": "Transport",
+  "Taal": "Language",
   "Bestemming": "Destination",
   "Klik op de regels die klaarstaan en zijn gecontroleerd.": "Click the lines that are ready and checked.",
   "{0} geselecteerd": "{0} selected",

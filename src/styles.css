@@ -415,3 +415,9 @@ body.route-dragging, body.route-dragging * { cursor: grabbing !important; user-s
 .convert-sup { display: flex; align-items: center; gap: 6px; }
 .convert-order td { background: var(--surface-2); padding-left: 44px; padding-block: 6px; }
 .convert-line td:first-child { padding-left: 44px; }
+
+/* Schermtaal */
+.lang-pick { display: inline-flex; align-items: center; gap: 4px; padding: 0 0 0 10px; border-radius: 8px; color: var(--muted); }
+.lang-pick:hover { background: var(--surface-2); color: var(--fg); }
+.lang-pick select { width: auto; min-height: 34px; padding: 4px 4px; border: 0; background: transparent; color: inherit; font: 500 .9rem var(--body); cursor: pointer; }
+.lang-pick select option { background: var(--surface); color: var(--fg); }

@@ -13,6 +13,7 @@ import {
 } from '../src/domain/services'
 import { estimateMatrix, parseRouterTable } from '../src/data/geo'
 import { dropIndex, googleMapsRouteUrl, moveItem, optimizeRoute, tourCost } from '../src/domain/route'
+import { es } from '../src/i18n.es'
 import { en } from '../src/i18n.en'
 import { toSeedSql } from '../scripts/seed-sql'
 
@@ -638,6 +639,11 @@ describe('route', () => {
 })
 
 describe('vertalingen', () => {
+  it('het Spaans heeft dezelfde teksten en plaatshouders als het Engels', () => {
+    expect(Object.keys(es).sort()).toEqual(Object.keys(en).sort())
+    const holes = (t: string) => [...new Set(t.match(/\{\d+\}/g) ?? [])].sort()
+    for (const key of Object.keys(es)) expect(holes(es[key]), key).toEqual(holes(key))
+  })
   it('heeft een Engelse tekst voor elke schermtekst', () => {
     const files = ['App.tsx', 'main.tsx', 'ui/kit.tsx', 'ui/app-context.tsx', 'domain/services.ts', ...readdirSync('src/screens').map((f) => `screens/${f}`)]
     const missing = files.flatMap((f) => [...readFileSync(`src/${f}`, 'utf8').matchAll(/\btx\(("(?:[^"\\\\]|\\\\.)*")/g)].map((m) => JSON.parse(m[1]) as string)).filter((k) => !(k in en))

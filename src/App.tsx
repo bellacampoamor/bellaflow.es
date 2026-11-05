@@ -18,7 +18,7 @@ import { Driver } from './screens/Driver'
 import { SalesOrderDocument } from './screens/SalesOrderDocument'
 import { PurchaseOrderDocument } from './screens/PurchaseOrderDocument'
 import { Archive as ArchiveScreen } from './screens/Archive'
-import { getLanguage, setLanguage, tx } from './i18n'
+import { getLanguage, setLanguage, tx, type UiLanguage } from './i18n'
 
 // Twee gescheiden processen, elk met eigen menu-optie en eigen stappen.
 const FLOWS = {
@@ -74,8 +74,7 @@ export function App({ onResetDemo, onSignOut }: { onResetDemo?: () => Promise<vo
     return () => ro.disconnect()
   }, [])
   const [language, setUiLanguage] = useState(getLanguage)
-  const switchLanguage = () => {
-    const next = language === 'nl' ? 'en' : 'nl'
+  const switchLanguage = (next: UiLanguage) => {
     setLanguage(next)
     setUiLanguage(next)
   }
@@ -113,7 +112,7 @@ export function App({ onResetDemo, onSignOut }: { onResetDemo?: () => Promise<vo
             <a href="#archief" className={screen === 'archief' ? 'on' : ''}><Archive size={16} />{tx("Archief")}</a>
             <a href="#voorraad" className={screen === 'voorraad' ? 'on' : ''}><Boxes size={16} />{tx("Voorraad")}</a>
             <a href="#beheer" className={screen === 'beheer' ? 'on' : ''}><Settings2 size={16} />{tx("Beheer")}</a>
-            <button className="btn-toggle" onClick={switchLanguage}><Languages size={16} />{language === 'nl' ? 'English' : 'Nederlands'}</button>
+            <label className="lang-pick"><Languages size={16} /><select aria-label={tx("Taal")} value={language} onChange={(e) => switchLanguage(e.target.value as UiLanguage)}><option value="nl">Nederlands</option><option value="en">English</option><option value="es">Español</option></select></label>
             <button className="btn-toggle" onClick={toggleTheme}>{theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}{theme === 'dark' ? tx("Dagstand") : tx("Nachtstand")}</button>
             <button className="btn-toggle" aria-label={tx("Contact en support")} title={tx("Contact en support")} onClick={() => setSupport(true)}><Headset size={18} /></button>
             {onSignOut && <a href="#overzicht" onClick={onSignOut}>{tx("Uitloggen")}</a>}
