@@ -356,3 +356,9 @@ body.route-dragging, body.route-dragging * { cursor: grabbing !important; user-s
 /* Toelichting onder een stap van de voortgang */
 .track div.track-note { flex: none; min-width: 0; padding-top: 0; font-size: .76rem; font-weight: 500; color: inherit; }
 .track div.track-note::before, .track div.track-note::after { content: none; }
+
+/* Documenten: tabel lijnt links en rechts uit met de koppen en de totalen */
+.paper table th:first-child, .paper table td:first-child { padding-left: 0; }
+.paper table th:last-child, .paper table td:last-child { padding-right: 0; }
+.paper .totals > div { font-variant-numeric: tabular-nums; }
+.paper table td.num, .paper table th.num { font-variant-numeric: tabular-nums; }
