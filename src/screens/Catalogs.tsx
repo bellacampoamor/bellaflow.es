@@ -2,7 +2,7 @@ import { useMemo, useRef, useState } from 'react'
 import { ImageOff, Upload } from 'lucide-react'
 import type { SupplierCatalogItem } from '../data/types'
 import { onHandMap, reservedMap, stockKey } from '../domain/calc'
-import { belongsTo, catalogCategories, catalogOf, elementCounts, elementsOf, imageSrc, seriesCode, mainCategory, plainText, productForItem, safeHtml, STOCK_STATUS, subCategory } from '../domain/catalog'
+import { catalogCategories, catalogOf, elementCounts, elementsOf, imageSrc, seriesCode, mainCategory, plainText, productForItem, safeHtml, STOCK_STATUS, subCategory } from '../domain/catalog'
 import { importCatalog } from '../domain/services'
 import { useApp } from '../ui/app-context'
 import { Empty, eur, fmtDate, Head, Modal, Pill } from '../ui/kit'
@@ -59,7 +59,7 @@ export function Catalogs({ supplierId }: { supplierId: string }) {
 
       <div className="cat-suppliers" role="tablist" aria-label={tx("Leverancier")}>
         {s.suppliers.filter((x) => x.is_active).map((x) => {
-          const n = s.supplier_catalog_items.filter((i) => belongsTo(i, x) && i.active).length
+          const n = catalogOf(s, x.id).length
           return (
             <button key={x.id} role="tab" aria-selected={x.id === supplierId} className={`cat-supplier ${x.id === supplierId ? 'on' : ''}`} onClick={() => pick(x.id)}>
               <span className="strong">{x.name}</span>
@@ -159,12 +159,10 @@ function ArticleCard({ item, onOpen, onClose }: { item: SupplierCatalogItem; onO
         </div>
       </div>
       {item.description_html && <div className="cat-description" dangerouslySetInnerHTML={{ __html: safeHtml(item.description_html) }} />}
-      {series && (
+      {series && elements.length > 0 && (
         <section className="cat-elements">
-          <h3>{tx("Elementen")}{elements.length > 0 && <span className="muted small"> ({elements.length})</span>}</h3>
-          <p className="muted small" style={{ margin: 0 }}>{elements.length
-            ? tx("Artikelen uit dezelfde serie ({0}) die erbij besteld kunnen worden, volgens het artikelnummer van de leverancier.", series)
-            : tx("Geen andere artikelen in serie {0}.", series)}</p>
+          <h3>{tx("Elementen")} <span className="muted small">({elements.length})</span></h3>
+          <p className="muted small" style={{ margin: 0 }}>{tx("Losse artikelen uit dezelfde serie ({0}) die bij deze set besteld kunnen worden, volgens het artikelnummer van de leverancier.", series)}</p>
           <div className="table-wrap flush"><table>
             <thead><tr><th></th><th>{tx("Artikelnummer")}</th><th>{tx("Artikel")}</th><th>{tx("Categorie")}</th><th className="num">{tx("Adviesprijs")}</th></tr></thead>
             <tbody>

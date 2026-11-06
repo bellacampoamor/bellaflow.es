@@ -58,15 +58,16 @@ export const mainCategory = (x: SupplierCatalogItem) => x.categories[0]?.name ??
 /** De meest specifieke categorie, bijvoorbeeld Dining tuinsets onder Tuinsets. */
 export const subCategory = (x: SupplierCatalogItem) => x.categories.length > 1 ? x.categories[x.categories.length - 1].name : ''
 
-export interface CatalogFilter { q?: string; category?: string; withInactive?: boolean }
+export interface CatalogFilter { q?: string; category?: string; withInactive?: boolean; withElements?: boolean }
 
-/** De artikellijst van één leverancier, gesorteerd op categorie en naam. Artikelen zonder categorie staan achteraan. */
+/** De artikellijst van één leverancier, zonder elementen, gesorteerd op categorie en naam. Artikelen zonder categorie staan achteraan. */
 export function catalogOf(s: Snapshot, supplierId: string, f: CatalogFilter = {}) {
   const sup = s.suppliers.find((x) => x.id === supplierId)
   if (!sup) return []
   const words = (f.q ?? '').toLowerCase().split(/\s+/).filter(Boolean)
+  const isElement = elementFilter(s.supplier_catalog_items)
   return s.supplier_catalog_items
-    .filter((x) => belongsTo(x, sup) && (f.withInactive || x.active))
+    .filter((x) => belongsTo(x, sup) && (f.withInactive || x.active) && (f.withElements || !isElement(x)))
     .filter((x) => !f.category || x.categories.some((c) => c.name === f.category))
     .filter((x) => { const hay = `${x.name} ${x.supplier_sku} ${x.categories.map((c) => c.name).join(' ')}`.toLowerCase(); return words.every((w) => hay.includes(w)) })
     .sort((a, b) => Number(!mainCategory(a)) - Number(!mainCategory(b)) || mainCategory(a).localeCompare(mainCategory(b)) || a.name.localeCompare(b.name) || a.supplier_sku.localeCompare(b.supplier_sku))
@@ -118,19 +119,43 @@ export function seriesCode(sku: string) {
   return m ? m[1].toUpperCase() : null
 }
 
-/** Elementen: de andere actieve artikelen van dezelfde leverancier met dezelfde seriecode, die erbij besteld kunnen worden. */
+/**
+ * Een set of opstelling volgens de categorie van de leverancier (Tuinsets, Loungeset tuin, Barset buiten, ...).
+ * Hoezen en tussendelen vóór een set zijn zelf geen set.
+ */
+export const isSetArticle = (x: SupplierCatalogItem) =>
+  x.categories.some((c) => /set/i.test(c.name)) && !x.categories.some((c) => /hoe(s|zen)|tussendel/i.test(c.name))
+
+const seriesKey = (x: SupplierCatalogItem) => { const c = seriesCode(x.supplier_sku); return c ? `${x.supplier_name.toLowerCase()}|${c}` : null }
+
+/** Series met minstens één actieve set. Alleen daarin zijn de losse artikelen elementen. */
+function seriesWithSets(items: SupplierCatalogItem[]) {
+  const out = new Set<string>()
+  for (const x of items) { const k = seriesKey(x); if (k && x.active && isSetArticle(x)) out.add(k) }
+  return out
+}
+
+/**
+ * Element: los artikel uit een serie waarin de leverancier ook sets of opstellingen aanbiedt.
+ * Het staat niet in de lijst, maar onderaan de artikelkaart van elke set uit die serie.
+ */
+export function elementFilter(items: SupplierCatalogItem[]) {
+  const withSets = seriesWithSets(items)
+  return (x: SupplierCatalogItem) => { const k = seriesKey(x); return !!k && withSets.has(k) && !isSetArticle(x) }
+}
+
+/** Elementen van een set: de losse actieve artikelen uit dezelfde serie, die erbij besteld kunnen worden. */
 export function elementsOf(s: Snapshot, item: SupplierCatalogItem) {
-  const code = seriesCode(item.supplier_sku)
-  if (!code) return []
+  const key = seriesKey(item)
+  if (!key || !isSetArticle(item)) return []
   return s.supplier_catalog_items
-    .filter((x) => x.id !== item.id && x.active && sameName(x.supplier_name, item.supplier_name) && seriesCode(x.supplier_sku) === code)
+    .filter((x) => x.id !== item.id && x.active && !isSetArticle(x) && seriesKey(x) === key)
     .sort((a, b) => mainCategory(a).localeCompare(mainCategory(b)) || a.name.localeCompare(b.name) || a.supplier_sku.localeCompare(b.supplier_sku))
 }
 
-/** Aantal elementen per artikel in één keer, voor de lijst. */
+/** Aantal elementen per set in één keer, voor de lijst. */
 export function elementCounts(items: SupplierCatalogItem[]) {
-  const perSeries = new Map<string, number>()
-  const key = (x: SupplierCatalogItem) => { const c = seriesCode(x.supplier_sku); return c && x.active ? `${x.supplier_name.toLowerCase()}|${c}` : null }
-  for (const x of items) { const k = key(x); if (k) perSeries.set(k, (perSeries.get(k) ?? 0) + 1) }
-  return (x: SupplierCatalogItem) => { const k = key(x); return k ? (perSeries.get(k) ?? 1) - 1 : 0 }
+  const loose = new Map<string, number>()
+  for (const x of items) { const k = seriesKey(x); if (k && x.active && !isSetArticle(x)) loose.set(k, (loose.get(k) ?? 0) + 1) }
+  return (x: SupplierCatalogItem) => { const k = seriesKey(x); return k && isSetArticle(x) ? loose.get(k) ?? 0 : 0 }
 }

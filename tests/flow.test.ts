@@ -752,7 +752,7 @@ describe('catalogi', () => {
   it('leest de export van de leverancier volledig in, per leverancier en zonder dubbelingen', async () => {
     expect(await importCatalog(db, CSV)).toEqual({ added: 642, updated: 0 })
     const s = await loadSnapshot(db)
-    const list = catalogOf(s, lol().id)
+    const list = catalogOf(s, lol().id, { withElements: true })
     expect(list).toHaveLength(642)
     expect(catalogOf(s, s.suppliers.find((x) => x.id !== lol().id)!.id)).toHaveLength(0)
     const cover = list.find((x) => x.supplier_sku === '24-1641-889')!
@@ -777,9 +777,18 @@ describe('catalogi', () => {
     expect([seriesCode('CONFIG-TIM-OPST1'), seriesCode('PRX-BBR-LMP-FLO'), seriesCode('24-1641-889'), seriesCode('CONFIG-24-1718')]).toEqual(['TIM', 'PRX', null, null])
     const timber = s.supplier_catalog_items.find((x) => x.supplier_sku === 'CONFIG-TIM-OPST1')!
     const els = elementsOf(s, timber)
-    expect(els.map((x) => x.supplier_sku)).toContain('CONFIG-TIM-TUS')
-    expect(els.every((x) => seriesCode(x.supplier_sku) === 'TIM' && x.id !== timber.id)).toBe(true)
+    expect(els.map((x) => x.supplier_sku)).toEqual(expect.arrayContaining(['CONFIG-TIM-TUS', 'CONFIG-TIM-POE', 'CONFIG-TIM-STO']))
+    // Andere opstellingen zijn geen element; elementen zelf hebben geen elementen.
+    expect(els.some((x) => x.supplier_sku.startsWith('CONFIG-TIM-OPST'))).toBe(false)
+    expect(els.every((x) => seriesCode(x.supplier_sku) === 'TIM')).toBe(true)
+    expect(elementsOf(s, els[0])).toEqual([])
     expect(elementsOf(s, s.supplier_catalog_items.find((x) => x.supplier_sku === '24-1641-889')!)).toEqual([])
+    // De lijst toont alleen hoofdartikelen: elementen staan alleen op de artikelkaart van de set.
+    const list = catalogOf(s, lol().id).map((x) => x.supplier_sku)
+    expect(list).toContain('CONFIG-TIM-OPST1')
+    expect(list).not.toContain('CONFIG-TIM-TUS')
+    expect(list).toContain('24-1641-889')
+    expect(catalogOf(s, lol().id, { withElements: true })).toHaveLength(642)
   })
   it('weigert een leverancier die niet onder Beheer staat', async () => {
     await expect(importCatalog(db, 'supplier_name,supplier_sku,name\nOnbekend B.V.,A1,Stoel\n')).rejects.toThrow(/Onbekend B\.V\..*Beheer/)
