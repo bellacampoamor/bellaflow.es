@@ -5,9 +5,10 @@ import { loadSnapshot, newId, type Driver } from '../data/driver'
 import type {
   EmailStatus, Language,
   Delivery, Fulfilment, InboundShipment, InvoiceLine, OrderType, Payment, Product, PurchaseLabel, SalesOrder, Settings,
-  SalesOrderLine, Snapshot, StockMovement, SupplierCatalogItem, TableName,
+  SalesOrderLine, Snapshot, StockMovement, SupplierCatalogItem, SupplierShowroomItem, TableName,
 } from '../data/types'
 import { CATALOG_COLUMNS, catalogItemFromCsv, parseCsv, sameName } from './catalog'
+import { SHOWROOM_COLUMNS, showroomItemFromCsv } from './showroom'
 import {
   addDays, depositAvailable, freeAt, linesToPurchase, invoicedDeliveryLineIds, lineTotal, onHandMap, orderLines, plannedQty, round2,
   shipmentLineOpen, shippedQty, stockKey, todayISO, vatBreakdown,
@@ -671,6 +672,41 @@ export async function importCatalog(db: Driver, csv: string) {
   if (!out.size) fail(tx("Het bestand bevat geen artikelen."))
   await db.upsert('supplier_catalog_items', [...out.values()])
   return { added, updated }
+}
+
+/** Leest de showroom-export (supplier_showroom_items.csv) in. Bestaande artikelen worden bijgewerkt op leverancier en artikelnummer. */
+export async function importShowroom(db: Driver, csv: string) {
+  const rows = parseCsv(csv)
+  if (!rows.length) fail(tx("Het bestand bevat geen artikelen."))
+  const missing = SHOWROOM_COLUMNS.filter((c) => !(c in rows[0]))
+  if (missing.length) fail(tx("Het bestand mist de kolom {0}. Gebruik een export van supplier_showroom_items.", missing.join(', ')))
+  const suppliers = await db.list('suppliers')
+  const unknown = [...new Set(rows.map((r) => r.supplier_name.trim()))].filter((n) => !suppliers.some((x) => sameName(x.name, n)))
+  if (unknown.length) fail(tx("Leverancier {0} staat niet onder Beheer. Voeg die eerst toe met precies deze naam.", unknown.join(', ')))
+  const current = await db.list('supplier_showroom_items')
+  const key = (name: string, sku: string) => `${name.toLowerCase()}|${sku.toLowerCase()}`
+  const byKey = new Map(current.map((x) => [key(x.supplier_name, x.supplier_sku), x.id]))
+  let added = 0, updated = 0
+  const out = new Map<string, SupplierShowroomItem>()
+  for (const r of rows) {
+    if (!r.supplier_sku?.trim() || !r.name?.trim()) continue
+    const item = showroomItemFromCsv(r)
+    const k = key(item.supplier_name, item.supplier_sku)
+    let id = byKey.get(k)
+    if (id) updated++
+    else { id = newId(); added++ }
+    byKey.set(k, id)
+    out.set(id, { ...item, id })
+  }
+  if (!out.size) fail(tx("Het bestand bevat geen artikelen."))
+  await db.upsert('supplier_showroom_items', [...out.values()])
+  return { added, updated }
+}
+
+/** Kiest aan de kopregel of het een showroom-export of een webshopcatalogus is. */
+export async function importSupplierFile(db: Driver, csv: string) {
+  const head = csv.replace(/^\uFEFF/, '').split(/\r?\n/, 1)[0]
+  return /(^|,)available_text(,|$)|(^|,)ean(,|$)/.test(head) ? { kind: 'showroom' as const, ...(await importShowroom(db, csv)) } : { kind: 'catalogus' as const, ...(await importCatalog(db, csv)) }
 }
 
 // Stamgegevens -----------------------------------------------------------------

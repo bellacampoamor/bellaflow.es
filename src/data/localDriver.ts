@@ -3,6 +3,8 @@ import { tx } from '../i18n'
 import { TABLES, type EmailAttachment, type Snapshot, type TableName } from './types'
 
 const KEY = 'bella-flow-v1'
+/** Catalogi zijn groot en komen uit de bestanden van de leverancier. Ze blijven in het geheugen en gaan niet in de browseropslag. */
+const VOLATILE: TableName[] = ['supplier_catalog_items', 'supplier_showroom_items']
 
 export function emptySnapshot(): Snapshot {
   return Object.fromEntries(TABLES.map((t) => [t, []])) as unknown as Snapshot
@@ -17,21 +19,31 @@ export class LocalDriver implements Driver {
       try {
         const raw = localStorage.getItem(KEY)
         if (raw) this.data = { ...this.data, ...JSON.parse(raw) }
+        for (const v of VOLATILE) this.data[v] = [] as never
       } catch { /* geheugen volstaat */ }
     }
+  }
+  private keepVolatile(next: Snapshot) {
+    for (const v of VOLATILE) next[v] = this.data[v] as never
+    return next
   }
   /** Een ander tabblad kan intussen hebben opgeslagen. Altijd eerst de laatste stand lezen, anders overschrijft dit tabblad die. */
   private sync() {
     if (!this.persist) return
     try {
       const raw = localStorage.getItem(KEY)
-      if (raw) this.data = { ...emptySnapshot(), ...JSON.parse(raw) }
+      if (raw) this.data = this.keepVolatile({ ...emptySnapshot(), ...JSON.parse(raw) })
     } catch { /* geheugen volstaat */ }
+  }
+  private serialize() {
+    const out: Record<string, unknown> = { ...this.data }
+    for (const v of VOLATILE) delete out[v]
+    return JSON.stringify(out)
   }
   get isEmpty() { return this.data.settings.length === 0 }
   private save() {
     if (!this.persist) return
-    try { localStorage.setItem(KEY, JSON.stringify(this.data)) } catch { /* geheugen volstaat */ }
+    try { localStorage.setItem(KEY, this.serialize()) } catch { /* geheugen volstaat */ }
   }
   clear() { this.data = emptySnapshot(); this.save() }
   async list<T extends TableName>(table: T) {
@@ -51,9 +63,9 @@ export class LocalDriver implements Driver {
       const i = at.get(row.id)
       if (i === undefined) { at.set(row.id, list.length); list.push(row) } else list[i] = row
     }
-    if (!this.persist) return
+    if (!this.persist || VOLATILE.includes(table)) return
     // Een grote catalogus kan de browseropslag vullen. Dan niets half bewaren, anders verdwijnt het bij de volgende keer lezen.
-    try { localStorage.setItem(KEY, JSON.stringify(this.data)) } catch {
+    try { localStorage.setItem(KEY, this.serialize()) } catch {
       list.splice(0, list.length, ...before)
       throw new Error(tx("De opslag van deze browser is vol. Met de database is er geen grens."))
     }

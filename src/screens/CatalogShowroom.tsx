@@ -1,0 +1,141 @@
+import { useMemo, useRef, useState } from 'react'
+import { ExternalLink } from 'lucide-react'
+import type { Supplier, SupplierShowroomItem } from '../data/types'
+import { onHandMap, reservedMap, stockKey, todayISO } from '../domain/calc'
+import { countBy, partOf, productForShowroom, showroomCategories, showroomOf, showroomParts } from '../domain/showroom'
+import { useApp } from '../ui/app-context'
+import { CatalogPhoto as Photo, Empty, eur, fmtDate, Modal, Pager, Pill } from '../ui/kit'
+import { tx } from '../i18n'
+
+const PAGE_SIZE = 50
+const price = (x: SupplierShowroomItem) => (x.price === null ? '–' : x.currency === 'EUR' ? eur(x.price) : `${x.price.toFixed(2)} ${x.currency}`)
+
+/** Beschikbaar in het magazijn van de leverancier: vandaag of eerder is beschikbaar, later is een datum, anders geen datum. */
+function Available({ x }: { x: SupplierShowroomItem }) {
+  if (!x.available_date) return <span className="muted small">{x.available_text || tx("Geen datum beschikbaar")}</span>
+  if (x.available_date <= todayISO()) return <Pill tone="good">{tx("Beschikbaar")}</Pill>
+  return <Pill tone="info">{tx("Vanaf {0}", fmtDate(x.available_date))}</Pill>
+}
+
+export function ShowroomList({ supplier }: { supplier: Supplier }) {
+  const { s } = useApp()
+  const [q, setQ] = useState('')
+  const [category, setCategory] = useState('')
+  const [series, setSeries] = useState('')
+  const [page, setPage] = useState(1)
+  const [openId, setOpenId] = useState<string | null>(null)
+  const listTop = useRef<HTMLElement>(null)
+  const { parts, parentOf } = useMemo(() => showroomParts(s.supplier_showroom_items), [s])
+  const all = useMemo(() => showroomOf(s, supplier, {}, parentOf), [s, supplier, parentOf])
+  const items = useMemo(() => showroomOf(s, supplier, { q, category, series }, parentOf), [s, supplier, q, category, series, parentOf])
+  const seriesList = useMemo(() => countBy(all, (x) => [x.series]), [all])
+  const categoryList = useMemo(() => countBy(all, showroomCategories), [all])
+  const pages = Math.max(1, Math.ceil(items.length / PAGE_SIZE))
+  const current = Math.min(page, pages)
+  const shown = items.slice((current - 1) * PAGE_SIZE, current * PAGE_SIZE)
+  const goPage = (p: number) => { setPage(p); listTop.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }) }
+  const open = s.supplier_showroom_items.find((x) => x.id === openId)
+  const showSeries = (name: string) => { setSeries(name); setCategory(''); setQ(''); setPage(1); setOpenId(null); listTop.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }) }
+
+  return (
+    <section className="panel cat-list" ref={listTop}>
+      <div className="panel-head">
+        <h2>{supplier.name}</h2>
+        <div className="actions">
+          <select style={{ width: 'auto', maxWidth: 220 }} aria-label={tx("Serie")} value={series} onChange={(e) => { setSeries(e.target.value); setPage(1) }}>
+            <option value="">{tx("Alle series")} ({seriesList.length})</option>
+            {seriesList.map((c) => <option key={c.name} value={c.name}>{c.name} ({c.n})</option>)}
+          </select>
+          <select style={{ width: 'auto', maxWidth: 240 }} aria-label={tx("Categorie")} value={category} onChange={(e) => { setCategory(e.target.value); setPage(1) }}>
+            <option value="">{tx("Alle categorieën")}</option>
+            {categoryList.map((c) => <option key={c.name} value={c.name}>{c.name} ({c.n})</option>)}
+          </select>
+          <input style={{ width: 240 }} aria-label={tx("Artikel zoeken")} placeholder={tx("Zoek op naam, artikelnummer of EAN")} value={q} onChange={(e) => { setQ(e.target.value); setPage(1) }} />
+        </div>
+      </div>
+      {all.length === 0 ? <Empty>{tx("Voor deze leverancier is nog geen showroom ingelezen. Gebruik Catalogus inlezen (CSV).")}</Empty>
+        : items.length === 0 ? <Empty>{tx("Geen artikelen gevonden.")}</Empty> : (
+        <div className="table-wrap"><table>
+          <thead><tr><th></th><th>{tx("Artikelnummer")}</th><th>{tx("Artikel")}</th><th>{tx("Serie")}</th><th>{tx("Beschikbaar in magazijn")}</th><th className="num">{tx("Prijs")}</th><th></th></tr></thead>
+          <tbody>{shown.map((x) => {
+            const own = productForShowroom(s, x)
+            const n = parts.get(x.id)?.length ?? 0
+            return (
+              <tr key={x.id} className="click" onClick={() => setOpenId(x.id)}>
+                <td style={{ width: 64 }}><Photo url={x.image_url} alt={x.name} className="thumb" /></td>
+                <td style={{ whiteSpace: 'nowrap' }}><span className="strong">{x.supplier_sku}</span>{x.ean && x.ean !== x.supplier_sku && <div className="muted small">{x.ean}</div>}</td>
+                <td><span className="strong">{x.name}</span>{showroomCategories(x).length > 0 && <div className="muted small">{showroomCategories(x).join(', ')}</div>}</td>
+                <td>{x.series || '–'}</td>
+                <td><Available x={x} /></td>
+                <td className="num" style={{ whiteSpace: 'nowrap' }}>{price(x)}</td>
+                <td style={{ whiteSpace: 'nowrap' }}>{n > 0 && <span className="muted small">{tx("+{0} elementen", n)}</span>} {own && <Pill tone="info">{tx("In assortiment")}</Pill>}</td>
+              </tr>
+            )
+          })}</tbody>
+        </table></div>
+      )}
+      {items.length > 0 && <Pager page={current} size={PAGE_SIZE} total={items.length} onPage={goPage} />}
+      {items.length > 0 && <p className="muted small" style={{ margin: '8px 0 0' }}>{tx("Gegevens uit de showroom van de leverancier, opgehaald op {0}.", fmtDate(all[0]?.scraped_at))}</p>}
+      {open && <ShowroomCard key={open.id} item={open} parts={parts.get(open.id) ?? []} parent={parentOf.get(open.id)} onOpen={setOpenId} onSeries={showSeries} onClose={() => setOpenId(null)} />}
+    </section>
+  )
+}
+
+function ShowroomCard({ item, parts, parent, onOpen, onSeries, onClose }: { item: SupplierShowroomItem; parts: SupplierShowroomItem[]; parent?: SupplierShowroomItem; onOpen: (id: string) => void; onSeries: (name: string) => void; onClose: () => void }) {
+  const { s } = useApp()
+  const own = productForShowroom(s, item)
+  const free = useMemo(() => {
+    if (!own) return 0
+    const hand = onHandMap(s), res = reservedMap(s)
+    return s.warehouses.reduce((n, w) => n + (hand.get(stockKey(own.id, w.id)) ?? 0) - (res.get(stockKey(own.id, w.id)) ?? 0), 0)
+  }, [s, own])
+  const part = partOf(item.name)
+  const safeUrl = /^https:\/\//i.test(item.product_url) ? item.product_url : ''
+  return (
+    <Modal wide title={item.name} onClose={onClose} footer={<>
+      {safeUrl && <a className="btn" href={safeUrl} target="_blank" rel="noopener noreferrer"><ExternalLink size={16} />{tx("Bekijk in de showroom")}</a>}
+      <button className="btn primary" onClick={onClose}>{tx("Sluiten")}</button>
+    </>}>
+      <div className="cat-card">
+        <div className="cat-gallery">
+          <Photo url={item.image_url} alt={item.name} className="large" />
+          {!item.image_url && <p className="muted small" style={{ margin: 0 }}>{tx("De leverancier heeft voor dit artikel geen foto aangeleverd.")}</p>}
+        </div>
+        <div className="cat-facts">
+          <dl className="cat-dl">
+            <dt>{tx("Artikelnummer")}</dt><dd className="strong">{item.supplier_sku}</dd>
+            <dt>{tx("EAN")}</dt><dd>{item.ean || '–'}</dd>
+            <dt>{tx("Leverancier")}</dt><dd>{item.supplier_name}</dd>
+            <dt>{tx("Serie")}</dt><dd>{item.series ? <button type="button" className="linklike" onClick={() => onSeries(item.series)}>{item.series}</button> : '–'}</dd>
+            <dt>{tx("Categorie")}</dt><dd>{showroomCategories(item).join(', ') || '–'}</dd>
+            <dt>{tx("Beschikbaar in magazijn")}</dt><dd><Available x={item} /></dd>
+            <dt>{tx("Prijs")}</dt><dd className="strong">{price(item)}</dd>
+            {part && <><dt>{tx("Onderdeel")}</dt><dd>{tx("Deel {0} van {1}", part.n, part.of)}{parent && <> · <button type="button" className="linklike" onClick={() => onOpen(parent.id)}>{parent.name}</button></>}</dd></>}
+          </dl>
+          {own ? (
+            <div className="note"><span className="strong">{tx("In assortiment")}</span>: {own.name}, {tx("verkoopprijs")} {eur(own.sale_price)}, {tx("{0} vrij op voorraad", free)}.</div>
+          ) : <p className="muted small" style={{ margin: 0 }}>{tx("Niet in het eigen assortiment onder Beheer.")}</p>}
+        </div>
+      </div>
+      {parts.length > 0 && (
+        <section className="cat-elements">
+          <h3>{tx("Elementen")} <span className="muted small">({parts.length})</span></h3>
+          <p className="muted small" style={{ margin: 0 }}>{tx("De onderdelen die samen dit artikel vormen, volgens de naam in de showroom (deel 1 van {0}, ...).", parts[0] ? partOf(parts[0].name)?.of ?? parts.length : parts.length)}</p>
+          <div className="table-wrap flush"><table>
+            <thead><tr><th></th><th>{tx("Artikelnummer")}</th><th>{tx("Artikel")}</th><th>{tx("Beschikbaar in magazijn")}</th><th className="num">{tx("Prijs")}</th></tr></thead>
+            <tbody>{parts.map((x) => (
+              <tr key={x.id} className="click" onClick={() => onOpen(x.id)}>
+                <td style={{ width: 64 }}><Photo url={x.image_url} alt={x.name} className="thumb" /></td>
+                <td className="strong" style={{ whiteSpace: 'nowrap' }}>{x.supplier_sku}</td>
+                <td>{x.name}</td>
+                <td><Available x={x} /></td>
+                <td className="num" style={{ whiteSpace: 'nowrap' }}>{price(x)}</td>
+              </tr>
+            ))}</tbody>
+          </table></div>
+        </section>
+      )}
+      <p className="muted small" style={{ margin: 0 }}>{tx("Opgehaald op {0}", fmtDate(item.scraped_at))}</p>
+    </Modal>
+  )
+}

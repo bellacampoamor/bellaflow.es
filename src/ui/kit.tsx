@@ -1,6 +1,7 @@
 // Gedeelde bouwstenen voor alle schermen.
 import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent, type ReactNode } from 'react'
-import { ArrowUp, Check as CheckIcon, ChevronLeft, ChevronRight, X } from 'lucide-react'
+import { ArrowUp, Check as CheckIcon, ChevronLeft, ChevronRight, ImageOff, X } from 'lucide-react'
+import { imageSrc } from '../domain/catalog'
 import { locale, tx } from '../i18n'
 import qrcode from 'qrcode-generator'
 import { DOC_MARK } from '../domain/noteText'
@@ -251,3 +252,15 @@ export function BackToTop() {
   if (!show) return null
   return <button type="button" className="back-to-top" aria-label={tx("Naar boven")} title={tx("Naar boven")} onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}><ArrowUp size={20} /></button>
 }
+
+/** Foto van de leverancier, op een witte ondergrond. Zonder foto of als hij niet laadt: een leeg vlak. */
+export function CatalogPhoto({ url, alt, className }: { url?: string; alt: string; className: string }) {
+  const [broken, setBroken] = useState(false)
+  const src = url ? imageSrc(url, import.meta.env.BASE_URL) : ''
+  return (
+    <div className={`cat-photo ${className}`}>
+      {src && !broken ? <img src={src} alt={alt} loading="lazy" referrerPolicy="no-referrer" onError={() => setBroken(true)} /> : <ImageOff size={className === 'thumb' ? 18 : 40} aria-label={tx("Geen foto")} />}
+    </div>
+  )
+}
+

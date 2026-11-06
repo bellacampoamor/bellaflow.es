@@ -1,27 +1,18 @@
 import { useMemo, useRef, useState } from 'react'
-import { ImageOff, Upload } from 'lucide-react'
-import type { SupplierCatalogItem } from '../data/types'
+import { Upload } from 'lucide-react'
+import type { Supplier, SupplierCatalogItem } from '../data/types'
 import { onHandMap, reservedMap, stockKey } from '../domain/calc'
-import { catalogCategories, catalogOf, elementCounts, elementsOf, imageSrc, seriesCode, mainCategory, plainText, productForItem, safeHtml, STOCK_STATUS, subCategory } from '../domain/catalog'
-import { importCatalog } from '../domain/services'
+import { catalogCategories, catalogOf, elementCounts, elementsOf, seriesCode, mainCategory, plainText, productForItem, safeHtml, STOCK_STATUS, subCategory } from '../domain/catalog'
+import { importSupplierFile } from '../domain/services'
+import { showroomOf, showroomParts } from '../domain/showroom'
+import { ShowroomList } from './CatalogShowroom'
 import { useApp } from '../ui/app-context'
-import { BackToTop, Empty, eur, fmtDate, Head, Modal, Pager, Pill } from '../ui/kit'
+import { BackToTop, CatalogPhoto as Photo, Empty, Tabs, eur, fmtDate, Head, Modal, Pager, Pill } from '../ui/kit'
 import { tx } from '../i18n'
 
 const stockLabel = (status: string) => ({ IN_STOCK: tx("Op voorraad"), OUT_OF_STOCK: tx("Niet op voorraad"), BACKORDER: tx("Nabestelling"), PREORDER: tx("Voorverkoop") }[status] ?? status)
 const PAGE_SIZE = 50
 const money = (n: number, currency: string) => (currency === 'EUR' ? eur(n) : `${n.toFixed(2)} ${currency}`)
-
-/** Foto van de leverancier, op een witte ondergrond. Zonder foto of als hij niet laadt: een leeg vlak. */
-function Photo({ url, alt, className }: { url?: string; alt: string; className: string }) {
-  const [broken, setBroken] = useState(false)
-  const src = url ? imageSrc(url, import.meta.env.BASE_URL) : ''
-  return (
-    <div className={`cat-photo ${className}`}>
-      {src && !broken ? <img src={src} alt={alt} loading="lazy" referrerPolicy="no-referrer" onError={() => setBroken(true)} /> : <ImageOff size={className === 'thumb' ? 18 : 40} aria-label={tx("Geen foto")} />}
-    </div>
-  )
-}
 
 /** Adviesprijs: gelijk aan de prijs in de showroom van de leverancier. De webshopprijs is de actieprijs op de consumentenwebshop. */
 function Price({ item }: { item: SupplierCatalogItem }) {
@@ -34,12 +25,17 @@ export function Catalogs({ supplierId }: { supplierId: string }) {
   const [category, setCategory] = useState('')
   const [openId, setOpenId] = useState<string | null>(null)
   const [page, setPage] = useState(1)
+  const [source, setSource] = useState<'showroom' | 'webshop' | null>(null)
   const listTop = useRef<HTMLElement>(null)
   const file = useRef<HTMLInputElement>(null)
   const supplier = s.suppliers.find((x) => x.id === supplierId)
   const all = useMemo(() => (supplier ? catalogOf(s, supplier.id) : []), [s, supplier])
   const items = useMemo(() => (supplier ? catalogOf(s, supplier.id, { q, category }) : []), [s, supplier, q, category])
   const categories = catalogCategories(all)
+  const partsIndex = useMemo(() => showroomParts(s.supplier_showroom_items).parentOf, [s])
+  const showroomCount = (sup: Supplier) => showroomOf(s, sup, {}, partsIndex).length
+  const hasShowroom = !!supplier && showroomCount(supplier) > 0
+  const view = source ?? (hasShowroom ? 'showroom' : 'webshop')
   // Nieuwe zoekopdracht, categorie of leverancier: terug naar pagina 1.
   const pages = Math.max(1, Math.ceil(items.length / PAGE_SIZE))
   const current = Math.min(page, pages)
@@ -48,13 +44,16 @@ export function Catalogs({ supplierId }: { supplierId: string }) {
   const open = s.supplier_catalog_items.find((x) => x.id === openId)
   const countOf = useMemo(() => elementCounts(s.supplier_catalog_items), [s])
 
-  const pick = (id: string) => { setQ(''); setCategory(''); setPage(1); location.hash = `catalogi-${id}` }
+  const pick = (id: string) => { setQ(''); setCategory(''); setPage(1); setSource(null); location.hash = `catalogi-${id}` }
   const onFile = async (f: File | undefined) => {
     if (!f) return
     const text = await f.text()
-    let result: { added: number; updated: number } | undefined
-    const ok = await run(async (db) => { result = await importCatalog(db, text) })
-    if (ok && result) toast(tx("Catalogus ingelezen: {0} nieuw, {1} bijgewerkt.", result.added, result.updated))
+    let result: { kind: 'showroom' | 'catalogus'; added: number; updated: number } | undefined
+    const ok = await run(async (db) => { result = await importSupplierFile(db, text) })
+    if (ok && result) {
+      toast(result.kind === 'showroom' ? tx("Showroom ingelezen: {0} nieuw, {1} bijgewerkt.", result.added, result.updated) : tx("Catalogus ingelezen: {0} nieuw, {1} bijgewerkt.", result.added, result.updated))
+      setSource(result.kind === 'showroom' ? 'showroom' : 'webshop')
+    }
     if (file.current) file.current.value = ''
   }
 
@@ -67,17 +66,20 @@ export function Catalogs({ supplierId }: { supplierId: string }) {
 
       <div className="cat-suppliers" role="tablist" aria-label={tx("Leverancier")}>
         {s.suppliers.filter((x) => x.is_active).map((x) => {
-          const n = catalogOf(s, x.id).length
+          const n = catalogOf(s, x.id).length, sr = showroomCount(x)
           return (
             <button key={x.id} role="tab" aria-selected={x.id === supplierId} className={`cat-supplier ${x.id === supplierId ? 'on' : ''}`} onClick={() => pick(x.id)}>
               <span className="strong">{x.name}</span>
-              <small>{n ? tx("{0} artikelen", n) : tx("Nog geen catalogus")}</small>
+              <small>{sr ? tx("Showroom: {0} artikelen", sr) : null}{sr && n ? ' · ' : null}{n ? tx("Webshop: {0} artikelen", n) : null}{!sr && !n ? tx("Nog geen catalogus") : null}</small>
             </button>
           )
         })}
       </div>
 
-      {!supplier ? <section className="panel"><Empty>{tx("Kies eerst een leverancier.")}</Empty></section> : (
+      {supplier && hasShowroom && <Tabs<'showroom' | 'webshop'> value={view} onChange={setSource} tabs={[
+        { value: 'showroom', label: tx("Showroom"), n: showroomCount(supplier) }, { value: 'webshop', label: tx("Webshop"), n: all.length },
+      ]} />}
+      {!supplier ? <section className="panel"><Empty>{tx("Kies eerst een leverancier.")}</Empty></section> : view === 'showroom' ? <ShowroomList key={supplier.id} supplier={supplier} /> : (
         <section className="panel cat-list" ref={listTop}>
           <div className="panel-head">
             <h2>{supplier.name}</h2>

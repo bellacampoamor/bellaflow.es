@@ -9,7 +9,7 @@ import { TABLES } from '../src/data/types'
 import { archiveRows, openLinesOnTransport, linePurchaseStatus, linesToPurchase, documentLanguage, flowCounts, freeAt, transportLoad, invoiceBalance, onHandMap, orderStage, orderTab, reservedMap, stockKey, vatBreakdown , invoiceReport, periodRange, invoiceQrUrl, hasTaxId, driverStops } from '../src/domain/calc'
 import { renameOldSuppliers, restoreSettings, restoreSuppliers, seedDemo } from '../src/domain/demo'
 import {
-  importCatalog, createDelivery, createInvoice, markDeliveriesReady, createOrder, createPurchaseOrder, invoiceProformas, lineFromProduct, markDelivered, assignShipmentsToTransport, cancelTransport, convertLinesToPurchaseOrders, createTransport, markReady, receiveGoods, rescheduleDelivery, rescheduleOrder, saveRouteOrder, saveSettings, mailSignedNote, setPurchaseLabel, signDelivery, splitLinesForStock, setDeliveryInTransit, setTransportStatus, updateTransport, transferStock,
+  importCatalog, importShowroom, importSupplierFile, createDelivery, createInvoice, markDeliveriesReady, createOrder, createPurchaseOrder, invoiceProformas, lineFromProduct, markDelivered, assignShipmentsToTransport, cancelTransport, convertLinesToPurchaseOrders, createTransport, markReady, receiveGoods, rescheduleDelivery, rescheduleOrder, saveRouteOrder, saveSettings, mailSignedNote, setPurchaseLabel, signDelivery, splitLinesForStock, setDeliveryInTransit, setTransportStatus, updateTransport, transferStock,
 } from '../src/domain/services'
 import { estimateMatrix, parseRouterTable } from '../src/data/geo'
 import { dropIndex, googleMapsRouteUrl, moveItem, optimizeRoute, tourCost } from '../src/domain/route'
@@ -17,6 +17,7 @@ import { es } from '../src/i18n.es'
 import { en } from '../src/i18n.en'
 import { toSeedSql } from '../scripts/seed-sql'
 import { pageNumbers } from '../src/ui/kit'
+import { partOf, showroomOf, showroomParts } from '../src/domain/showroom'
 import { catalogOf, elementsOf, imageSrc, parseCsv, safeHtml, seriesCode } from '../src/domain/catalog'
 
 const TODAY = '2026-11-04'
@@ -819,4 +820,62 @@ describe('catalogi', () => {
     expect(r.rows[0].n).toBe(642)
     expect(r.rows[0].imgs).toBe(db.data.supplier_catalog_items.reduce((n, x) => n + x.image_urls.length, 0))
   }, 60000)
+})
+
+describe('showroom', () => {
+  // Kleine testexport in het formaat van supplier_showroom_items.csv; de artikelen zijn verzonnen.
+  const SUP = 'Life Outdoor Living International B.V.'
+  const CSV = [
+    'supplier_name,supplier_sku,name,ean,series,categories,price,currency,available_date,available_text,image_url,product_url,scraped_at',
+    `${SUP},T-LAMP,Testlamp groot met LED,8700000000001,Testserie,Accessoires,248.75,EUR,2099-12-04,04-12-2099,,https://voorbeeld.test/lamp,2026-11-06T17:00:00Z`,
+    `${SUP},T-LAMP-1,Testlamp groot met LED deel 1 van 2 lantaarn,8700000000002,Testserie,,156.25,EUR,2026-11-06,06-11-2026,,,2026-11-06T17:00:00Z`,
+    `${SUP},T-LAMP-2,Testlamp groot met LED deel 2 van 2 voet,8700000000003,Testserie,,68.75,EUR,,Geen datum beschikbaar,,,2026-11-06T17:00:00Z`,
+    `${SUP},T-FRAME-1,"Testtafel frame 120 rond deel 1 van 2 poot",8700000000004,Andere,"Tuintafels | Accessoires",375.00,EUR,,Geen datum beschikbaar,,,2026-11-06T17:00:00Z`,
+  ].join('\n')
+
+  it('leest de showroom in en koppelt onderdelen aan hun hoofdartikel', async () => {
+    expect(await importShowroom(db, CSV)).toEqual({ added: 4, updated: 0 })
+    const s = await loadSnapshot(db)
+    const sup = s.suppliers.find((x) => x.name === SUP)!
+    const lamp = s.supplier_showroom_items.find((x) => x.supplier_sku === 'T-LAMP')!
+    expect(lamp).toMatchObject({ price: 248.75, available_date: '2099-12-04', ean: '8700000000001', series: 'Testserie' })
+    expect(s.supplier_showroom_items.find((x) => x.supplier_sku === 'T-LAMP-2')!.available_date).toBeNull()
+    const { parts } = showroomParts(s.supplier_showroom_items)
+    expect(parts.get(lamp.id)!.map((x) => x.supplier_sku)).toEqual(['T-LAMP-1', 'T-LAMP-2'])
+    // Onderdelen met hoofdartikel staan niet in de lijst; een onderdeel zonder hoofdartikel wel.
+    expect(showroomOf(s, sup).map((x) => x.supplier_sku).sort()).toEqual(['T-FRAME-1', 'T-LAMP'])
+    expect(showroomOf(s, sup, { category: 'Tuintafels' }).map((x) => x.supplier_sku)).toEqual(['T-FRAME-1'])
+    expect(showroomOf(s, sup, { series: 'Testserie' }).map((x) => x.supplier_sku)).toEqual(['T-LAMP'])
+    expect(showroomOf(s, sup, { q: '8700000000004' }).map((x) => x.supplier_sku)).toEqual(['T-FRAME-1'])
+    expect(partOf('Testlamp deel 2 van 3 voet')).toEqual({ base: 'Testlamp', n: 2, of: 3 })
+    // Opnieuw inlezen werkt bij.
+    expect(await importShowroom(db, CSV)).toEqual({ added: 0, updated: 4 })
+  })
+  it('herkent aan de kopregel of het showroom of webshop is', async () => {
+    expect((await importSupplierFile(db, CSV)).kind).toBe('showroom')
+    expect((await importSupplierFile(db, readFileSync('public/assets/catalogus/supplier_catalog_items.csv', 'utf8'))).kind).toBe('catalogus')
+  })
+  it('de showroom past in de database', async () => {
+    await importShowroom(db, CSV)
+    const pg = new PGlite()
+    await pg.exec('create role authenticated;')
+    await pg.exec(readdirSync('supabase/migrations').sort().map((f) => readFileSync(`supabase/migrations/${f}`, 'utf8')).join('\n'))
+    await pg.exec(toSeedSql(await loadSnapshot(db)))
+    const r = await pg.query<{ n: number }>('select count(*)::int as n from supplier_showroom_items where available_date is not null')
+    expect(r.rows[0].n).toBe(2)
+  }, 60000)
+  it('catalogi gaan niet in de browseropslag', async () => {
+    const store = new Map<string, string>()
+    vi.stubGlobal('localStorage', { getItem: (k: string) => store.get(k) ?? null, setItem: (k: string, v: string) => { store.set(k, v) }, removeItem: (k: string) => { store.delete(k) } })
+    try {
+      const local = new LocalDriver()
+      await seedDemo(local, TODAY)
+      await importShowroom(local, CSV)
+      expect((await local.list('supplier_showroom_items')).length).toBe(4)
+      await local.update('settings', 'default', { shop_email: 'winkel@voorbeeld.test' })
+      const saved = JSON.parse(store.get('bella-flow-v1')!)
+      expect(saved.supplier_showroom_items).toBeUndefined()
+      expect((await local.list('supplier_showroom_items')).length).toBe(4)
+    } finally { vi.unstubAllGlobals() }
+  })
 })
