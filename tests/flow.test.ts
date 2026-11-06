@@ -851,6 +851,16 @@ describe('showroom', () => {
     // Opnieuw inlezen werkt bij.
     expect(await importShowroom(db, CSV)).toEqual({ added: 0, updated: 4 })
   })
+  it('leest de echte showroom-export volledig in', async () => {
+    const real = readFileSync('public/assets/catalogus/supplier_showroom_items.csv', 'utf8')
+    expect(await importShowroom(db, real)).toEqual({ added: 6758, updated: 0 })
+    const s = await loadSnapshot(db)
+    const sup = s.suppliers.find((x) => x.name === SUP)!
+    const { parentOf } = showroomParts(s.supplier_showroom_items)
+    expect(showroomOf(s, sup).length).toBe(6758 - parentOf.size)
+    expect(s.supplier_showroom_items.find((x) => x.supplier_sku === 'PRX-BBR-LMP-FLO')).toMatchObject({ price: 248.75, series: 'Proxima' })
+    expect(s.supplier_showroom_items.every((x) => x.price !== null)).toBe(true)
+  })
   it('herkent aan de kopregel of het showroom of webshop is', async () => {
     expect((await importSupplierFile(db, CSV)).kind).toBe('showroom')
     expect((await importSupplierFile(db, readFileSync('public/assets/catalogus/supplier_catalog_items.csv', 'utf8'))).kind).toBe('catalogus')
