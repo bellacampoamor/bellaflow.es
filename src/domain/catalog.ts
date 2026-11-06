@@ -107,3 +107,30 @@ export function imageSrc(url: string, base = '/') {
 }
 
 export const STOCK_STATUS: Record<string, 'good' | 'bad' | 'warn'> = { IN_STOCK: 'good', OUT_OF_STOCK: 'bad', BACKORDER: 'warn', PREORDER: 'warn' }
+
+/**
+ * Seriecode uit het artikelnummer van de leverancier: CONFIG-TIM-OPST1 en CONFIG-TIM-TUS horen bij serie TIM,
+ * PRX-BBR-LMP-FLO bij PRX. Artikelnummers die met cijfers beginnen (24-1641-889) hebben geen serie.
+ */
+export function seriesCode(sku: string) {
+  const rest = sku.replace(/^CONFIG-/i, '')
+  const m = /^([A-Za-z]{2,4})-/.exec(rest)
+  return m ? m[1].toUpperCase() : null
+}
+
+/** Elementen: de andere actieve artikelen van dezelfde leverancier met dezelfde seriecode, die erbij besteld kunnen worden. */
+export function elementsOf(s: Snapshot, item: SupplierCatalogItem) {
+  const code = seriesCode(item.supplier_sku)
+  if (!code) return []
+  return s.supplier_catalog_items
+    .filter((x) => x.id !== item.id && x.active && sameName(x.supplier_name, item.supplier_name) && seriesCode(x.supplier_sku) === code)
+    .sort((a, b) => mainCategory(a).localeCompare(mainCategory(b)) || a.name.localeCompare(b.name) || a.supplier_sku.localeCompare(b.supplier_sku))
+}
+
+/** Aantal elementen per artikel in één keer, voor de lijst. */
+export function elementCounts(items: SupplierCatalogItem[]) {
+  const perSeries = new Map<string, number>()
+  const key = (x: SupplierCatalogItem) => { const c = seriesCode(x.supplier_sku); return c && x.active ? `${x.supplier_name.toLowerCase()}|${c}` : null }
+  for (const x of items) { const k = key(x); if (k) perSeries.set(k, (perSeries.get(k) ?? 0) + 1) }
+  return (x: SupplierCatalogItem) => { const k = key(x); return k ? (perSeries.get(k) ?? 1) - 1 : 0 }
+}

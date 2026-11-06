@@ -165,14 +165,22 @@ export function Combo({ id, value, options, onChange, placeholder, footer }: { i
   )
 }
 
+/** Alleen een klik op de achtergrond zelf sluit, niet op de scrollbalk en niet als je in het venster begon te slepen. */
+const onBackdrop = (e: ReactMouseEvent<HTMLDivElement>) => {
+  const el = e.currentTarget
+  const r = el.getBoundingClientRect()
+  return e.target === el && e.clientX < r.left + el.clientWidth && e.clientY < r.top + el.clientHeight
+}
+
 export function Modal({ title, wide, center, onClose, children, footer }: { title: string; wide?: boolean; center?: boolean; onClose: () => void; children: ReactNode; footer?: ReactNode }) {
+  const backdrop = useRef(false)
   useEffect(() => {
     const k = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
     document.addEventListener('keydown', k)
     return () => document.removeEventListener('keydown', k)
   }, [onClose])
   return (
-    <div className="overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose() }}>
+    <div className="overlay" onMouseDown={(e) => { backdrop.current = onBackdrop(e) }} onClick={(e) => { if (backdrop.current && onBackdrop(e)) onClose(); backdrop.current = false }}>
       <div className={`modal ${wide ? 'wide' : ''} ${center ? 'center' : ''}`} role="dialog" aria-modal="true" aria-label={title}>
         <div className="panel-head" style={{ marginBottom: 0 }}>
           <h2>{title}</h2>

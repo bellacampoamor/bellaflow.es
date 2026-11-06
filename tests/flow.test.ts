@@ -16,7 +16,7 @@ import { dropIndex, googleMapsRouteUrl, moveItem, optimizeRoute, tourCost } from
 import { es } from '../src/i18n.es'
 import { en } from '../src/i18n.en'
 import { toSeedSql } from '../scripts/seed-sql'
-import { catalogOf, imageSrc, parseCsv, safeHtml } from '../src/domain/catalog'
+import { catalogOf, elementsOf, imageSrc, parseCsv, safeHtml, seriesCode } from '../src/domain/catalog'
 
 const TODAY = '2026-11-04'
 let db: LocalDriver
@@ -770,6 +770,16 @@ describe('catalogi', () => {
     const dining = catalogOf(s, lol().id, { category: 'Dining tuinsets' })
     expect(dining.length).toBeGreaterThan(0)
     expect(dining.every((x) => x.categories.some((c) => c.name === 'Dining tuinsets'))).toBe(true)
+  })
+  it('toont bij een artikel de elementen uit dezelfde serie', async () => {
+    await importCatalog(db, CSV)
+    const s = await loadSnapshot(db)
+    expect([seriesCode('CONFIG-TIM-OPST1'), seriesCode('PRX-BBR-LMP-FLO'), seriesCode('24-1641-889'), seriesCode('CONFIG-24-1718')]).toEqual(['TIM', 'PRX', null, null])
+    const timber = s.supplier_catalog_items.find((x) => x.supplier_sku === 'CONFIG-TIM-OPST1')!
+    const els = elementsOf(s, timber)
+    expect(els.map((x) => x.supplier_sku)).toContain('CONFIG-TIM-TUS')
+    expect(els.every((x) => seriesCode(x.supplier_sku) === 'TIM' && x.id !== timber.id)).toBe(true)
+    expect(elementsOf(s, s.supplier_catalog_items.find((x) => x.supplier_sku === '24-1641-889')!)).toEqual([])
   })
   it('weigert een leverancier die niet onder Beheer staat', async () => {
     await expect(importCatalog(db, 'supplier_name,supplier_sku,name\nOnbekend B.V.,A1,Stoel\n')).rejects.toThrow(/Onbekend B\.V\..*Beheer/)

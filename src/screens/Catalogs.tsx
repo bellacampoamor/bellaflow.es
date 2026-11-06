@@ -2,7 +2,7 @@ import { useMemo, useRef, useState } from 'react'
 import { ImageOff, Upload } from 'lucide-react'
 import type { SupplierCatalogItem } from '../data/types'
 import { onHandMap, reservedMap, stockKey } from '../domain/calc'
-import { belongsTo, catalogCategories, catalogOf, imageSrc, mainCategory, plainText, productForItem, safeHtml, STOCK_STATUS, subCategory } from '../domain/catalog'
+import { belongsTo, catalogCategories, catalogOf, elementCounts, elementsOf, imageSrc, seriesCode, mainCategory, plainText, productForItem, safeHtml, STOCK_STATUS, subCategory } from '../domain/catalog'
 import { importCatalog } from '../domain/services'
 import { useApp } from '../ui/app-context'
 import { Empty, eur, fmtDate, Head, Modal, Pill } from '../ui/kit'
@@ -22,9 +22,9 @@ function Photo({ url, alt, className }: { url?: string; alt: string; className: 
   )
 }
 
+/** Adviesprijs: gelijk aan de prijs in de showroom van de leverancier. De webshopprijs is de actieprijs op de consumentenwebshop. */
 function Price({ item }: { item: SupplierCatalogItem }) {
-  const reduced = item.price_regular > item.price_final && item.price_final > 0
-  return <>{reduced && <s className="muted small">{money(item.price_regular, item.currency)}</s>} {money(item.price_final || item.price_regular, item.currency)}</>
+  return <>{money(item.price_regular || item.price_final, item.currency)}</>
 }
 
 export function Catalogs({ supplierId }: { supplierId: string }) {
@@ -38,6 +38,7 @@ export function Catalogs({ supplierId }: { supplierId: string }) {
   const items = useMemo(() => (supplier ? catalogOf(s, supplier.id, { q, category }) : []), [s, supplier, q, category])
   const categories = catalogCategories(all)
   const open = s.supplier_catalog_items.find((x) => x.id === openId)
+  const countOf = useMemo(() => elementCounts(s.supplier_catalog_items), [s])
 
   const pick = (id: string) => { setQ(''); setCategory(''); location.hash = `catalogi-${id}` }
   const onFile = async (f: File | undefined) => {
@@ -83,7 +84,7 @@ export function Catalogs({ supplierId }: { supplierId: string }) {
           {all.length === 0 ? <Empty>{tx("Voor deze leverancier is nog geen catalogus ingelezen. Gebruik Catalogus inlezen (CSV).")}</Empty>
             : items.length === 0 ? <Empty>{tx("Geen artikelen gevonden.")}</Empty> : (
             <div className="table-wrap"><table>
-              <thead><tr><th></th><th>{tx("Artikelnummer")}</th><th>{tx("Artikel")}</th><th>{tx("Categorie")}</th><th>{tx("Voorraad leverancier")}</th><th className="num">{tx("Prijs")}</th><th></th></tr></thead>
+              <thead><tr><th></th><th>{tx("Artikelnummer")}</th><th>{tx("Artikel")}</th><th>{tx("Categorie")}</th><th>{tx("Voorraad webshop")}</th><th className="num">{tx("Adviesprijs")}</th><th></th></tr></thead>
               <tbody>{items.map((x) => {
                 const own = productForItem(s, x)
                 return (
@@ -94,23 +95,25 @@ export function Catalogs({ supplierId }: { supplierId: string }) {
                     <td>{mainCategory(x) || '–'}{subCategory(x) && <div className="muted small">{subCategory(x)}</div>}</td>
                     <td>{x.stock_status ? <Pill tone={STOCK_STATUS[x.stock_status] ?? ''}>{stockLabel(x.stock_status)}</Pill> : '–'}</td>
                     <td className="num" style={{ whiteSpace: 'nowrap' }}><Price item={x} /></td>
-                    <td>{own && <Pill tone="info">{tx("In assortiment")}</Pill>}</td>
+                    <td style={{ whiteSpace: 'nowrap' }}>{countOf(x) > 0 && <span className="muted small">{tx("+{0} elementen", countOf(x))}</span>} {own && <Pill tone="info">{tx("In assortiment")}</Pill>}</td>
                   </tr>
                 )
               })}</tbody>
             </table></div>
           )}
-          {items.length > 0 && <p className="muted small" style={{ margin: '12px 0 0' }}>{tx("{0} van {1} artikelen", items.length, all.length)}</p>}
+          {items.length > 0 && <p className="muted small" style={{ margin: '12px 0 0' }}>{tx("{0} van {1} artikelen", items.length, all.length)}. {tx("Adviesprijs is de prijs in de showroom van de leverancier. Voorraad en webshopprijs komen van de consumentenwebshop.")}</p>}
         </section>
       )}
 
-      {open && <ArticleCard item={open} onClose={() => setOpenId(null)} />}
+      {open && <ArticleCard key={open.id} item={open} onOpen={setOpenId} onClose={() => setOpenId(null)} />}
     </>
   )
 }
 
-function ArticleCard({ item, onClose }: { item: SupplierCatalogItem; onClose: () => void }) {
+function ArticleCard({ item, onOpen, onClose }: { item: SupplierCatalogItem; onOpen: (id: string) => void; onClose: () => void }) {
   const { s } = useApp()
+  const elements = useMemo(() => elementsOf(s, item), [s, item])
+  const series = seriesCode(item.supplier_sku)
   const [photo, setPhoto] = useState(0)
   const images = item.image_urls
   const own = productForItem(s, item)
@@ -142,9 +145,9 @@ function ArticleCard({ item, onClose }: { item: SupplierCatalogItem; onClose: ()
             <dt>{tx("Leverancier")}</dt><dd>{item.supplier_name}</dd>
             <dt>{tx("Categorie")}</dt><dd>{item.categories.length ? item.categories.map((c) => c.name).join(' › ') : '–'}</dd>
             {type && <><dt>{tx("Soort")}</dt><dd>{type}</dd></>}
-            <dt>{tx("Voorraad leverancier")}</dt><dd>{item.stock_status ? <Pill tone={STOCK_STATUS[item.stock_status] ?? ''}>{stockLabel(item.stock_status)}</Pill> : '–'}</dd>
-            {reduced && <><dt>{tx("Normale prijs")}</dt><dd><s>{money(item.price_regular, item.currency)}</s></dd></>}
-            <dt>{reduced ? tx("Actuele prijs") : tx("Prijs")}</dt><dd className="strong">{money(item.price_final || item.price_regular, item.currency)}</dd>
+            <dt>{tx("Voorraad webshop")}</dt><dd>{item.stock_status ? <Pill tone={STOCK_STATUS[item.stock_status] ?? ''}>{stockLabel(item.stock_status)}</Pill> : '–'}</dd>
+            <dt>{tx("Adviesprijs")}</dt><dd className="strong">{money(item.price_regular, item.currency)}</dd>
+            {reduced && <><dt>{tx("Webshopprijs")}</dt><dd>{money(item.price_final, item.currency)}</dd></>}
             {!item.active && <><dt>{tx("Status")}</dt><dd><Pill tone="warn">{tx("Niet meer actief bij de leverancier")}</Pill></dd></>}
           </dl>
           {own ? (
@@ -155,6 +158,23 @@ function ArticleCard({ item, onClose }: { item: SupplierCatalogItem; onClose: ()
           {item.short_description_html && <p className="cat-lead" dangerouslySetInnerHTML={{ __html: safeHtml(item.short_description_html) }} />}
         </div>
       </div>
+      {series && (
+        <section className="cat-elements">
+          <h3>{tx("Artikel en Elementen")}</h3>
+          <p className="muted small" style={{ margin: 0 }}>{elements.length
+            ? tx("Artikelen uit dezelfde serie ({0}) die erbij besteld kunnen worden, volgens het artikelnummer van de leverancier.", series)
+            : tx("Geen andere artikelen in serie {0}.", series)}</p>
+          <div className="table-wrap flush"><table>
+            <thead><tr><th></th><th>{tx("Artikelnummer")}</th><th>{tx("Artikel")}</th><th>{tx("Categorie")}</th><th className="num">{tx("Adviesprijs")}</th></tr></thead>
+            <tbody>
+              <tr className="cat-self"><td style={{ width: 64 }}><Photo url={item.image_urls[0]?.url} alt={item.name} className="thumb" /></td><td className="strong" style={{ whiteSpace: 'nowrap' }}>{item.supplier_sku}</td><td><span className="strong">{item.name}</span><div className="muted small">{tx("Dit artikel")}</div></td><td>{subCategory(item) || mainCategory(item) || '–'}</td><td className="num"><Price item={item} /></td></tr>
+              {elements.map((x) => (
+                <tr key={x.id} className="click" onClick={() => onOpen(x.id)}><td><Photo url={x.image_urls[0]?.url} alt={x.name} className="thumb" /></td><td className="strong" style={{ whiteSpace: 'nowrap' }}>{x.supplier_sku}</td><td>{x.name}</td><td>{subCategory(x) || mainCategory(x) || '–'}</td><td className="num" style={{ whiteSpace: 'nowrap' }}><Price item={x} /></td></tr>
+              ))}
+            </tbody>
+          </table></div>
+        </section>
+      )}
       {item.description_html && <div className="cat-description" dangerouslySetInnerHTML={{ __html: safeHtml(item.description_html) }} />}
       <p className="muted small" style={{ margin: 0 }}>
         {item.source_updated_at && <>{tx("Gewijzigd bij de leverancier op {0}", fmtDate(item.source_updated_at))}. </>}
