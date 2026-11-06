@@ -16,6 +16,7 @@ import { dropIndex, googleMapsRouteUrl, moveItem, optimizeRoute, tourCost } from
 import { es } from '../src/i18n.es'
 import { en } from '../src/i18n.en'
 import { toSeedSql } from '../scripts/seed-sql'
+import { pageNumbers } from '../src/ui/kit'
 import { catalogOf, elementsOf, imageSrc, parseCsv, safeHtml, seriesCode } from '../src/domain/catalog'
 
 const TODAY = '2026-11-04'
@@ -792,6 +793,12 @@ describe('catalogi', () => {
   })
   it('weigert een leverancier die niet onder Beheer staat', async () => {
     await expect(importCatalog(db, 'supplier_name,supplier_sku,name\nOnbekend B.V.,A1,Stoel\n')).rejects.toThrow(/Onbekend B\.V\..*Beheer/)
+  })
+  it('pagineert met weglatingstekens', () => {
+    expect(pageNumbers(1, 1)).toEqual([1])
+    expect(pageNumbers(1, 10)).toEqual([1, 2, '…', 10])
+    expect(pageNumbers(5, 10)).toEqual([1, '…', 4, 5, 6, '…', 10])
+    expect(pageNumbers(10, 10)).toEqual([1, '…', 9, 10])
   })
   it('leest velden met komma, aanhalingsteken en regeleinde', () => {
     expect(parseCsv('a,b\n"x, ""y""","1\n2"\n')).toEqual([{ a: 'x, "y"', b: '1\n2' }])

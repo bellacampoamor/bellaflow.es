@@ -1,6 +1,6 @@
 // Gedeelde bouwstenen voor alle schermen.
 import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent, type ReactNode } from 'react'
-import { Check as CheckIcon, X } from 'lucide-react'
+import { ArrowUp, Check as CheckIcon, ChevronLeft, ChevronRight, X } from 'lucide-react'
 import { locale, tx } from '../i18n'
 import qrcode from 'qrcode-generator'
 import { DOC_MARK } from '../domain/noteText'
@@ -210,4 +210,44 @@ export const Empty = ({ children }: { children: ReactNode }) => <div className="
 /** Artikelnummer onder of naast een productnaam, overal hetzelfde. */
 export function Sku({ code }: { code?: string | null }) {
   return code ? <span className="sku">{code}</span> : null
+}
+
+/** Paginanummers met weglatingstekens: 1 … 4 5 6 … 10. */
+export function pageNumbers(page: number, pages: number): (number | '…')[] {
+  const keep = new Set([1, pages, page - 1, page, page + 1].filter((n) => n >= 1 && n <= pages))
+  const out: (number | '…')[] = []
+  let prev = 0
+  for (const n of [...keep].sort((a, b) => a - b)) { if (n - prev > 1) out.push('…'); out.push(n); prev = n }
+  return out
+}
+
+/** Paginering onderaan een lijst: vorige, paginanummers, volgende en welke regels je ziet. */
+export function Pager({ page, size, total, onPage }: { page: number; size: number; total: number; onPage: (p: number) => void }) {
+  const pages = Math.max(1, Math.ceil(total / size))
+  const from = total ? (page - 1) * size + 1 : 0, to = Math.min(total, page * size)
+  return (
+    <nav className="pager" aria-label={tx("Paginering")}>
+      <span className="muted small">{tx("{0}–{1} van {2}", from, to, total)}</span>
+      {pages > 1 && <div className="pager-buttons">
+        <button type="button" className="btn sm" disabled={page <= 1} onClick={() => onPage(page - 1)} aria-label={tx("Vorige pagina")}><ChevronLeft size={16} /></button>
+        {pageNumbers(page, pages).map((n, i) => n === '…'
+          ? <span key={`e${i}`} className="muted">…</span>
+          : <button key={n} type="button" className={`btn sm ${n === page ? 'on' : ''}`} aria-current={n === page ? 'page' : undefined} onClick={() => onPage(n)}>{n}</button>)}
+        <button type="button" className="btn sm" disabled={page >= pages} onClick={() => onPage(page + 1)} aria-label={tx("Volgende pagina")}><ChevronRight size={16} /></button>
+      </div>}
+    </nav>
+  )
+}
+
+/** Knop rechtsonder die verschijnt na wat scrollen en terug naar boven gaat. */
+export function BackToTop() {
+  const [show, setShow] = useState(false)
+  useEffect(() => {
+    const on = () => setShow(window.scrollY > 400)
+    on()
+    window.addEventListener('scroll', on, { passive: true })
+    return () => window.removeEventListener('scroll', on)
+  }, [])
+  if (!show) return null
+  return <button type="button" className="back-to-top" aria-label={tx("Naar boven")} title={tx("Naar boven")} onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}><ArrowUp size={20} /></button>
 }

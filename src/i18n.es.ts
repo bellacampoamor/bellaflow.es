@@ -938,4 +938,9 @@ export const es: Record<string, string> = {
   "+{0} elementen": "+{0} elementos",
   "Elementen": "Elementos",
   "Losse artikelen uit dezelfde serie ({0}) die bij deze set besteld kunnen worden, volgens het artikelnummer van de leverancier.": "Artículos sueltos de la misma serie ({0}) que se pueden pedir con este conjunto, según el número de artículo del proveedor.",
+  "Paginering": "Paginación",
+  "{0}–{1} van {2}": "{0}–{1} de {2}",
+  "Vorige pagina": "Página anterior",
+  "Volgende pagina": "Página siguiente",
+  "Naar boven": "Volver arriba",
 }

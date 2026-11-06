@@ -477,3 +477,11 @@ body.route-dragging, body.route-dragging * { cursor: grabbing !important; user-s
 @media (max-width: 720px) { .cat-card { grid-template-columns: 1fr; } .cat-supplier { min-width: 0; flex: 1 1 100%; } }
 .cat-elements { display: flex; flex-direction: column; gap: 8px; border-top: 1px solid var(--line); padding-top: 14px; }
 .cat-elements h3 { margin: 0; font-size: 1.05rem; color: var(--link); }
+.pager { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); }
+.pager-buttons { display: flex; gap: 4px; align-items: center; flex-wrap: wrap; }
+.pager-buttons .btn { min-width: 36px; justify-content: center; }
+.pager-buttons .btn.on { background: var(--selected); color: var(--on-selected); border-color: var(--selected); }
+.cat-list { scroll-margin-top: calc(var(--top-h, 0px) + 12px); }
+.back-to-top { position: fixed; right: max(18px, env(safe-area-inset-right, 0px)); bottom: calc(18px + env(safe-area-inset-bottom, 0px)); z-index: 40; width: 46px; height: 46px; border-radius: 50%; border: 0; background: var(--primary); color: var(--on-primary); box-shadow: var(--shadow); display: grid; place-items: center; cursor: pointer; }
+.back-to-top:hover { background: var(--primary-hover); }
+.back-to-top:focus-visible { outline: 2px solid var(--brand-line); outline-offset: 3px; }

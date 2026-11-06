@@ -5,10 +5,11 @@ import { onHandMap, reservedMap, stockKey } from '../domain/calc'
 import { catalogCategories, catalogOf, elementCounts, elementsOf, imageSrc, seriesCode, mainCategory, plainText, productForItem, safeHtml, STOCK_STATUS, subCategory } from '../domain/catalog'
 import { importCatalog } from '../domain/services'
 import { useApp } from '../ui/app-context'
-import { Empty, eur, fmtDate, Head, Modal, Pill } from '../ui/kit'
+import { BackToTop, Empty, eur, fmtDate, Head, Modal, Pager, Pill } from '../ui/kit'
 import { tx } from '../i18n'
 
 const stockLabel = (status: string) => ({ IN_STOCK: tx("Op voorraad"), OUT_OF_STOCK: tx("Niet op voorraad"), BACKORDER: tx("Nabestelling"), PREORDER: tx("Voorverkoop") }[status] ?? status)
+const PAGE_SIZE = 50
 const money = (n: number, currency: string) => (currency === 'EUR' ? eur(n) : `${n.toFixed(2)} ${currency}`)
 
 /** Foto van de leverancier, op een witte ondergrond. Zonder foto of als hij niet laadt: een leeg vlak. */
@@ -32,15 +33,22 @@ export function Catalogs({ supplierId }: { supplierId: string }) {
   const [q, setQ] = useState('')
   const [category, setCategory] = useState('')
   const [openId, setOpenId] = useState<string | null>(null)
+  const [page, setPage] = useState(1)
+  const listTop = useRef<HTMLElement>(null)
   const file = useRef<HTMLInputElement>(null)
   const supplier = s.suppliers.find((x) => x.id === supplierId)
   const all = useMemo(() => (supplier ? catalogOf(s, supplier.id) : []), [s, supplier])
   const items = useMemo(() => (supplier ? catalogOf(s, supplier.id, { q, category }) : []), [s, supplier, q, category])
   const categories = catalogCategories(all)
+  // Nieuwe zoekopdracht, categorie of leverancier: terug naar pagina 1.
+  const pages = Math.max(1, Math.ceil(items.length / PAGE_SIZE))
+  const current = Math.min(page, pages)
+  const shown = items.slice((current - 1) * PAGE_SIZE, current * PAGE_SIZE)
+  const goPage = (p: number) => { setPage(p); listTop.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }) }
   const open = s.supplier_catalog_items.find((x) => x.id === openId)
   const countOf = useMemo(() => elementCounts(s.supplier_catalog_items), [s])
 
-  const pick = (id: string) => { setQ(''); setCategory(''); location.hash = `catalogi-${id}` }
+  const pick = (id: string) => { setQ(''); setCategory(''); setPage(1); location.hash = `catalogi-${id}` }
   const onFile = async (f: File | undefined) => {
     if (!f) return
     const text = await f.text()
@@ -70,22 +78,22 @@ export function Catalogs({ supplierId }: { supplierId: string }) {
       </div>
 
       {!supplier ? <section className="panel"><Empty>{tx("Kies eerst een leverancier.")}</Empty></section> : (
-        <section className="panel">
+        <section className="panel cat-list" ref={listTop}>
           <div className="panel-head">
             <h2>{supplier.name}</h2>
             <div className="actions">
-              <select style={{ width: 'auto', maxWidth: 280 }} aria-label={tx("Categorie")} value={category} onChange={(e) => setCategory(e.target.value)}>
+              <select style={{ width: 'auto', maxWidth: 280 }} aria-label={tx("Categorie")} value={category} onChange={(e) => { setCategory(e.target.value); setPage(1) }}>
                 <option value="">{tx("Alle categorieën")} ({all.length})</option>
                 {categories.map((c) => <option key={c.name} value={c.name}>{c.name} ({c.n})</option>)}
               </select>
-              <input style={{ width: 260 }} aria-label={tx("Artikel zoeken")} placeholder={tx("Zoek op naam of artikelnummer")} value={q} onChange={(e) => setQ(e.target.value)} />
+              <input style={{ width: 260 }} aria-label={tx("Artikel zoeken")} placeholder={tx("Zoek op naam of artikelnummer")} value={q} onChange={(e) => { setQ(e.target.value); setPage(1) }} />
             </div>
           </div>
           {all.length === 0 ? <Empty>{tx("Voor deze leverancier is nog geen catalogus ingelezen. Gebruik Catalogus inlezen (CSV).")}</Empty>
             : items.length === 0 ? <Empty>{tx("Geen artikelen gevonden.")}</Empty> : (
             <div className="table-wrap"><table>
               <thead><tr><th></th><th>{tx("Artikelnummer")}</th><th>{tx("Artikel")}</th><th>{tx("Categorie")}</th><th>{tx("Voorraad webshop")}</th><th className="num">{tx("Adviesprijs")}</th><th></th></tr></thead>
-              <tbody>{items.map((x) => {
+              <tbody>{shown.map((x) => {
                 const own = productForItem(s, x)
                 return (
                   <tr key={x.id} className="click" onClick={() => setOpenId(x.id)}>
@@ -101,10 +109,12 @@ export function Catalogs({ supplierId }: { supplierId: string }) {
               })}</tbody>
             </table></div>
           )}
-          {items.length > 0 && <p className="muted small" style={{ margin: '12px 0 0' }}>{tx("{0} van {1} artikelen", items.length, all.length)}. {tx("Adviesprijs is de prijs in de showroom van de leverancier. Voorraad en webshopprijs komen van de consumentenwebshop.")}</p>}
+          {items.length > 0 && <Pager page={current} size={PAGE_SIZE} total={items.length} onPage={goPage} />}
+          {items.length > 0 && <p className="muted small" style={{ margin: '8px 0 0' }}>{items.length < all.length && <>{tx("{0} van {1} artikelen", items.length, all.length)}. </>}{tx("Adviesprijs is de prijs in de showroom van de leverancier. Voorraad en webshopprijs komen van de consumentenwebshop.")}</p>}
         </section>
       )}
 
+      <BackToTop />
       {open && <ArticleCard key={open.id} item={open} onOpen={setOpenId} onClose={() => setOpenId(null)} />}
     </>
   )
