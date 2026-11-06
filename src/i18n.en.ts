@@ -936,8 +936,7 @@ export const en: Record<string, string> = {
   "Voorraad webshop": "Webshop stock",
   "Adviesprijs is de prijs in de showroom van de leverancier. Voorraad en webshopprijs komen van de consumentenwebshop.": "Recommended price is the price in the supplier's showroom. Stock and webshop price come from the consumer webshop.",
   "+{0} elementen": "+{0} elements",
-  "Artikel en Elementen": "Item and Elements",
   "Artikelen uit dezelfde serie ({0}) die erbij besteld kunnen worden, volgens het artikelnummer van de leverancier.": "Items from the same series ({0}) that can be ordered with it, according to the supplier's item number.",
   "Geen andere artikelen in serie {0}.": "No other items in series {0}.",
-  "Dit artikel": "This item",
+  "Elementen": "Elements",
 }

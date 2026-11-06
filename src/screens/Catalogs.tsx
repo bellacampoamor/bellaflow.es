@@ -158,16 +158,16 @@ function ArticleCard({ item, onOpen, onClose }: { item: SupplierCatalogItem; onO
           {item.short_description_html && <p className="cat-lead" dangerouslySetInnerHTML={{ __html: safeHtml(item.short_description_html) }} />}
         </div>
       </div>
+      {item.description_html && <div className="cat-description" dangerouslySetInnerHTML={{ __html: safeHtml(item.description_html) }} />}
       {series && (
         <section className="cat-elements">
-          <h3>{tx("Artikel en Elementen")}</h3>
+          <h3>{tx("Elementen")}{elements.length > 0 && <span className="muted small"> ({elements.length})</span>}</h3>
           <p className="muted small" style={{ margin: 0 }}>{elements.length
             ? tx("Artikelen uit dezelfde serie ({0}) die erbij besteld kunnen worden, volgens het artikelnummer van de leverancier.", series)
             : tx("Geen andere artikelen in serie {0}.", series)}</p>
           <div className="table-wrap flush"><table>
             <thead><tr><th></th><th>{tx("Artikelnummer")}</th><th>{tx("Artikel")}</th><th>{tx("Categorie")}</th><th className="num">{tx("Adviesprijs")}</th></tr></thead>
             <tbody>
-              <tr className="cat-self"><td style={{ width: 64 }}><Photo url={item.image_urls[0]?.url} alt={item.name} className="thumb" /></td><td className="strong" style={{ whiteSpace: 'nowrap' }}>{item.supplier_sku}</td><td><span className="strong">{item.name}</span><div className="muted small">{tx("Dit artikel")}</div></td><td>{subCategory(item) || mainCategory(item) || '–'}</td><td className="num"><Price item={item} /></td></tr>
               {elements.map((x) => (
                 <tr key={x.id} className="click" onClick={() => onOpen(x.id)}><td><Photo url={x.image_urls[0]?.url} alt={x.name} className="thumb" /></td><td className="strong" style={{ whiteSpace: 'nowrap' }}>{x.supplier_sku}</td><td>{x.name}</td><td>{subCategory(x) || mainCategory(x) || '–'}</td><td className="num" style={{ whiteSpace: 'nowrap' }}><Price item={x} /></td></tr>
               ))}
@@ -175,7 +175,6 @@ function ArticleCard({ item, onOpen, onClose }: { item: SupplierCatalogItem; onO
           </table></div>
         </section>
       )}
-      {item.description_html && <div className="cat-description" dangerouslySetInnerHTML={{ __html: safeHtml(item.description_html) }} />}
       <p className="muted small" style={{ margin: 0 }}>
         {item.source_updated_at && <>{tx("Gewijzigd bij de leverancier op {0}", fmtDate(item.source_updated_at))}. </>}
         {item.last_synced_at && tx("Opgehaald op {0}", fmtDate(item.last_synced_at))}
