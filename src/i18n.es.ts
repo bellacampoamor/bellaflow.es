@@ -962,4 +962,9 @@ export const es: Record<string, string> = {
   "Webshop": "Tienda online",
   "Webshop: {0} artikelen": "Tienda online: {0} artículos",
   "Zoek op naam, artikelnummer of EAN": "Buscar por nombre, número de artículo o EAN",
+  "Het bestand mist de kolom {0}. Gebruik een export van supplier_showroom_details.": "Al archivo le falta la columna {0}. Usa una exportación de supplier_showroom_details.",
+  "Specificaties en elementen ingelezen: {0} nieuw, {1} bijgewerkt.": "Especificaciones y elementos importados: {0} nuevos, {1} actualizados.",
+  "Element van": "Elemento de",
+  "Product specificaties": "Especificaciones del producto",
+  "Artikelen die erbij besteld kunnen worden, zoals de showroom ze onder Elementen toont.": "Artículos que se pueden pedir junto con este, tal como el showroom los muestra en Elementos.",
 }

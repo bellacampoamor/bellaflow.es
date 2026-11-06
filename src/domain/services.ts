@@ -5,10 +5,10 @@ import { loadSnapshot, newId, type Driver } from '../data/driver'
 import type {
   EmailStatus, Language,
   Delivery, Fulfilment, InboundShipment, InvoiceLine, OrderType, Payment, Product, PurchaseLabel, SalesOrder, Settings,
-  SalesOrderLine, Snapshot, StockMovement, SupplierCatalogItem, SupplierShowroomItem, TableName,
+  SalesOrderLine, Snapshot, StockMovement, SupplierCatalogItem, SupplierShowroomDetail, SupplierShowroomItem, TableName,
 } from '../data/types'
 import { CATALOG_COLUMNS, catalogItemFromCsv, parseCsv, sameName } from './catalog'
-import { SHOWROOM_COLUMNS, showroomItemFromCsv } from './showroom'
+import { DETAIL_COLUMNS, SHOWROOM_COLUMNS, showroomDetailFromCsv, showroomItemFromCsv } from './showroom'
 import {
   addDays, depositAvailable, freeAt, linesToPurchase, invoicedDeliveryLineIds, lineTotal, onHandMap, orderLines, plannedQty, round2,
   shipmentLineOpen, shippedQty, stockKey, todayISO, vatBreakdown,
@@ -703,9 +703,35 @@ export async function importShowroom(db: Driver, csv: string) {
   return { added, updated }
 }
 
-/** Kiest aan de kopregel of het een showroom-export of een webshopcatalogus is. */
+/** Leest de details van de showroom in (supplier_showroom_details.csv): specificaties en elementen per artikel. */
+export async function importShowroomDetails(db: Driver, csv: string) {
+  const rows = parseCsv(csv)
+  if (!rows.length) fail(tx("Het bestand bevat geen artikelen."))
+  const missing = DETAIL_COLUMNS.filter((c) => !(c in rows[0]))
+  if (missing.length) fail(tx("Het bestand mist de kolom {0}. Gebruik een export van supplier_showroom_details.", missing.join(', ')))
+  const current = await db.list('supplier_showroom_details')
+  const key = (name: string, sku: string) => `${name.toLowerCase()}|${sku.toLowerCase()}`
+  const byKey = new Map(current.map((x) => [key(x.supplier_name, x.supplier_sku), x.id]))
+  let added = 0, updated = 0
+  const out = new Map<string, SupplierShowroomDetail>()
+  for (const r of rows) {
+    if (!r.supplier_sku?.trim()) continue
+    const item = showroomDetailFromCsv(r)
+    const k = key(item.supplier_name, item.supplier_sku)
+    let id = byKey.get(k)
+    if (id) updated++
+    else { id = newId(); added++ }
+    byKey.set(k, id)
+    out.set(id, { ...item, id })
+  }
+  await db.upsert('supplier_showroom_details', [...out.values()])
+  return { added, updated }
+}
+
+/** Kiest aan de kopregel welke export het is: showroom, details van de showroom of webshopcatalogus. */
 export async function importSupplierFile(db: Driver, csv: string) {
   const head = csv.replace(/^\uFEFF/, '').split(/\r?\n/, 1)[0]
+  if (/(^|,)specifications(,|$)/.test(head)) return { kind: 'details' as const, ...(await importShowroomDetails(db, csv)) }
   return /(^|,)available_text(,|$)|(^|,)ean(,|$)/.test(head) ? { kind: 'showroom' as const, ...(await importShowroom(db, csv)) } : { kind: 'catalogus' as const, ...(await importCatalog(db, csv)) }
 }
 

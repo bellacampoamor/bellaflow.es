@@ -32,7 +32,7 @@ export function Catalogs({ supplierId }: { supplierId: string }) {
   const all = useMemo(() => (supplier ? catalogOf(s, supplier.id) : []), [s, supplier])
   const items = useMemo(() => (supplier ? catalogOf(s, supplier.id, { q, category }) : []), [s, supplier, q, category])
   const categories = catalogCategories(all)
-  const partsIndex = useMemo(() => showroomParts(s.supplier_showroom_items).parentOf, [s])
+  const partsIndex = useMemo(() => showroomParts(s.supplier_showroom_items, s.supplier_showroom_details).parentOf, [s])
   const showroomCount = (sup: Supplier) => showroomOf(s, sup, {}, partsIndex).length
   const hasShowroom = !!supplier && showroomCount(supplier) > 0
   const view = source ?? (hasShowroom ? 'showroom' : 'webshop')
@@ -48,11 +48,13 @@ export function Catalogs({ supplierId }: { supplierId: string }) {
   const onFile = async (f: File | undefined) => {
     if (!f) return
     const text = await f.text()
-    let result: { kind: 'showroom' | 'catalogus'; added: number; updated: number } | undefined
+    let result: { kind: 'showroom' | 'details' | 'catalogus'; added: number; updated: number } | undefined
     const ok = await run(async (db) => { result = await importSupplierFile(db, text) })
     if (ok && result) {
-      toast(result.kind === 'showroom' ? tx("Showroom ingelezen: {0} nieuw, {1} bijgewerkt.", result.added, result.updated) : tx("Catalogus ingelezen: {0} nieuw, {1} bijgewerkt.", result.added, result.updated))
-      setSource(result.kind === 'showroom' ? 'showroom' : 'webshop')
+      toast(result.kind === 'showroom' ? tx("Showroom ingelezen: {0} nieuw, {1} bijgewerkt.", result.added, result.updated)
+        : result.kind === 'details' ? tx("Specificaties en elementen ingelezen: {0} nieuw, {1} bijgewerkt.", result.added, result.updated)
+        : tx("Catalogus ingelezen: {0} nieuw, {1} bijgewerkt.", result.added, result.updated))
+      setSource(result.kind === 'catalogus' ? 'webshop' : 'showroom')
     }
     if (file.current) file.current.value = ''
   }

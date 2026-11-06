@@ -485,3 +485,7 @@ body.route-dragging, body.route-dragging * { cursor: grabbing !important; user-s
 .back-to-top { position: fixed; right: max(18px, env(safe-area-inset-right, 0px)); bottom: calc(18px + env(safe-area-inset-bottom, 0px)); z-index: 40; width: 46px; height: 46px; border-radius: 50%; border: 0; background: var(--primary); color: var(--on-primary); box-shadow: var(--shadow); display: grid; place-items: center; cursor: pointer; }
 .back-to-top:hover { background: var(--primary-hover); }
 .back-to-top:focus-visible { outline: 2px solid var(--brand-line); outline-offset: 3px; }
+.cat-specs { grid-template-columns: 1fr; gap: 0; }
+.cat-specs > div { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; padding: 7px 0; border-bottom: 1px solid var(--line); }
+.cat-specs > div:last-child { border-bottom: 0; }
+.cat-specs dd { text-align: right; }

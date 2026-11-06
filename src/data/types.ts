@@ -49,6 +49,15 @@ export interface SupplierShowroomItem {
   price: number | null; currency: string; available_date: string | null; available_text: string
   image_url: string; product_url: string; scraped_at: string
 }
+/** Details van een showroomartikel van de productpagina: specificaties en de elementen die erbij besteld kunnen worden. */
+export interface ShowroomSpec { label: string; value: string }
+export interface SupplierShowroomDetail {
+  id: string; supplier_name: string; supplier_sku: string
+  specifications: ShowroomSpec[]
+  /** Artikelnummers onder "Elementen" op de productpagina, in de volgorde van de showroom. */
+  elements: string[]
+  scraped_at: string
+}
 export type OrderType = 'direct' | 'bestelling'
 export type Fulfilment = 'meenemen' | 'verzenden' | 'bezorgen'
 export interface SalesOrder {
@@ -131,7 +140,7 @@ export interface Payment {
 export interface NumberSeries { id: string; last_number: number }
 
 export interface Snapshot {
-  settings: Settings[]; warehouses: Warehouse[]; suppliers: Supplier[]; customers: Customer[]; salespeople: Salesperson[]; products: Product[]; supplier_catalog_items: SupplierCatalogItem[]; supplier_showroom_items: SupplierShowroomItem[]
+  settings: Settings[]; warehouses: Warehouse[]; suppliers: Supplier[]; customers: Customer[]; salespeople: Salesperson[]; products: Product[]; supplier_catalog_items: SupplierCatalogItem[]; supplier_showroom_items: SupplierShowroomItem[]; supplier_showroom_details: SupplierShowroomDetail[]
   sales_orders: SalesOrder[]; sales_order_lines: SalesOrderLine[]; order_events: OrderEvent[]
   purchase_orders: PurchaseOrder[]; purchase_order_lines: PurchaseOrderLine[]
   transports: Transport[]; inbound_shipments: InboundShipment[]; inbound_shipment_lines: InboundShipmentLine[]
@@ -143,7 +152,7 @@ export type TableName = keyof Snapshot
 
 // Volgorde respecteert de foreign keys; gebruikt voor laden en voor seed.sql.
 export const TABLES: TableName[] = [
-  'settings', 'warehouses', 'suppliers', 'customers', 'salespeople', 'products', 'supplier_catalog_items', 'supplier_showroom_items', 'sales_orders', 'sales_order_lines',
+  'settings', 'warehouses', 'suppliers', 'customers', 'salespeople', 'products', 'supplier_catalog_items', 'supplier_showroom_items', 'supplier_showroom_details', 'sales_orders', 'sales_order_lines',
   'order_events', 'purchase_orders', 'purchase_order_lines', 'transports', 'inbound_shipments', 'inbound_shipment_lines',
   'goods_receipts', 'goods_receipt_lines', 'stock_movements', 'deliveries', 'delivery_lines', 'invoices',
   'invoice_lines', 'payments', 'number_series', 'email_outbox',

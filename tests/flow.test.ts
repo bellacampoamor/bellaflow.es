@@ -9,7 +9,7 @@ import { TABLES } from '../src/data/types'
 import { archiveRows, openLinesOnTransport, linePurchaseStatus, linesToPurchase, documentLanguage, flowCounts, freeAt, transportLoad, invoiceBalance, onHandMap, orderStage, orderTab, reservedMap, stockKey, vatBreakdown , invoiceReport, periodRange, invoiceQrUrl, hasTaxId, driverStops } from '../src/domain/calc'
 import { renameOldSuppliers, restoreSettings, restoreSuppliers, seedDemo } from '../src/domain/demo'
 import {
-  importCatalog, importShowroom, importSupplierFile, createDelivery, createInvoice, markDeliveriesReady, createOrder, createPurchaseOrder, invoiceProformas, lineFromProduct, markDelivered, assignShipmentsToTransport, cancelTransport, convertLinesToPurchaseOrders, createTransport, markReady, receiveGoods, rescheduleDelivery, rescheduleOrder, saveRouteOrder, saveSettings, mailSignedNote, setPurchaseLabel, signDelivery, splitLinesForStock, setDeliveryInTransit, setTransportStatus, updateTransport, transferStock,
+  importCatalog, importShowroom, importShowroomDetails, importSupplierFile, createDelivery, createInvoice, markDeliveriesReady, createOrder, createPurchaseOrder, invoiceProformas, lineFromProduct, markDelivered, assignShipmentsToTransport, cancelTransport, convertLinesToPurchaseOrders, createTransport, markReady, receiveGoods, rescheduleDelivery, rescheduleOrder, saveRouteOrder, saveSettings, mailSignedNote, setPurchaseLabel, signDelivery, splitLinesForStock, setDeliveryInTransit, setTransportStatus, updateTransport, transferStock,
 } from '../src/domain/services'
 import { estimateMatrix, parseRouterTable } from '../src/data/geo'
 import { dropIndex, googleMapsRouteUrl, moveItem, optimizeRoute, tourCost } from '../src/domain/route'
@@ -860,6 +860,25 @@ describe('showroom', () => {
     expect(showroomOf(s, sup).length).toBe(6758 - parentOf.size)
     expect(s.supplier_showroom_items.find((x) => x.supplier_sku === 'PRX-BBR-LMP-FLO')).toMatchObject({ price: 248.75, series: 'Proxima' })
     expect(s.supplier_showroom_items.every((x) => x.price !== null)).toBe(true)
+  })
+  it('elementen en specificaties komen uit de details van de productpagina', async () => {
+    await importShowroom(db, CSV)
+    const DETAILS = [
+      'supplier_name,supplier_sku,specifications,elements,scraped_at',
+      `${SUP},T-FRAME-1,"[{""label"":""Lengte (cm)"",""value"":""120""},{""label"":""Kleur frame"",""value"":""Beige""}]","[""T-LAMP-2""]",2026-11-06T20:00:00Z`,
+    ].join('\n')
+    expect((await importSupplierFile(db, DETAILS)).kind).toBe('details')
+    const s = await loadSnapshot(db)
+    const sup = s.suppliers.find((x) => x.name === SUP)!
+    const { parts, parentOf, detailOf } = showroomParts(s.supplier_showroom_items, s.supplier_showroom_details)
+    const frame = s.supplier_showroom_items.find((x) => x.supplier_sku === 'T-FRAME-1')!
+    expect(detailOf(frame)!.specifications).toEqual([{ label: 'Lengte (cm)', value: '120' }, { label: 'Kleur frame', value: 'Beige' }])
+    expect(parts.get(frame.id)!.map((x) => x.supplier_sku)).toEqual(['T-LAMP-2'])
+    // T-LAMP-2 is element van T-FRAME-1 en van de naam T-LAMP: niet in de lijst, wel te vinden met zoeken.
+    expect(parentOf.has(s.supplier_showroom_items.find((x) => x.supplier_sku === 'T-LAMP-2')!.id)).toBe(true)
+    expect(showroomOf(s, sup).map((x) => x.supplier_sku)).not.toContain('T-LAMP-2')
+    expect(showroomOf(s, sup, { q: 'T-LAMP-2' }).map((x) => x.supplier_sku)).toEqual(['T-LAMP-2'])
+    expect(await importShowroomDetails(db, DETAILS)).toEqual({ added: 0, updated: 1 })
   })
   it('herkent aan de kopregel of het showroom of webshop is', async () => {
     expect((await importSupplierFile(db, CSV)).kind).toBe('showroom')

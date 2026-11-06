@@ -4,7 +4,7 @@ import { TABLES, type EmailAttachment, type Snapshot, type TableName } from './t
 
 const KEY = 'bella-flow-v1'
 /** Catalogi zijn groot en komen uit de bestanden van de leverancier. Ze blijven in het geheugen en gaan niet in de browseropslag. */
-const VOLATILE: TableName[] = ['supplier_catalog_items', 'supplier_showroom_items']
+const VOLATILE: TableName[] = ['supplier_catalog_items', 'supplier_showroom_items', 'supplier_showroom_details']
 
 export function emptySnapshot(): Snapshot {
   return Object.fromEntries(TABLES.map((t) => [t, []])) as unknown as Snapshot

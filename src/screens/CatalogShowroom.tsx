@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState } from 'react'
 import { ExternalLink } from 'lucide-react'
-import type { Supplier, SupplierShowroomItem } from '../data/types'
+import type { ShowroomSpec, Supplier, SupplierShowroomItem } from '../data/types'
 import { onHandMap, reservedMap, stockKey, todayISO } from '../domain/calc'
 import { countBy, partOf, productForShowroom, showroomCategories, showroomOf, showroomParts } from '../domain/showroom'
 import { useApp } from '../ui/app-context'
@@ -25,7 +25,7 @@ export function ShowroomList({ supplier }: { supplier: Supplier }) {
   const [page, setPage] = useState(1)
   const [openId, setOpenId] = useState<string | null>(null)
   const listTop = useRef<HTMLElement>(null)
-  const { parts, parentOf } = useMemo(() => showroomParts(s.supplier_showroom_items), [s])
+  const { parts, parentOf, detailOf } = useMemo(() => showroomParts(s.supplier_showroom_items, s.supplier_showroom_details), [s])
   const all = useMemo(() => showroomOf(s, supplier, {}, parentOf), [s, supplier, parentOf])
   const items = useMemo(() => showroomOf(s, supplier, { q, category, series }, parentOf), [s, supplier, q, category, series, parentOf])
   const seriesList = useMemo(() => countBy(all, (x) => [x.series]), [all])
@@ -76,12 +76,12 @@ export function ShowroomList({ supplier }: { supplier: Supplier }) {
       )}
       {items.length > 0 && <Pager page={current} size={PAGE_SIZE} total={items.length} onPage={goPage} />}
       {items.length > 0 && <p className="muted small" style={{ margin: '8px 0 0' }}>{tx("Gegevens uit de showroom van de leverancier, opgehaald op {0}.", fmtDate(all[0]?.scraped_at))}</p>}
-      {open && <ShowroomCard key={open.id} item={open} parts={parts.get(open.id) ?? []} parent={parentOf.get(open.id)} onOpen={setOpenId} onSeries={showSeries} onClose={() => setOpenId(null)} />}
+      {open && <ShowroomCard key={open.id} item={open} parts={parts.get(open.id) ?? []} parent={parentOf.get(open.id)} specs={detailOf(open)?.specifications ?? []} fromShowroom={!!detailOf(open)} onOpen={setOpenId} onSeries={showSeries} onClose={() => setOpenId(null)} />}
     </section>
   )
 }
 
-function ShowroomCard({ item, parts, parent, onOpen, onSeries, onClose }: { item: SupplierShowroomItem; parts: SupplierShowroomItem[]; parent?: SupplierShowroomItem; onOpen: (id: string) => void; onSeries: (name: string) => void; onClose: () => void }) {
+function ShowroomCard({ item, parts, parent, specs, fromShowroom, onOpen, onSeries, onClose }: { item: SupplierShowroomItem; parts: SupplierShowroomItem[]; parent?: SupplierShowroomItem; specs: ShowroomSpec[]; fromShowroom: boolean; onOpen: (id: string) => void; onSeries: (name: string) => void; onClose: () => void }) {
   const { s } = useApp()
   const own = productForShowroom(s, item)
   const free = useMemo(() => {
@@ -110,17 +110,26 @@ function ShowroomCard({ item, parts, parent, onOpen, onSeries, onClose }: { item
             <dt>{tx("Categorie")}</dt><dd>{showroomCategories(item).join(', ') || '–'}</dd>
             <dt>{tx("Beschikbaar in magazijn")}</dt><dd><Available x={item} /></dd>
             <dt>{tx("Prijs")}</dt><dd className="strong">{price(item)}</dd>
-            {part && <><dt>{tx("Onderdeel")}</dt><dd>{tx("Deel {0} van {1}", part.n, part.of)}{parent && <> · <button type="button" className="linklike" onClick={() => onOpen(parent.id)}>{parent.name}</button></>}</dd></>}
+            {part && <><dt>{tx("Onderdeel")}</dt><dd>{tx("Deel {0} van {1}", part.n, part.of)}</dd></>}
+            {parent && <><dt>{tx("Element van")}</dt><dd><button type="button" className="linklike" onClick={() => onOpen(parent.id)}>{parent.name}</button></dd></>}
           </dl>
           {own ? (
             <div className="note"><span className="strong">{tx("In assortiment")}</span>: {own.name}, {tx("verkoopprijs")} {eur(own.sale_price)}, {tx("{0} vrij op voorraad", free)}.</div>
           ) : <p className="muted small" style={{ margin: 0 }}>{tx("Niet in het eigen assortiment onder Beheer.")}</p>}
         </div>
       </div>
+      {specs.length > 0 && (
+        <section className="cat-elements">
+          <h3>{tx("Product specificaties")}</h3>
+          <dl className="cat-dl cat-specs">{specs.map((x, i) => <div key={i}><dt>{x.label}</dt><dd>{x.value || '–'}</dd></div>)}</dl>
+        </section>
+      )}
       {parts.length > 0 && (
         <section className="cat-elements">
           <h3>{tx("Elementen")} <span className="muted small">({parts.length})</span></h3>
-          <p className="muted small" style={{ margin: 0 }}>{tx("De onderdelen die samen dit artikel vormen, volgens de naam in de showroom (deel 1 van {0}, ...).", parts[0] ? partOf(parts[0].name)?.of ?? parts.length : parts.length)}</p>
+          <p className="muted small" style={{ margin: 0 }}>{fromShowroom
+            ? tx("Artikelen die erbij besteld kunnen worden, zoals de showroom ze onder Elementen toont.")
+            : tx("De onderdelen die samen dit artikel vormen, volgens de naam in de showroom (deel 1 van {0}, ...).", parts[0] ? partOf(parts[0].name)?.of ?? parts.length : parts.length)}</p>
           <div className="table-wrap flush"><table>
             <thead><tr><th></th><th>{tx("Artikelnummer")}</th><th>{tx("Artikel")}</th><th>{tx("Beschikbaar in magazijn")}</th><th className="num">{tx("Prijs")}</th></tr></thead>
             <tbody>{parts.map((x) => (
