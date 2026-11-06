@@ -3,6 +3,7 @@ import { TABLES, type Snapshot } from '../src/data/types'
 const lit = (v: unknown): string => {
   if (v === null || v === undefined) return 'null'
   if (typeof v === 'number' || typeof v === 'boolean') return String(v)
+  if (typeof v === 'object') return `'${JSON.stringify(v).replace(/'/g, "''")}'`
   return `'${String(v).replace(/'/g, "''")}'`
 }
 

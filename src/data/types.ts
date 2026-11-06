@@ -31,6 +31,16 @@ export interface Product {
   color: string; dimensions: string; weight_kg: number; colli: number; purchase_price: number
   sale_price: number; vat_rate: number; supplier_id: string | null; min_stock: number; is_active: boolean; volume_m3: number
 }
+/** Artikel uit de catalogus van een leverancier, zoals de leverancier het aanbiedt. Staat los van de eigen producten onder Beheer. */
+export interface CatalogCategory { name: string; url_path: string }
+export interface CatalogImage { url: string; label: string; position: number }
+export interface SupplierCatalogItem {
+  id: string; supplier_id: string | null; supplier_name: string; supplier_sku: string; name: string; url_key: string
+  description_html: string; short_description_html: string; stock_status: string
+  price_regular: number; price_final: number; currency: string
+  categories: CatalogCategory[]; image_urls: CatalogImage[]; attributes: Record<string, unknown>
+  source_hash: string; source_updated_at: string | null; active: boolean; last_seen_run: number | null; last_synced_at: string | null
+}
 export type OrderType = 'direct' | 'bestelling'
 export type Fulfilment = 'meenemen' | 'verzenden' | 'bezorgen'
 export interface SalesOrder {
@@ -113,7 +123,7 @@ export interface Payment {
 export interface NumberSeries { id: string; last_number: number }
 
 export interface Snapshot {
-  settings: Settings[]; warehouses: Warehouse[]; suppliers: Supplier[]; customers: Customer[]; salespeople: Salesperson[]; products: Product[]
+  settings: Settings[]; warehouses: Warehouse[]; suppliers: Supplier[]; customers: Customer[]; salespeople: Salesperson[]; products: Product[]; supplier_catalog_items: SupplierCatalogItem[]
   sales_orders: SalesOrder[]; sales_order_lines: SalesOrderLine[]; order_events: OrderEvent[]
   purchase_orders: PurchaseOrder[]; purchase_order_lines: PurchaseOrderLine[]
   transports: Transport[]; inbound_shipments: InboundShipment[]; inbound_shipment_lines: InboundShipmentLine[]
@@ -125,7 +135,7 @@ export type TableName = keyof Snapshot
 
 // Volgorde respecteert de foreign keys; gebruikt voor laden en voor seed.sql.
 export const TABLES: TableName[] = [
-  'settings', 'warehouses', 'suppliers', 'customers', 'salespeople', 'products', 'sales_orders', 'sales_order_lines',
+  'settings', 'warehouses', 'suppliers', 'customers', 'salespeople', 'products', 'supplier_catalog_items', 'sales_orders', 'sales_order_lines',
   'order_events', 'purchase_orders', 'purchase_order_lines', 'transports', 'inbound_shipments', 'inbound_shipment_lines',
   'goods_receipts', 'goods_receipt_lines', 'stock_movements', 'deliveries', 'delivery_lines', 'invoices',
   'invoice_lines', 'payments', 'number_series', 'email_outbox',

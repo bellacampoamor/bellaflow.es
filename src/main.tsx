@@ -5,6 +5,7 @@ import { App } from './App'
 import { LocalDriver } from './data/localDriver'
 import { createSupabase, SupabaseDriver } from './data/supabaseDriver'
 import { renameOldSuppliers, restoreSettings, restoreSuppliers, seedDemo } from './domain/demo'
+import { importCatalog } from './domain/services'
 import { AppProvider } from './ui/app-context'
 import { LogoFull } from './ui/kit'
 import './styles.css'
@@ -12,12 +13,22 @@ import { tx } from './i18n'
 
 const Loading = () => <div className="wrap" style={{ paddingBlock: 40 }}>{tx("Gegevens laden…")}</div>
 
+// De catalogus van Life Outdoor Living uit de aangeleverde export. Alleen inlezen als er nog geen catalogus is.
+async function loadCatalogFile(d: LocalDriver) {
+  if ((await d.list('supplier_catalog_items')).length) return
+  try {
+    const res = await fetch(`${import.meta.env.BASE_URL}assets/catalogus/supplier_catalog_items.csv`)
+    if (res.ok) await importCatalog(d, await res.text())
+  } catch { /* Catalogi blijft leeg; inlezen kan ook met de knop */ }
+}
+
 // Eén driver per paginabezoek, ook als React een effect dubbel uitvoert.
 let localBoot: Promise<LocalDriver> | null = null
 const bootLocal = () => (localBoot ??= (async () => {
   const d = new LocalDriver()
   if (d.isEmpty) await seedDemo(d)
   await renameOldSuppliers(d)
+  await loadCatalogFile(d)
   return d
 })())
 
@@ -35,6 +46,7 @@ function LocalRoot() {
     await seedDemo(driver)
     await restoreSuppliers(driver, suppliers)
     await restoreSettings(driver, settings)
+    await loadCatalogFile(driver)
     setVersion((v) => v + 1)
   }
   return <AppProvider key={version} db={driver} fallback={<Loading />}><App onResetDemo={reset} /></AppProvider>

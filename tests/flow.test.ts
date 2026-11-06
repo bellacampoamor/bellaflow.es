@@ -9,13 +9,14 @@ import { TABLES } from '../src/data/types'
 import { archiveRows, openLinesOnTransport, linePurchaseStatus, linesToPurchase, documentLanguage, flowCounts, freeAt, transportLoad, invoiceBalance, onHandMap, orderStage, orderTab, reservedMap, stockKey, vatBreakdown , invoiceReport, periodRange, invoiceQrUrl, hasTaxId, driverStops } from '../src/domain/calc'
 import { renameOldSuppliers, restoreSettings, restoreSuppliers, seedDemo } from '../src/domain/demo'
 import {
-  createDelivery, createInvoice, markDeliveriesReady, createOrder, createPurchaseOrder, invoiceProformas, lineFromProduct, markDelivered, assignShipmentsToTransport, cancelTransport, convertLinesToPurchaseOrders, createTransport, markReady, receiveGoods, rescheduleDelivery, rescheduleOrder, saveRouteOrder, saveSettings, mailSignedNote, setPurchaseLabel, signDelivery, splitLinesForStock, setDeliveryInTransit, setTransportStatus, updateTransport, transferStock,
+  importCatalog, createDelivery, createInvoice, markDeliveriesReady, createOrder, createPurchaseOrder, invoiceProformas, lineFromProduct, markDelivered, assignShipmentsToTransport, cancelTransport, convertLinesToPurchaseOrders, createTransport, markReady, receiveGoods, rescheduleDelivery, rescheduleOrder, saveRouteOrder, saveSettings, mailSignedNote, setPurchaseLabel, signDelivery, splitLinesForStock, setDeliveryInTransit, setTransportStatus, updateTransport, transferStock,
 } from '../src/domain/services'
 import { estimateMatrix, parseRouterTable } from '../src/data/geo'
 import { dropIndex, googleMapsRouteUrl, moveItem, optimizeRoute, tourCost } from '../src/domain/route'
 import { es } from '../src/i18n.es'
 import { en } from '../src/i18n.en'
 import { toSeedSql } from '../scripts/seed-sql'
+import { catalogOf, imageSrc, parseCsv, safeHtml } from '../src/domain/catalog'
 
 const TODAY = '2026-11-04'
 let db: LocalDriver
@@ -742,4 +743,54 @@ describe('database', () => {
     const inv = snap.invoices[0]
     await expect(pg.query(`insert into invoices (number, sales_order_id, customer_id, kind, invoice_date, due_date, base_amount, vat_amount, total) values ('X', $1, $2, 'volledig', '2000-01-01', '2000-01-01', 0, 0, 0)`, [inv.sales_order_id, inv.customer_id])).rejects.toThrow(/ligt voor/)
   })
+})
+
+describe('catalogi', () => {
+  const CSV = readFileSync('public/assets/catalogus/supplier_catalog_items.csv', 'utf8')
+  const lol = () => db.data.suppliers.find((x) => x.name === 'Life Outdoor Living International B.V.')!
+
+  it('leest de export van de leverancier volledig in, per leverancier en zonder dubbelingen', async () => {
+    expect(await importCatalog(db, CSV)).toEqual({ added: 642, updated: 0 })
+    const s = await loadSnapshot(db)
+    const list = catalogOf(s, lol().id)
+    expect(list).toHaveLength(642)
+    expect(catalogOf(s, s.suppliers.find((x) => x.id !== lol().id)!.id)).toHaveLength(0)
+    const cover = list.find((x) => x.supplier_sku === '24-1641-889')!
+    expect(cover).toMatchObject({ name: 'Ligbedhoes Fits Roy 2-personen - 218x173x39cm', price_regular: 98.75, price_final: 79, stock_status: 'IN_STOCK', supplier_id: lol().id })
+    expect(cover.image_urls[0].url).toMatch(/^https:\/\/www\.lifeoutdoorliving\.com\/.*24-1641-889-V1\.png$/)
+    expect(cover.categories[0].name).toBe('Beschermhoezen en onderhoudsmiddelen')
+    // Opnieuw inlezen werkt bij, het ID blijft gelijk.
+    expect(await importCatalog(db, CSV)).toEqual({ added: 0, updated: 642 })
+    expect((await loadSnapshot(db)).supplier_catalog_items.find((x) => x.supplier_sku === '24-1641-889')!.id).toBe(cover.id)
+  })
+  it('zoekt op naam, artikelnummer en categorie', async () => {
+    await importCatalog(db, CSV)
+    const s = await loadSnapshot(db)
+    expect(catalogOf(s, lol().id, { q: '24-1641-889' }).map((x) => x.supplier_sku)).toEqual(['24-1641-889'])
+    const dining = catalogOf(s, lol().id, { category: 'Dining tuinsets' })
+    expect(dining.length).toBeGreaterThan(0)
+    expect(dining.every((x) => x.categories.some((c) => c.name === 'Dining tuinsets'))).toBe(true)
+  })
+  it('weigert een leverancier die niet onder Beheer staat', async () => {
+    await expect(importCatalog(db, 'supplier_name,supplier_sku,name\nOnbekend B.V.,A1,Stoel\n')).rejects.toThrow(/Onbekend B\.V\..*Beheer/)
+  })
+  it('leest velden met komma, aanhalingsteken en regeleinde', () => {
+    expect(parseCsv('a,b\n"x, ""y""","1\n2"\n')).toEqual([{ a: 'x, "y"', b: '1\n2' }])
+  })
+  it('toont alleen opmaak uit de html van de leverancier', () => {
+    expect(safeHtml('<strong onclick="x()">Hoi</strong><br/><script>alert(1)</script><a href="javascript:x">link</a><img src=x onerror=alert(1)>'))
+      .toBe('<strong>Hoi</strong><br>link')
+    expect(imageSrc('javascript:alert(1)')).toBe('')
+    expect(imageSrc('https://a.test/x.png')).toBe('https://a.test/x.png')
+  })
+  it('de catalogus past in de database', async () => {
+    await importCatalog(db, CSV)
+    const pg = new PGlite()
+    await pg.exec('create role authenticated;')
+    await pg.exec(readdirSync('supabase/migrations').sort().map((f) => readFileSync(`supabase/migrations/${f}`, 'utf8')).join('\n'))
+    await pg.exec(toSeedSql(await loadSnapshot(db)))
+    const r = await pg.query<{ n: number; imgs: number }>(`select count(*)::int as n, sum(jsonb_array_length(image_urls))::int as imgs from supplier_catalog_items`)
+    expect(r.rows[0].n).toBe(642)
+    expect(r.rows[0].imgs).toBe(db.data.supplier_catalog_items.reduce((n, x) => n + x.image_urls.length, 0))
+  }, 60000)
 })

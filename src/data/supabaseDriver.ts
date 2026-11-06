@@ -27,6 +27,12 @@ export class SupabaseDriver implements Driver {
     const { error } = await this.sb.from(table).insert(rows as never)
     if (error) throw new Error(error.message)
   }
+  async upsert<T extends TableName>(table: T, rows: Snapshot[T][number][]) {
+    for (let i = 0; i < rows.length; i += 500) {
+      const { error } = await this.sb.from(table).upsert(rows.slice(i, i + 500) as never)
+      if (error) throw new Error(error.message)
+    }
+  }
   async update<T extends TableName>(table: T, id: string, patch: Partial<Snapshot[T][number]>) {
     const { error } = await this.sb.from(table).update(patch as never).eq('id', id)
     if (error) throw new Error(error.message)
@@ -51,7 +57,7 @@ export class SupabaseDriver implements Driver {
 
 const NUMERIC = new Set([
   'weight_kg', 'purchase_price', 'sale_price', 'vat_rate', 'unit_price', 'discount_pct', 'unit_cost',
-  'volume_m3', 'capacity_m3', 'latitude', 'longitude', 'delivery_latitude', 'delivery_longitude', 'base_amount', 'vat_amount', 'total', 'deposit_settled', 'line_total', 'amount',
+  'volume_m3', 'capacity_m3', 'latitude', 'longitude', 'delivery_latitude', 'delivery_longitude', 'base_amount', 'vat_amount', 'total', 'deposit_settled', 'line_total', 'amount', 'price_regular', 'price_final',
 ])
 function toNumbers(row: Record<string, unknown>) {
   const out: Record<string, unknown> = { ...row }

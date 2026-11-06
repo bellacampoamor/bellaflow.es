@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { FileBarChart, Headset, Languages, Moon, Store, Sun, Boxes, ClipboardList, FileText, LayoutDashboard, PackageCheck, Settings2, ShoppingCart, Truck, Warehouse as WarehouseIcon } from 'lucide-react'
+import { BookOpen, FileBarChart, Headset, Languages, Moon, Store, Sun, Boxes, ClipboardList, FileText, LayoutDashboard, PackageCheck, Settings2, ShoppingCart, Truck, Warehouse as WarehouseIcon } from 'lucide-react'
 import { flowCounts } from './domain/calc'
 import { useApp, useHash } from './ui/app-context'
 import { Logo, Modal } from './ui/kit'
@@ -18,6 +18,7 @@ import { Driver } from './screens/Driver'
 import { SalesOrderDocument } from './screens/SalesOrderDocument'
 import { PurchaseOrderDocument } from './screens/PurchaseOrderDocument'
 import { Reports } from './screens/Reports'
+import { Catalogs } from './screens/Catalogs'
 import { getLanguage, setLanguage, tx, type UiLanguage } from './i18n'
 
 // Twee gescheiden processen, elk met eigen menu-optie en eigen stappen.
@@ -112,6 +113,7 @@ export function App({ onResetDemo, onSignOut }: { onResetDemo?: () => Promise<vo
             <a href="#rapportage" className={screen === 'rapportage' || screen === 'archief' ? 'on' : ''}><FileBarChart size={16} />{tx("Rapportage")}</a>
             <a href="#voorraad" className={screen === 'voorraad' ? 'on' : ''}><Boxes size={16} />{tx("Voorraad")}</a>
             <a href="#beheer" className={screen === 'beheer' ? 'on' : ''}><Settings2 size={16} />{tx("Beheer")}</a>
+            <a href="#catalogi" className={screen === 'catalogi' ? 'on' : ''}><BookOpen size={16} />{tx("Catalogi")}</a>
             <label className="lang-pick"><Languages size={16} /><select aria-label={tx("Taal")} value={language} onChange={(e) => switchLanguage(e.target.value as UiLanguage)}><option value="nl">Nederlands</option><option value="en">English</option><option value="es">Español</option></select></label>
             <button className="btn-toggle" onClick={toggleTheme}>{theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}{theme === 'dark' ? tx("Dagstand") : tx("Nachtstand")}</button>
             <button className="btn-toggle" aria-label={tx("Contact en support")} title={tx("Contact en support")} onClick={() => setSupport(true)}><Headset size={18} /></button>
@@ -172,6 +174,7 @@ function Route({ screen, param }: { screen: string; param: string }) {
     case 'facturatie': return param.startsWith('print-') ? <InvoiceDetail key={param} id={param.slice(6)} autoPrint /> : param ? <InvoiceDetail key={param} id={param} /> : <Invoices />
     case 'rapportage': return <Reports tab="facturen" />
     case 'archief': return <Reports tab="archief" />
+    case 'catalogi': return <Catalogs supplierId={param} />
     case 'voorraad': return <Stock />
     case 'beheer': return <Admin />
     default: return (

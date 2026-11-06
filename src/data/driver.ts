@@ -5,6 +5,8 @@ import { TABLES, type EmailAttachment, type Snapshot, type TableName } from './t
 export interface Driver {
   list<T extends TableName>(table: T): Promise<Snapshot[T]>
   insert<T extends TableName>(table: T, rows: Snapshot[T][number][]): Promise<void>
+  /** Voegt toe of overschrijft op id, in één keer. Voor grote aantallen, zoals een catalogus. */
+  upsert<T extends TableName>(table: T, rows: Snapshot[T][number][]): Promise<void>
   update<T extends TableName>(table: T, id: string, patch: Partial<Snapshot[T][number]>): Promise<void>
   remove(table: TableName, id: string): Promise<void>
   /** Geeft bijvoorbeeld 'F-2026-0007'. */

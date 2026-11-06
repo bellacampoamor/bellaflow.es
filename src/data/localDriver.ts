@@ -1,4 +1,5 @@
 import type { Driver } from './driver'
+import { tx } from '../i18n'
 import { TABLES, type EmailAttachment, type Snapshot, type TableName } from './types'
 
 const KEY = 'bella-flow-v1'
@@ -40,6 +41,22 @@ export class LocalDriver implements Driver {
   async insert<T extends TableName>(table: T, rows: Snapshot[T][number][]) {
     this.sync();
     (this.data[table] as unknown[]).push(...structuredClone(rows)); this.save()
+  }
+  async upsert<T extends TableName>(table: T, rows: Snapshot[T][number][]) {
+    this.sync()
+    const list = this.data[table] as { id: string }[]
+    const at = new Map(list.map((r, i) => [r.id, i]))
+    const before = list.slice()
+    for (const row of structuredClone(rows) as { id: string }[]) {
+      const i = at.get(row.id)
+      if (i === undefined) { at.set(row.id, list.length); list.push(row) } else list[i] = row
+    }
+    if (!this.persist) return
+    // Een grote catalogus kan de browseropslag vullen. Dan niets half bewaren, anders verdwijnt het bij de volgende keer lezen.
+    try { localStorage.setItem(KEY, JSON.stringify(this.data)) } catch {
+      list.splice(0, list.length, ...before)
+      throw new Error(tx("De opslag van deze browser is vol. Met de database is er geen grens."))
+    }
   }
   async update<T extends TableName>(table: T, id: string, patch: Partial<Snapshot[T][number]>) {
     this.sync();
