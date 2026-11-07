@@ -24,6 +24,8 @@ export function showroomItemFromCsv(r: Record<string, string>): Omit<SupplierSho
     series: (r.series ?? '').trim(), categories: (r.categories ?? '').trim(), price: num(r.price), currency: r.currency || 'EUR',
     available_date: isoDate(r.available_date), available_text: (r.available_text ?? '').trim(), image_url: (r.image_url ?? '').trim(),
     product_url: (r.product_url ?? '').trim(), scraped_at: (r.scraped_at ?? '').trim() || new Date().toISOString(),
+    ...(r.active !== undefined && r.active !== '' ? { active: r.active === 'true' } : {}),
+    ...(r.listed !== undefined && r.listed !== '' ? { listed: r.listed === 'true' } : {}),
   }
 }
 
@@ -100,7 +102,7 @@ export interface ShowroomFilter { q?: string; category?: string; series?: string
 export function showroomOf(s: Snapshot, sup: Supplier, f: ShowroomFilter = {}, parentOf = showroomParts(s.supplier_showroom_items, s.supplier_showroom_details).parentOf) {
   const words = (f.q ?? '').toLowerCase().split(/\s+/).filter(Boolean)
   return s.supplier_showroom_items
-    .filter((x) => sameName(x.supplier_name, sup.name) && (words.length > 0 || !parentOf.has(x.id)))
+    .filter((x) => sameName(x.supplier_name, sup.name) && x.active !== false && (words.length > 0 || !parentOf.has(x.id)))
     .filter((x) => !f.category || showroomCategories(x).includes(f.category))
     .filter((x) => !f.series || x.series === f.series)
     .filter((x) => { const hay = `${x.name} ${x.supplier_sku} ${x.ean} ${x.series}`.toLowerCase(); return words.every((w) => hay.includes(w)) })

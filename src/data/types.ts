@@ -48,6 +48,8 @@ export interface SupplierShowroomItem {
   categories: string
   price: number | null; currency: string; available_date: string | null; available_text: string
   image_url: string; product_url: string; scraped_at: string
+  /** Gezet door de nachtelijke sync: false = niet meer in de showroom; listed false = alleen als element. */
+  active?: boolean; listed?: boolean
 }
 /** Details van een showroomartikel van de productpagina: specificaties en de elementen die erbij besteld kunnen worden. */
 export interface ShowroomSpec { label: string; value: string }

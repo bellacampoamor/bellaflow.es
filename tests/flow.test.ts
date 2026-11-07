@@ -902,6 +902,29 @@ describe('showroom', () => {
     const r = await pg.query<{ n: number }>('select count(*)::int as n from supplier_showroom_items where available_date is not null')
     expect(r.rows[0].n).toBe(2)
   }, 60000)
+  it('de nachtelijke sync schrijft alleen wat veranderd is', async () => {
+    const pg = new PGlite()
+    await pg.exec('create role authenticated; create role anon; create role service_role;')
+    await pg.exec(readdirSync('supabase/migrations').sort().map((f) => readFileSync(`supabase/migrations/${f}`, 'utf8')).join('\n'))
+    const call = async (sql: string, ...args: unknown[]) => (await pg.query<{ r: Record<string, number> }>(sql, args)).rows[0].r
+    const row = (sku: string, price: number, hash: string) => ({ supplier_sku: sku, name: `Artikel ${sku}`, ean: '', series: 'Test', categories: '', price, available_date: '2026-11-07', available_text: '07-11-2026', image_url: '', product_url: `https://voorbeeld.test/${sku}`, source_hash: hash })
+    const items = (rows: unknown[]) => call('select sync_supplier_showroom_items($1, $2::jsonb) as r', SUP, JSON.stringify(rows))
+    expect(await items([row('A', 10, 'h1'), row('B', 20, 'h2')])).toMatchObject({ new: 2, changed: 0, unchanged: 0 })
+    expect(await items([row('A', 10, 'h1'), row('B', 25, 'h3')])).toMatchObject({ new: 0, changed: 1, unchanged: 1 })
+    // Een element mag een artikel uit de lijst niet overschrijven.
+    expect(await call('select sync_supplier_showroom_elements($1, $2::jsonb) as r', SUP, JSON.stringify([{ supplier_sku: 'A', name: 'fout', price: 1, source_hash: 'x' }, { supplier_sku: 'E', name: 'Element E', price: 5, source_hash: 'e1' }]))).toMatchObject({ new: 1, changed: 0 })
+    expect((await pg.query<{ name: string }>("select name from supplier_showroom_items where supplier_sku = 'A'")).rows[0].name).toBe('Artikel A')
+    // Details: tweede keer zelfde vingerafdruk = niet herschreven.
+    const det = (hash: string) => call('select sync_supplier_showroom_details($1, $2::jsonb) as r', SUP, JSON.stringify([{ supplier_sku: 'A', specifications: [{ label: 'Hoogte (cm)', value: '76' }], elements: ['E'], source_hash: hash }]))
+    expect(await det('d1')).toMatchObject({ new: 1 })
+    expect(await det('d1')).toMatchObject({ new: 0, changed: 0, unchanged: 1 })
+    // Todo: B heeft nog geen details en komt eerst.
+    expect((await pg.query<{ supplier_sku: string }>('select supplier_sku from showroom_details_todo($1, 10)', [SUP])).rows.map((x) => x.supplier_sku)).toEqual(['B', 'A'])
+    // Afsluiten: te weinig gezien = fout, niets inactief; genoeg = B inactief.
+    await expect(call('select finish_supplier_showroom_sync($1, $2::jsonb, 5) as r', SUP, JSON.stringify(['A']))).rejects.toThrow(/Te weinig/)
+    expect(await call('select finish_supplier_showroom_sync($1, $2::jsonb, 1) as r', SUP, JSON.stringify(['A']))).toMatchObject({ seen: 1, deactivated: 1 })
+    expect((await pg.query<{ active: boolean }>("select active from supplier_showroom_items where supplier_sku = 'B'")).rows[0].active).toBe(false)
+  }, 60000)
   it('catalogi gaan niet in de browseropslag', async () => {
     const store = new Map<string, string>()
     vi.stubGlobal('localStorage', { getItem: (k: string) => store.get(k) ?? null, setItem: (k: string, v: string) => { store.set(k, v) }, removeItem: (k: string) => { store.delete(k) } })
