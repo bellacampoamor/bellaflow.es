@@ -93,6 +93,9 @@ a { color: var(--link); }
 main { padding-block: 22px 56px; }
 .head { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; margin-bottom: 18px; }
 .head p { margin: 3px 0 0; color: var(--muted); max-width: 68ch; }
+.head > div:first-child { flex: 1 1 320px; }
+.head .actions { flex: 1 1 100%; }
+@media (min-width: 900px) { .head { flex-wrap: nowrap; } .head .actions { flex: 0 0 auto; } }
 .actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 .back { display: inline-flex; gap: 5px; align-items: center; color: var(--muted); text-decoration: none; font-size: .88rem; margin-bottom: 6px; }
 .back:hover { color: var(--fg); }
