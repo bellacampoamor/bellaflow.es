@@ -5,7 +5,8 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { loadSnapshot, newId } from '../src/data/driver'
 import { LocalDriver } from '../src/data/localDriver'
 import type { CatalogArticle } from '../src/data/types'
-import { freeAt, freeTotal, linesToPurchase, orderStage, orderTab, scanWarehouse } from '../src/domain/calc'
+import { freeAt, freeTotal, linesToPurchase, orderStage, scanWarehouse } from '../src/domain/calc'
+import { orderFlow } from '../src/domain/orderFlow'
 import { seedDemo } from '../src/domain/demo'
 import { addToBasket, articleNumberFromScan, removeFromBasket, stockShortage } from '../src/domain/scan'
 import { confirmProforma, createOrder, createProformaOrder, findArticleByCode, importShowroom, productForArticle, saveProforma, syncCatalogArticles, type OrderInput } from '../src/domain/services'
@@ -81,7 +82,7 @@ describe('proforma', () => {
     expect(o).toMatchObject({ status: 'proforma', customer_id: null, salesperson_id: seller, number })
     const s = await loadSnapshot(db)
     expect(orderStage(s, o)).toBe('proforma')
-    expect(orderTab(s, o)).toBe('proforma')
+    expect(orderFlow(s, o, TODAY)).toMatchObject({ follow: 'actie', next: { key: 'proforma' } })
     // 3 tafels: 2 vrij in de showroom, 1 op bestelling. Stoelen zijn nergens op voorraad.
     const lines = s.sales_order_lines.filter((l) => l.sales_order_id === id)
     expect(lines.filter((l) => l.product_id === pid).map((l) => [l.qty, l.source, l.warehouse_id])).toEqual([[2, 'voorraad', showroom], [1, 'bestelling', null]])

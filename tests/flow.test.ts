@@ -9,7 +9,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { loadSnapshot } from '../src/data/driver'
 import { LocalDriver } from '../src/data/localDriver'
 import { TABLES } from '../src/data/types'
-import { archiveRows, openLinesOnTransport, linePurchaseStatus, linesToPurchase, documentLanguage, flowCounts, freeAt, transportLoad, invoiceBalance, onHandMap, orderStage, orderTab, reservedMap, stockKey, vatBreakdown , invoiceReport, periodRange, invoiceQrUrl, hasTaxId, driverStops } from '../src/domain/calc'
+import { archiveRows, openLinesOnTransport, linePurchaseStatus, linesToPurchase, documentLanguage, flowCounts, freeAt, transportLoad, invoiceBalance, onHandMap, orderStage, reservedMap, stockKey, vatBreakdown , invoiceReport, periodRange, invoiceQrUrl, hasTaxId, driverStops } from '../src/domain/calc'
 import { renameOldSuppliers, restoreSettings, restoreSuppliers, seedDemo } from '../src/domain/demo'
 import {
   importShowroom, importShowroomDetails, importSupplierFile, createDelivery, createInvoice, markDeliveriesReady, createOrder, createPurchaseOrder, invoiceProformas, lineFromProduct, markDelivered, assignShipmentsToTransport, cancelTransport, convertPurchaseProformas, syncPurchaseProformas, cancelOrder, cancelPurchaseOrder, createTransport, markReady, receiveGoods, rescheduleDelivery, rescheduleOrder, saveRouteOrder, saveSettings, mailSignedNote, setPurchaseLabel, signDelivery, splitLinesForStock, setDeliveryInTransit, setTransportStatus, updateTransport, transferStock,
@@ -172,7 +172,7 @@ describe('van inkoop tot factuur', () => {
     const s = await loadSnapshot(db)
     for (const v of onHandMap(s).values()) expect(v).toBeGreaterThanOrEqual(0)
     const c = flowCounts(s, TODAY)
-    for (const key of ['inkoop', 'inkomend', 'ontvangst', 'orders', 'levering', 'facturatie'] as const) expect(c[key], key).toBeGreaterThan(0)
+    for (const key of ['inkoop', 'inkomend', 'ontvangst', 'levering', 'facturatie'] as const) expect(c[key], key).toBeGreaterThan(0)
   })
 })
 
@@ -333,27 +333,6 @@ describe('rijvolgorde slepen', () => {
     expect(dropIndex(mids, 2, 310)).toBe(2)
     expect(moveItem(['a', 'b', 'c', 'd'], 0, 2)).toEqual(['b', 'c', 'a', 'd'])
     expect(moveItem(['a', 'b', 'c', 'd'], 3, 0)).toEqual(['d', 'a', 'b', 'c'])
-  })
-})
-
-describe('tabbladen verkooporders', () => {
-  it('deelt in op nog te leveren, ingepland en afgeleverd', async () => {
-    let s = await loadSnapshot(db)
-    const product = s.products.find((p) => p.sku === 'LIG-AL-WT')!
-    const id = await createOrder(db, { header: header(s.customers[0].id), lines: [lineFromProduct(product, { qty: 2, warehouse_id: s.warehouses[1].id })] })
-    const tab = async () => { s = await loadSnapshot(db); return orderTab(s, s.sales_orders.find((o) => o.id === id)!) }
-    expect(await tab()).toBe('te_leveren')
-    s = await loadSnapshot(db)
-    const line = s.sales_order_lines.find((l) => l.sales_order_id === id)!
-    const plan = (qty: number) => createDelivery(db, { sales_order_id: id, method: 'eigen_team', planned_date: TODAY, carrier: '', notes: '', lines: [{ sales_order_line_id: line.id, qty }] })
-    const first = await plan(1)
-    expect(await tab()).toBe('te_leveren')
-    await deliver(first)
-    expect(await tab()).toBe('te_leveren')
-    const rest = await plan(1)
-    expect(await tab()).toBe('ingepland')
-    await deliver(rest)
-    expect(await tab()).toBe('afgeleverd')
   })
 })
 
@@ -769,9 +748,15 @@ describe('vertalingen', () => {
     for (const key of Object.keys(es)) expect(holes(es[key]), key).toEqual(holes(key))
   })
   it('heeft een Engelse tekst voor elke schermtekst', () => {
-    const files = ['App.tsx', 'main.tsx', 'ui/kit.tsx', 'ui/app-context.tsx', 'domain/services.ts', ...readdirSync('src/screens').map((f) => `screens/${f}`)]
+    const files = ['App.tsx', 'main.tsx', 'ui/kit.tsx', 'ui/app-context.tsx', 'ui/OrderFlowTrack.tsx', 'domain/services.ts', ...readdirSync('src/screens').map((f) => `screens/${f}`)]
     const missing = files.flatMap((f) => [...readFileSync(`src/${f}`, 'utf8').matchAll(/\btx\(("(?:[^"\\\\]|\\\\.)*")/g)].map((m) => JSON.parse(m[1]) as string)).filter((k) => !(k in en))
     expect(missing).toEqual([])
+  })
+  it('heeft een Engelse tekst voor elke fasetekst van de verkoop-flow', () => {
+    // Fasen en hun teksten staan als gewone tekst in het domein; het scherm vertaalt ze met tx().
+    const texts = [...readFileSync('src/domain/orderFlow.ts', 'utf8').matchAll(/'([A-Z{][^'\\]*(?:\\'[^'\\]*)*)'/g)].map((m) => m[1].replace(/\\'/g, "'")).filter((t) => t.trim() === t)
+    expect(texts.length).toBeGreaterThan(30)
+    expect(texts.filter((k) => !(k in en))).toEqual([])
   })
 })
 

@@ -169,22 +169,6 @@ export function orderStage(s: Snapshot, o: SalesOrder): OrderStage {
   return 'wacht_op_goederen'
 }
 
-export type OrderTab = 'proforma' | 'te_leveren' | 'ingepland' | 'afgeleverd'
-
-/** Tabblad op Verkooporders. Geannuleerde verkooporders staan alleen onder Alles. */
-export function orderTab(s: Snapshot, o: SalesOrder): OrderTab | null {
-  const stage = orderStage(s, o)
-  if (stage === 'geannuleerd') return null
-  if (stage === 'proforma') return 'proforma'
-  if (stage === 'te_factureren' || stage === 'gefactureerd') return 'afgeleverd'
-  if (stage === 'gepland') return 'ingepland'
-  if (stage === 'deels_geleverd') {
-    const lines = orderLines(s, o.id)
-    return lines.every((l) => plannedQty(s, l.id) >= l.qty) ? 'ingepland' : 'te_leveren'
-  }
-  return 'te_leveren'
-}
-
 export function uninvoicedDeliveries(s: Snapshot, orderId: string): Delivery[] {
   const billed = invoicedDeliveryLineIds(s)
   return s.deliveries.filter(
@@ -239,7 +223,6 @@ export function flowCounts(s: Snapshot, today = todayISO()) {
     inkoop: linesToPurchase(s).length,
     inkomend: openShipments.filter((x) => x.transport_id && x.expected_date < today).length,
     ontvangst: s.transports.filter((t) => t.status !== 'cancelled' && t.arrival_date <= addDays(today, 7) && openLinesOnTransport(s, t.id).length > 0).length,
-    orders: openOrders.filter((o) => orderStage(s, o) === 'te_plannen').length,
     levering: s.deliveries.filter((d) => deliveryIsOpen(d) && d.planned_date <= today).length,
     facturatie: openOrders.reduce((n, o) => n + uninvoicedDeliveries(s, o.id).length, 0),
   }

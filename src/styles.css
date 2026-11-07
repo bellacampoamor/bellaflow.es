@@ -204,13 +204,6 @@ td input.price { width: 104px; }
 .dl dd { margin: 0; font-weight: 500; overflow-wrap: anywhere; }
 
 /* Stappen op orderdetail */
-.track { display: flex; gap: 0; overflow-x: auto; }
-.track div { flex: 1; min-width: 92px; position: relative; padding-top: 22px; font-size: .82rem; color: var(--muted); text-align: center; }
-.track div::before { content: ''; position: absolute; top: 6px; left: 50%; width: 12px; height: 12px; margin-left: -6px; border-radius: 50%; background: var(--line-strong); z-index: 1; }
-.track div::after { content: ''; position: absolute; top: 11px; left: 0; right: 0; height: 2px; background: var(--line); }
-.track div:first-child::after { left: 50%; } .track div:last-child::after { right: 50%; }
-.track div.done { color: var(--fg); } .track div.done::before { background: var(--good); }
-.track div.now { color: var(--heading); font-weight: 600; } .track div.now::before { background: var(--brand-line); box-shadow: 0 0 0 3px var(--sell); }
 
 .timeline { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
 .timeline li { display: grid; grid-template-columns: 74px minmax(0, 1fr); gap: 8px; font-size: .88rem; }
@@ -395,8 +388,6 @@ body.route-dragging, body.route-dragging * { cursor: grabbing !important; user-s
 .tri.open svg { transform: rotate(180deg); }
 
 /* Toelichting onder een stap van de voortgang */
-.track div.track-note { flex: none; min-width: 0; padding-top: 0; font-size: .76rem; font-weight: 500; color: inherit; }
-.track div.track-note::before, .track div.track-note::after { content: none; }
 
 /* Documenten: tabel lijnt links en rechts uit met de koppen en de totalen */
 .paper table th:first-child, .paper table td:first-child { padding-left: 0; }
@@ -637,3 +628,98 @@ body.route-dragging, body.route-dragging * { cursor: grabbing !important; user-s
 .scan-done { width: 64px; height: 64px; border-radius: 50%; display: grid; place-items: center; background: var(--good-bg); color: var(--good); }
 .bad-text { color: var(--bad); }
 .warn-text { color: var(--warn); display: inline-flex; align-items: center; gap: 4px; }
+
+/* Verkoop-flow: elke verkooporder loopt van links naar rechts door zes fasen.
+   Kleuren per stand: klaar = Goed, actie = hoofdkleur, te laat = Fout, wacht = Info, komt nog = lijn. */
+.flow-table { border-collapse: separate; border-spacing: 0; }
+.flow-table th.ph-head { padding: 0 1px 8px; vertical-align: bottom; min-width: 104px; }
+.ph-head button { --tint: var(--sell); --tint-fg: var(--sell-fg); width: 100%; min-height: 50px; display: grid; grid-template-columns: 1fr auto; grid-template-rows: auto auto; align-items: center; column-gap: 6px; row-gap: 1px; border: 0; cursor: pointer; text-align: left;
+  background: var(--tint); color: var(--tint-fg); font: 600 .8rem/1.2 var(--body); padding: 6px 18px 6px 16px; clip-path: polygon(0 0, calc(100% - 9px) 0, 100% 50%, calc(100% - 9px) 100%, 0 100%, 9px 50%); }
+.flow-table th.ph-head:nth-child(3) button { clip-path: polygon(0 0, calc(100% - 9px) 0, 100% 50%, calc(100% - 9px) 100%, 0 100%); padding-left: 10px; }
+.flow-table th.ph-head:nth-child(5) button { --tint: var(--buy); --tint-fg: var(--buy-fg); }
+.flow-table th.ph-head:nth-child(6) button, .flow-table th.ph-head:nth-child(7) button { --tint: var(--ship); --tint-fg: var(--ship-fg); }
+.flow-table th.ph-head:nth-child(8) button { --tint: var(--bill); --tint-fg: var(--bill-fg); }
+.ph-head button:hover { filter: brightness(.96); }
+.ph-head.on button { background: var(--selected); color: var(--on-selected); }
+.ph-head-n { display: inline-flex; align-items: center; gap: 4px; font-variant-numeric: tabular-nums; opacity: .85; }
+.ph-head-l { grid-column: 1 / -1; grid-row: 2; }
+.ph-head-c { grid-column: 2; grid-row: 1; }
+.ph-head-c { min-width: 20px; text-align: center; border-radius: 99px; background: var(--surface); color: var(--fg); font-size: .74rem; padding: 0 6px; }
+.ph-head-c:empty { visibility: hidden; }
+.flow-table td.ph-td { padding: 10px 0 8px; vertical-align: top; }
+.flow-table tbody tr td:first-child { box-shadow: inset 4px 0 transparent; }
+.flow-table tr.fl-te_laat td:first-child { box-shadow: inset 4px 0 var(--bad); }
+.flow-table tr.fl-actie td:first-child { box-shadow: inset 4px 0 var(--brand-line); }
+.flow-table tr.fl-wacht td:first-child { box-shadow: inset 4px 0 var(--info); }
+.flow-table tr.fl-afgerond td:first-child { box-shadow: inset 4px 0 var(--good); }
+.flow-table tr.fl-afgerond td, .flow-table tr.fl-geannuleerd td { opacity: .78; }
+.fl-who { min-width: 170px; }
+.ph { position: relative; display: flex; flex-direction: column; align-items: center; gap: 5px; text-align: center; padding: 0 4px; --c: var(--line-strong); }
+.ph::before { content: ''; position: absolute; top: 9px; left: 0; right: 0; height: 3px; background: var(--line); }
+.ph-td:nth-child(3) .ph::before { left: 50%; } .ph-td:nth-child(8) .ph::before { right: 50%; }
+.ph.ph-done::before { background: var(--good); }
+.ph.ph-skip::before { background: repeating-linear-gradient(90deg, var(--line-strong) 0 5px, transparent 5px 9px); }
+.ph-dot { position: relative; z-index: 1; width: 21px; height: 21px; border-radius: 50%; display: grid; place-items: center; background: var(--surface); border: 2px solid var(--c); color: var(--surface); }
+.ph-done { --c: var(--good); } .ph-done .ph-dot { background: var(--good); }
+.ph-actie { --c: var(--brand-line); } .ph-actie .ph-dot { background: var(--brand-line); box-shadow: 0 0 0 4px var(--sell); }
+.ph-laat { --c: var(--bad); } .ph-laat .ph-dot { background: var(--bad); box-shadow: 0 0 0 4px var(--bad-bg); }
+.ph-wacht { --c: var(--info); } .ph-wacht .ph-dot { background: var(--info); }
+.ph-skip .ph-dot { width: 13px; height: 13px; margin-block: 4px; border-style: dashed; color: transparent; }
+.ph-t { font-size: .76rem; line-height: 1.25; color: var(--muted); max-width: 120px; }
+.ph-done .ph-t { color: var(--fg); }
+.ph-actie .ph-t { color: var(--brand-strong); font-weight: 600; }
+.ph-laat .ph-t { color: var(--bad); font-weight: 600; }
+.ph-wacht .ph-t { color: var(--info); }
+.ph-partial .ph-dot::after { content: ''; position: absolute; right: -5px; top: -5px; width: 9px; height: 9px; border-radius: 50%; background: var(--warn); border: 2px solid var(--surface); }
+.ph-now .ph-dot { transform: scale(1.12); }
+.fl-next { min-width: 190px; vertical-align: middle; }
+.next { display: inline-flex; flex-direction: column; align-items: flex-start; position: relative; gap: 1px; padding: 6px 30px 6px 10px; border-radius: 8px; text-decoration: none; font-size: .82rem; line-height: 1.3; background: var(--neutral-bg); color: var(--fg); max-width: 240px; }
+.next-ph { font-size: .7rem; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; opacity: .85; }
+.next-t { font-weight: 600; }
+.next-arrow { position: absolute; right: 9px; top: 50%; margin-top: -7px; }
+.next-actie { background: var(--sell); color: var(--sell-fg); }
+.next-te_laat { background: var(--bad-bg); color: var(--bad); }
+.next-wacht { background: var(--info-bg); color: var(--info); }
+.next-afgerond { flex-direction: row; align-items: center; gap: 6px; background: var(--good-bg); color: var(--good); font-weight: 600; padding-right: 10px; }
+a.next:hover { filter: brightness(.96); }
+.mini-track { display: none; gap: 4px; margin-top: 6px; }
+.mini-track span { flex: 1; height: 6px; border-radius: 3px; background: var(--line); max-width: 34px; }
+.mini-track .ph-done { background: var(--good); } .mini-track .ph-actie { background: var(--brand-line); } .mini-track .ph-laat { background: var(--bad); }
+.mini-track .ph-wacht { background: var(--info); } .mini-track .ph-skip { background: repeating-linear-gradient(90deg, var(--line-strong) 0 3px, transparent 3px 6px); }
+@media (max-width: 860px) {
+  .flow-table thead, .flow-table td.ph-td { display: none; }
+  .flow-table, .flow-table tbody { display: block; }
+  .flow-table tr { display: grid; grid-template-columns: auto 1fr; border-bottom: 1px solid var(--line); box-shadow: inset 4px 0 transparent; }
+  .flow-table tr.fl-te_laat { box-shadow: inset 4px 0 var(--bad); } .flow-table tr.fl-actie { box-shadow: inset 4px 0 var(--brand-line); }
+  .flow-table tr.fl-wacht { box-shadow: inset 4px 0 var(--info); } .flow-table tr.fl-afgerond { box-shadow: inset 4px 0 var(--good); }
+  .flow-table tbody tr td { border: 0; box-shadow: none !important; }
+  .flow-table td.fl-next { grid-column: 1 / -1; padding-top: 0; padding-left: 14px; }
+  .next { max-width: none; width: 100%; }
+  .mini-track { display: flex; }
+}
+
+/* Groot spoor op het scherm van één verkooporder. */
+.flow-track { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(6, minmax(104px, 1fr)); overflow-x: auto; }
+.ft { position: relative; display: flex; flex-direction: column; align-items: center; text-align: center; gap: 4px; padding: 0 6px; --c: var(--line-strong); }
+.ft::before { content: ''; position: absolute; top: 17px; left: 0; right: 0; height: 4px; background: var(--line); }
+.ft:first-child::before { left: 50%; } .ft:last-child::before { right: 50%; }
+.ft.ph-done::before { background: var(--good); }
+.ft.ph-skip::before { background: repeating-linear-gradient(90deg, var(--line-strong) 0 6px, transparent 6px 11px); }
+.ft-dot { position: relative; z-index: 1; width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center; background: var(--surface); border: 2px solid var(--c); color: var(--muted); }
+.ft.ph-done .ft-dot { background: var(--good); color: var(--surface); }
+.ft.ph-actie .ft-dot { background: var(--brand-line); color: var(--on-primary); box-shadow: 0 0 0 5px var(--sell); }
+.ft.ph-laat .ft-dot { background: var(--bad); color: var(--surface); box-shadow: 0 0 0 5px var(--bad-bg); }
+.ft.ph-wacht .ft-dot { background: var(--info); color: var(--surface); }
+.ft.ph-skip .ft-dot { border-style: dashed; }
+.ft-n { font: 600 .84rem var(--display); color: var(--heading); margin-top: 4px; }
+.ft-t { font-size: .8rem; line-height: 1.3; }
+.ft.ph-actie .ft-t { color: var(--brand-strong); font-weight: 600; } .ft.ph-laat .ft-t { color: var(--bad); font-weight: 600; } .ft.ph-wacht .ft-t { color: var(--info); }
+.ft-partial { font-size: .72rem; font-weight: 600; color: var(--warn); background: var(--warn-bg); border-radius: 99px; padding: 0 7px; }
+.ft-next .ft-n { text-decoration: underline; text-decoration-color: var(--brand-line); text-decoration-thickness: 2px; text-underline-offset: 3px; }
+.flow-next { display: flex; gap: 12px; align-items: center; justify-content: space-between; flex-wrap: wrap; margin-top: 16px; padding: 10px 14px; border-radius: 8px; border-left: 4px solid var(--line-strong); background: var(--surface-2); }
+.flow-next .lbl { display: block; }
+.flow-next.fl-actie { background: var(--sell); color: var(--sell-fg); border-left-color: var(--brand-line); }
+.flow-next.fl-te_laat { background: var(--bad-bg); color: var(--bad); border-left-color: var(--bad); }
+.flow-next.fl-wacht { background: var(--info-bg); color: var(--info); border-left-color: var(--info); }
+.flow-next.fl-afgerond { background: var(--good-bg); color: var(--good); border-left-color: var(--good); }
+.flow-next.fl-actie .lbl, .flow-next.fl-te_laat .lbl, .flow-next.fl-wacht .lbl { color: inherit; opacity: .85; }

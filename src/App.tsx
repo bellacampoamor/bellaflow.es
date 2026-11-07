@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { BookOpen, FileBarChart, Headset, Languages, Moon, Store, Sun, Boxes, ClipboardList, FileText, LayoutDashboard, PackageCheck, Settings2, ShoppingCart, Truck, Warehouse as WarehouseIcon } from 'lucide-react'
 import { flowCounts } from './domain/calc'
+import { followUpCount } from './domain/orderFlow'
 import { useApp, useHash } from './ui/app-context'
 import { Logo, Modal } from './ui/kit'
 import { Overview } from './screens/Overview'
@@ -28,7 +29,7 @@ const FLOWS = {
   verkoop: {
     label: 'Verkoop', icon: Store, home: 'orders',
     steps: [
-      { key: 'orders', label: '4. Verkooporders', sub: (n: number) => tx("{0} te plannen", n), icon: ClipboardList, tint: 'sell' },
+      { key: 'orders', label: '4. Verkooporders', sub: (n: number) => tx("{0} op te volgen", n), icon: ClipboardList, tint: 'sell' },
       { key: 'levering', label: '5. Levering', sub: (n: number) => tx("{0} vandaag", n), icon: Truck, tint: 'ship' },
       { key: 'facturatie', label: '6. Facturatie', sub: (n: number) => tx("{0} te factureren", n), icon: FileText, tint: 'bill' },
     ],
@@ -88,7 +89,7 @@ export function App({ onResetDemo, onSignOut }: { onResetDemo?: () => Promise<vo
   const dash = hash.indexOf('-')
   const screen = dash < 0 ? hash : hash.slice(0, dash)
   const param = dash < 0 ? '' : hash.slice(dash + 1)
-  const counts = flowCounts(s)
+  const counts = { ...flowCounts(s), orders: followUpCount(s) }
   const flow = flowOf(screen)
 
   if (screen === 'chauffeur') return <Driver param={param} />
