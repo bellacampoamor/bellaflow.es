@@ -176,8 +176,8 @@ function Route({ screen, param }: { screen: string; param: string }) {
       if (param.startsWith('wijzig-')) return <OrderForm id={param.slice(7)} />
       if (!param || param.startsWith('lijst-')) { const l = parseOrdersParam(param); return <Orders key={param} tab={l.tab} phase={l.phase} /> }
       return <OrderDetail id={param} />
-    case 'levering': return param.startsWith('print-') ? <DeliveryNote key={param} id={param.slice(6)} autoPrint /> : param.startsWith('archief-') ? <DeliveryNote key={param} id={param.slice(8)} fromArchive /> : param ? <DeliveryNote key={param} id={param} /> : <Deliveries />
-    case 'facturatie': return param.startsWith('print-') ? <InvoiceDetail key={param} id={param.slice(6)} autoPrint /> : param ? <InvoiceDetail key={param} id={param} /> : <Invoices />
+    case 'levering': return param.startsWith('print-') ? <DeliveryNote key={param} id={param.slice(6)} autoPrint /> : param.startsWith('archief-') ? <DeliveryNote key={param} id={param.slice(8)} fromArchive /> : param.startsWith('naar-') ? <Deliveries key={param} focus={param.slice(5)} /> : param ? <DeliveryNote key={param} id={param} /> : <Deliveries />
+    case 'facturatie': return param.startsWith('print-') ? <InvoiceDetail key={param} id={param.slice(6)} autoPrint /> : param.startsWith('naar-') ? <Invoices key={param} focus={param.slice(5)} /> : param ? <InvoiceDetail key={param} id={param} /> : <Invoices />
     case 'rapportage': return <Reports tab="facturen" />
     case 'archief': return <Reports tab="archief" />
     case 'catalogi': return <Catalogs supplierId={param} />

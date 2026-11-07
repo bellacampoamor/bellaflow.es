@@ -104,11 +104,11 @@ export function orderFlow(s: Snapshot, o: SalesOrder, today = todayISO()): Order
     afleveren = allTakenNow ? { key: 'afleveren', state: 'done', label: 'Meegenomen' } : { key: 'afleveren', state: 'done', label: last ? 'Geleverd {0}' : 'Geleverd', args: last ? [last] : undefined }
   } else if (openDeliveries.length) {
     const d = openDeliveries[0]
-    if (d.planned_date < today) afleveren = { key: 'afleveren', state: 'laat', label: 'Te laat, gepland {0}', args: [d.planned_date], href: '#levering' }
-    else if (d.status === 'planned' && d.planned_date <= today) afleveren = { key: 'afleveren', state: 'actie', label: 'Klaarzetten', href: '#levering' }
-    else if (d.status === 'in_transit') afleveren = { key: 'afleveren', state: 'wacht', label: 'Onderweg naar de klant', href: '#levering' }
-    else if (d.status === 'ready') afleveren = { key: 'afleveren', state: 'wacht', label: 'Klaargezet voor {0}', args: [d.planned_date], href: '#levering' }
-    else afleveren = { key: 'afleveren', state: 'wacht', label: 'Bezorging {0}', args: [d.planned_date], href: '#levering' }
+    if (d.planned_date < today) afleveren = { key: 'afleveren', state: 'laat', label: 'Te laat, gepland {0}', args: [d.planned_date], href: `#levering-naar-${d.id}` }
+    else if (d.status === 'planned' && d.planned_date <= today) afleveren = { key: 'afleveren', state: 'actie', label: 'Klaarzetten', href: `#levering-naar-${d.id}` }
+    else if (d.status === 'in_transit') afleveren = { key: 'afleveren', state: 'wacht', label: 'Onderweg naar de klant', href: `#levering-naar-${d.id}` }
+    else if (d.status === 'ready') afleveren = { key: 'afleveren', state: 'wacht', label: 'Klaargezet voor {0}', args: [d.planned_date], href: `#levering-naar-${d.id}` }
+    else afleveren = { key: 'afleveren', state: 'wacht', label: 'Bezorging {0}', args: [d.planned_date], href: `#levering-naar-${d.id}` }
     afleveren.partial = partialShip
   } else afleveren = { key: 'afleveren', state: 'open', label: partialShip ? '{0} van {1} geleverd' : '', args: partialShip ? [shipped, qty] : undefined, partial: partialShip }
 
@@ -117,7 +117,7 @@ export function orderFlow(s: Snapshot, o: SalesOrder, today = todayISO()): Order
   const invoices = s.invoices.filter((i) => i.sales_order_id === id)
   const overdue = invoices.find((i) => invoiceBalance(s, i) > 0 && i.due_date < today)
   let factureren: Phase
-  if (toBill.length) factureren = { key: 'factureren', state: 'actie', label: toBill.length === 1 ? 'Factureren {0}' : 'Factureren, {0} proforma\'s', args: [toBill.length === 1 ? toBill[0].proforma_number ?? '' : toBill.length], href: '#facturatie', partial: shipped < qty }
+  if (toBill.length) factureren = { key: 'factureren', state: 'actie', label: toBill.length === 1 ? 'Factureren {0}' : 'Factureren, {0} proforma\'s', args: [toBill.length === 1 ? toBill[0].proforma_number ?? '' : toBill.length], href: `#facturatie-naar-${toBill[0].id}`, partial: shipped < qty }
   else if (overdue) factureren = { key: 'factureren', state: 'laat', label: 'Factuur {0} vervallen', args: [overdue.number], href: `#facturatie-${overdue.id}` }
   else if (qty > 0 && shipped >= qty) {
     const open = invoices.some((i) => invoiceBalance(s, i) > 0)

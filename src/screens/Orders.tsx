@@ -232,7 +232,7 @@ export function OrderDetail({ id }: { id: string }) {
             <div className="panel-head"><h2>{tx("Leveringen")}</h2></div>
             {deliveries.length === 0 && <Empty>{plannable.length ? tx("Nog niets gepland. Plan alles ineens of in delen.") : tx("Plannen kan zodra de goederen binnen zijn.")}</Empty>}
             {deliveries.map((d) => (
-              <a key={d.id} href={d.status === 'planned' || d.status === 'cancelled' || d.method === 'meenemen' ? '#levering' : `#levering-${d.id}`} className="task">
+              <a key={d.id} href={d.status === 'planned' || d.status === 'cancelled' || d.method === 'meenemen' ? `#levering-naar-${d.id}` : `#levering-${d.id}`} className="task">
                 <div><div className="task-t">{d.number}{d.sequence > 1 || deliveries.length > 1 ? tx(", deellevering {0}", d.sequence) : ''}</div>
                   <div className="muted small">{s.delivery_lines.filter((l) => l.delivery_id === d.id).map((l) => tx("{0} × {1}", l.qty, withSku(lines.find((x) => x.id === l.sales_order_line_id)))).join(', ')}</div></div>
                 <DeliveryPill d={d} />

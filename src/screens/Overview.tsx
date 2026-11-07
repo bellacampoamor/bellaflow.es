@@ -67,7 +67,7 @@ export function Overview() {
               <Group key={day.late ? 'laat' : day.date} title={day.late ? tx("Te laat") : dayLabel(day.date)} tone={day.late ? 'bad' : day.date === today ? 'now' : ''}
                 n={tx("{0} van {1} klaargezet", day.ready, day.deliveries.length)}>
                 {day.deliveries.map((d) => (
-                  <a className="task" key={d.id} href="#levering">
+                  <a className="task" key={d.id} href={`#levering-naar-${d.id}`}>
                     <div><div className="task-t">{custOf(d.sales_order_id)}</div>
                       <div className="muted small">{d.number}{cityOf(d.sales_order_id) ? `, ${cityOf(d.sales_order_id)}` : ''}{d.sequence > 1 ? tx(", deellevering {0}", d.sequence) : ''}{day.late ? `, ${fmtShort(d.planned_date)}` : ''}</div></div>
                     <Pill tone={d.status === 'planned' ? (day.late ? 'bad' : '') : 'good'}>{deliveryState[d.status]}</Pill>
@@ -122,7 +122,7 @@ export function Overview() {
             {o.billing.toBill.length > 0 && (
               <Group title={tx("Proforma's, klaar om te factureren")} n={o.billing.toBill.length}>
                 {o.billing.toBill.slice(0, MAX).map(({ d, value }) => (
-                  <a className="task" key={d.id} href="#facturatie">
+                  <a className="task" key={d.id} href={`#facturatie-naar-${d.id}`}>
                     <div><div className="task-t">{custOf(d.sales_order_id)}</div><div className="muted small">{d.proforma_number ?? d.number}{d.delivered_at ? tx(", geleverd {0}", fmtShort(d.delivered_at)) : ''}</div></div>
                     <span className="num strong">{eur(value)}</span>
                   </a>

@@ -38,12 +38,12 @@ describe('verkoop-flow per verkooporder', () => {
     // Vandaag gepland en nog niet klaargezet: klaarzetten is de volgende actie zodra alles gepland is.
     const second = await plan(1, addDays(TODAY, 3))
     f = await flowOf(id)
-    expect(f).toMatchObject({ follow: 'actie', next: { key: 'afleveren', label: 'Klaarzetten' } })
+    expect(f).toMatchObject({ follow: 'actie', next: { key: 'afleveren', label: 'Klaarzetten', href: `#levering-naar-${first}` } })
     await markReady(db, first, { approved_by: 'Jan', date: TODAY })
     await markDelivered(db, first, { date: TODAY, signed_by: 'Klant', signed_note_received: true })
     // Deellevering afgemeld: de proforma (PF) moet direct gefactureerd worden.
     f = await flowOf(id)
-    expect(f).toMatchObject({ follow: 'actie', next: { key: 'factureren' } })
+    expect(f).toMatchObject({ follow: 'actie', next: { key: 'factureren', href: `#facturatie-naar-${first}` } })
     expect(f.phases.find((p) => p.key === 'afleveren')).toMatchObject({ state: 'wacht', partial: true })
     const pf = (await loadSnapshot(db)).deliveries.find((d) => d.id === first)!
     await invoiceProformas(db, { delivery_ids: [pf.id], invoice_date: TODAY })

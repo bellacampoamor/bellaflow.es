@@ -4,15 +4,17 @@ import type { Language, Payment } from '../data/types'
 import { articleNo, deliveryValue, depositAvailable, documentLanguage, hasTaxId, invoiceBalance, invoiceQrUrl, invoiceState, todayISO, uninvoicedDeliveries, vatBreakdown } from '../domain/calc'
 import { ensureProformas, invoiceProformas, payInvoice } from '../domain/services'
 import { go, useApp, useAutoPrint } from '../ui/app-context'
-import { Empty, eur, fmtDate, Head, Modal, NumberField, Pill, SelectField, Tabs, TextField, DocPaper, pickRow, PickMark, TaxQr } from '../ui/kit'
+import { Empty, eur, fmtDate, Head, Modal, NumberField, Pill, SelectField, Tabs, TextField, DocPaper, pickRow, PickMark, TaxQr, useScrollToFocus } from '../ui/kit'
 import { tx } from '../i18n'
 
 const STATE = { betaald: ['Betaald', 'good'], open: ['Open', 'bill'], te_laat: ['Te laat', 'bad'] } as const
 
-export function Invoices() {
+/** focus: levering (PF) waar het scherm naartoe scrolt; die staat meteen geselecteerd om te factureren. */
+export function Invoices({ focus }: { focus?: string }) {
   const { s, run } = useApp()
   const [tab, setTab] = useState<'open' | 'all'>('open')
-  const [ticked, setTicked] = useState<Set<string>>(new Set())
+  const [ticked, setTicked] = useState<Set<string>>(() => new Set(focus ? [focus] : []))
+  useScrollToFocus(focus ? `pf-${focus}` : null)
   const [confirm, setConfirm] = useState(false)
   const proformas = s.sales_orders.filter((o) => o.status === 'open').flatMap((o) => uninvoicedDeliveries(s, o.id).map((d) => ({ d, o, c: s.customers.find((x) => x.id === o.customer_id)! }))).sort((a, b) => a.d.number.localeCompare(b.d.number))
   const chosen = proformas.filter((p) => ticked.has(p.d.id))
@@ -39,7 +41,7 @@ export function Invoices() {
             <tbody>{proformas.map(({ d, o, c }) => {
               const dep = depositAvailable(s, o.id)
               return (
-                <tr key={d.id} {...pickRow(ticked.has(d.id), () => toggle(d.id, !ticked.has(d.id)))}>
+                <tr key={d.id} id={`pf-${d.id}`} {...pickRow(ticked.has(d.id), () => toggle(d.id, !ticked.has(d.id)))}>
                   <td className="strong">{d.proforma_number ?? '…'}</td><td><a className="rowlink" href={`#orders-${o.id}`}>{o.number}</a></td><td>{c.company || c.name}</td><td>{d.number}</td><td>{fmtDate(d.delivered_at)}</td>
                   <td className="num">{eur(deliveryValue(s, d.id))}</td><td className="num">{dep > 0 ? eur(dep) : <span className="zero">–</span>}</td>
                   <PickMark on={ticked.has(d.id)} />

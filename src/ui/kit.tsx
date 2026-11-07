@@ -264,3 +264,22 @@ export function CatalogPhoto({ url, alt, className }: { url?: string; alt: strin
   )
 }
 
+
+/**
+ * Scrolt na het openen van een scherm naar één regel (element met dat id) en laat die kort oplichten.
+ * Voor links als "Naar afleveren" vanaf een verkooporder, zodat je niet zelf hoeft te zoeken.
+ */
+export function useScrollToFocus(elementId: string | null | undefined) {
+  useEffect(() => {
+    if (!elementId) return
+    let off: ReturnType<typeof setTimeout> | undefined
+    const t = setTimeout(() => {
+      const el = document.getElementById(elementId)
+      if (!el) return
+      el.scrollIntoView({ block: 'center', behavior: 'smooth' })
+      el.classList.add('focus-flash')
+      off = setTimeout(() => el.classList.remove('focus-flash'), 2600)
+    }, 120)
+    return () => { clearTimeout(t); if (off) clearTimeout(off) }
+  }, [elementId])
+}

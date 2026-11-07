@@ -723,3 +723,9 @@ a.next:hover { filter: brightness(.96); }
 .flow-next.fl-wacht { background: var(--info-bg); color: var(--info); border-left-color: var(--info); }
 .flow-next.fl-afgerond { background: var(--good-bg); color: var(--good); border-left-color: var(--good); }
 .flow-next.fl-actie .lbl, .flow-next.fl-te_laat .lbl, .flow-next.fl-wacht .lbl { color: inherit; opacity: .85; }
+
+/* Regel waar een link naartoe stuurt: kort oplichten in de accentkleur. */
+@keyframes focus-flash { 0%, 60% { box-shadow: 0 0 0 3px var(--brand-line); } 100% { box-shadow: 0 0 0 3px transparent; } }
+.focus-flash { animation: focus-flash 2.6s ease-out; border-radius: 8px; }
+tr.focus-flash td { animation: focus-flash-cell 2.6s ease-out; }
+@keyframes focus-flash-cell { 0%, 60% { background: var(--sell); } 100% { background: transparent; } }

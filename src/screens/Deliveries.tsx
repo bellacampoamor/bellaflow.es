@@ -7,7 +7,7 @@ import { googleMapsRouteUrl, MAPS_MAX_WAYPOINTS, optimizeRoute, tourCost, type P
 import { cancelDelivery, markDeliveriesReady, markDelivered, rescheduleDelivery, saveRouteOrder, setDeliveryInTransit, setOrderCoordinates } from '../domain/services'
 import { go, useApp } from '../ui/app-context'
 import { useRouteDrag } from '../ui/useRouteDrag'
-import { Check, Empty, fmtDate, fmtShort, Head, Modal, Pill, Tabs, TextField, pickRow, PickMark } from '../ui/kit'
+import { Check, Empty, fmtDate, fmtShort, Head, Modal, Pill, Tabs, TextField, pickRow, PickMark, useScrollToFocus } from '../ui/kit'
 import { tx } from '../i18n'
 
 const METHOD = { meenemen: 'Klant haalt op', vervoerder: 'Vervoerder' }
@@ -16,12 +16,16 @@ const coords = (o: SalesOrder): Point | null => (o.delivery_latitude != null && 
 /** Rekenresultaat per dag; de matrix blijft bewaard zodat handmatig schuiven de totalen bijwerkt. */
 interface DayRoute { ids: string[]; matrix: TravelMatrix }
 
-export function Deliveries() {
+/** focus: levering waar het scherm naartoe scrolt (link "Naar afleveren" vanaf een verkooporder). */
+export function Deliveries({ focus }: { focus?: string }) {
   const { s, run, toast } = useApp()
-  const [tab, setTab] = useState<'planning' | 'done'>('planning')
+  const focused = focus ? s.deliveries.find((d) => d.id === focus) : undefined
+  const [tab, setTab] = useState<'planning' | 'done'>(focused && !deliveryIsOpen(focused) ? 'done' : 'planning')
+  useScrollToFocus(focused ? `lv-${focused.id}` : null)
   const [finish, setFinish] = useState<Delivery | null>(null)
   const [move, setMove] = useState<Delivery | null>(null)
-  const [picked, setPicked] = useState<Set<string>>(new Set())
+  // Een geplande levering waar je naartoe gestuurd wordt, staat meteen geselecteerd om klaar te zetten.
+  const [picked, setPicked] = useState<Set<string>>(() => new Set(focused && focused.status === 'planned' && focused.method !== 'meenemen' ? [focused.id] : []))
   const [preparing, setPreparing] = useState(false)
   // Na slepen in de route telt de klik niet als selectie.
   const pressY = useRef(0)
@@ -151,11 +155,11 @@ export function Deliveries() {
       </div>
     )
     const pick = pickProps(d)
-    if (!position) return <div key={d.id} {...pick}>{card}</div>
+    if (!position) return <div key={d.id} id={`lv-${d.id}`} {...pick}>{card}</div>
     const { day, index, ids } = position
     const row = rowState(day, d.id, index)
     return (
-      <div {...pick} className={`stop${row.dragging ? ' dragging' : ''}${row.active ? ' shifting' : ''}${pick.className ? ` ${pick.className}` : ''}`} key={d.id} style={row.active ? { transform: `translateY(${row.y}px)` } : undefined} onPointerDown={(e) => begin(e, day, d.id, ids)}>
+      <div id={`lv-${d.id}`} {...pick} className={`stop${row.dragging ? ' dragging' : ''}${row.active ? ' shifting' : ''}${pick.className ? ` ${pick.className}` : ''}`} key={d.id} style={row.active ? { transform: `translateY(${row.y}px)` } : undefined} onPointerDown={(e) => begin(e, day, d.id, ids)}>
         {ids.length > 1 && <span className="stop-grip" title={tx("Sleep om de volgorde in de route te wijzigen")} aria-hidden="true"><GripVertical size={16} /></span>}
         <div className="stop-nr">
           <button className="btn icon" aria-label={tx("{0} eerder in de route", d.number)} disabled={index === 0} onClick={() => shift(day, d.id, -1)}><ChevronUp size={16} /></button>
@@ -213,7 +217,7 @@ export function Deliveries() {
           <tbody>{done.map((d) => {
             const o = orderOf(d)
             const c = s.customers.find((x) => x.id === o.customer_id)!
-            return <tr key={d.id}><td className="strong">{d.number}</td><td><a className="rowlink" href={`#orders-${o.id}`}>{o.number}</a></td><td>{c.company || c.name}</td><td>{fmtDate(d.delivered_at ?? d.planned_date)}</td><td className="muted">{d.signed_by || '–'}</td>
+            return <tr key={d.id} id={`lv-${d.id}`}><td className="strong">{d.number}</td><td><a className="rowlink" href={`#orders-${o.id}`}>{o.number}</a></td><td>{c.company || c.name}</td><td>{fmtDate(d.delivered_at ?? d.planned_date)}</td><td className="muted">{d.signed_by || '–'}</td>
               <td>{d.method !== 'meenemen' && d.status === 'delivered' ? <a className="small" href={`#levering-${d.id}`}>{d.signature_data ? tx("Digitaal getekend") : d.signed_note_received ? tx("Getekend retour") : tx("Nog niet retour")}</a> : '–'}</td>
               <td>{d.status === 'delivered' ? <Pill tone="good">{tx("Geleverd")}</Pill> : <Pill>{tx("Geannuleerd")}</Pill>}</td></tr>
           })}</tbody>
