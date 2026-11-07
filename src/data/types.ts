@@ -141,7 +141,7 @@ export interface Delivery {
 }
 export type EmailStatus = 'pending' | 'sent' | 'failed' | 'no_recipient' | 'demo'
 export interface OutgoingEmail {
-  id: string; kind: 'getekende_afleverbon'; delivery_id: string; to_email: string; bcc_email: string
+  id: string; kind: 'getekende_afleverbon' | 'factuur'; delivery_id: string | null; invoice_id?: string | null; to_email: string; bcc_email: string
   subject: string; body_text: string; status: EmailStatus; error: string; created_at: string; sent_at: string | null
 }
 export interface EmailAttachment { name: string; base64: string }

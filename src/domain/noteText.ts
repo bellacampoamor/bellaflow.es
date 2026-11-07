@@ -13,3 +13,17 @@ export const DOC_MARK: Record<Language, string> = {
   nl: 'Dit document is opgesteld met Bella Flow.',
   en: 'This document was prepared with Bella Flow.',
 }
+
+// Vaste teksten van de factuur, in de taal van het document (scherm en pdf).
+export const INVOICE_TEXT: Record<Language, Record<string, string>> = {
+  es: { title: 'Factura', code: 'Referencia', deelfactuur: 'Factura parcial', eindfactuur: 'Factura final', volledig: 'Factura', date: 'Fecha', due: 'Vencimiento', order: 'Pedido', to: 'Facturar a', desc: 'Descripción', qty: 'Cant.', price: 'Precio', disc: 'Dto.', total: 'Total', base: 'Base imponible', vat: 'IVA', deposit: 'Anticipo aplicado', paid: 'Pagado', due_amt: 'Importe a pagar', pay: 'Pago por transferencia a', tax: 'NIF' },
+  nl: { title: 'Factuur', code: 'Artikelnummer', deelfactuur: 'Deelfactuur', eindfactuur: 'Eindfactuur', volledig: 'Factuur', date: 'Datum', due: 'Vervaldatum', order: 'Order', to: 'Factuur aan', desc: 'Omschrijving', qty: 'Aantal', price: 'Prijs', disc: 'Korting', total: 'Totaal', base: 'Grondslag', vat: 'IVA', deposit: 'Vooruitbetaling verrekend', paid: 'Betaald', due_amt: 'Te betalen', pay: 'Betaling per overboeking op', tax: 'NIF' },
+  en: { title: 'Invoice', code: 'Item no.', deelfactuur: 'Partial invoice', eindfactuur: 'Final invoice', volledig: 'Invoice', date: 'Date', due: 'Due date', order: 'Order', to: 'Bill to', desc: 'Description', qty: 'Qty', price: 'Price', disc: 'Disc.', total: 'Total', base: 'Tax base', vat: 'IVA', deposit: 'Advance applied', paid: 'Paid', due_amt: 'Amount due', pay: 'Pay by bank transfer to', tax: 'Tax ID' },
+}
+
+// Mail bij een factuur, in de taal van de klant.
+export const INVOICE_MAIL: Record<Language, { subject: (n: string, c: string) => string; body: (name: string, n: string, c: string) => string }> = {
+  es: { subject: (n, c) => `Factura ${n}, ${c}`, body: (name, n, c) => `Estimado/a ${name}:\n\nAdjuntamos la factura ${n}.\n\nGracias por su compra.\n\n${c}` },
+  nl: { subject: (n, c) => `Factuur ${n}, ${c}`, body: (name, n, c) => `Beste ${name},\n\nHierbij ontvangt u factuur ${n}.\n\nBedankt voor uw aankoop.\n\n${c}` },
+  en: { subject: (n, c) => `Invoice ${n}, ${c}`, body: (name, n, c) => `Dear ${name},\n\nPlease find attached invoice ${n}.\n\nThank you for your purchase.\n\n${c}` },
+}

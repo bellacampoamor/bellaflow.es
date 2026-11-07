@@ -12,7 +12,7 @@ import { TABLES } from '../src/data/types'
 import { archiveRows, openLinesOnTransport, linePurchaseStatus, linesToPurchase, documentLanguage, flowCounts, freeAt, transportLoad, invoiceBalance, onHandMap, orderStage, reservedMap, stockKey, vatBreakdown , invoiceReport, periodRange, invoiceQrUrl, hasTaxId, driverStops } from '../src/domain/calc'
 import { renameOldSuppliers, restoreSettings, restoreSuppliers, seedDemo } from '../src/domain/demo'
 import {
-  importShowroom, importShowroomDetails, importSupplierFile, createDelivery, createInvoice, markDeliveriesReady, createOrder, createPurchaseOrder, invoiceProformas, lineFromProduct, markDelivered, assignShipmentsToTransport, cancelTransport, convertPurchaseProformas, syncPurchaseProformas, markReceivedInNl, cancelOrder, cancelPurchaseOrder, createTransport, markReady, receiveGoods, rescheduleDelivery, rescheduleOrder, saveRouteOrder, saveSettings, mailSignedNote, setPurchaseLabel, signDelivery, splitLinesForStock, setDeliveryInTransit, setTransportStatus, updateTransport, transferStock,
+  mailInvoice, importShowroom, importShowroomDetails, importSupplierFile, createDelivery, createInvoice, markDeliveriesReady, createOrder, createPurchaseOrder, invoiceProformas, lineFromProduct, markDelivered, assignShipmentsToTransport, cancelTransport, convertPurchaseProformas, syncPurchaseProformas, markReceivedInNl, cancelOrder, cancelPurchaseOrder, createTransport, markReady, receiveGoods, rescheduleDelivery, rescheduleOrder, saveRouteOrder, saveSettings, mailSignedNote, setPurchaseLabel, signDelivery, splitLinesForStock, setDeliveryInTransit, setTransportStatus, updateTransport, transferStock,
 } from '../src/domain/services'
 import { estimateMatrix, parseRouterTable } from '../src/data/geo'
 import { dropIndex, googleMapsRouteUrl, moveItem, optimizeRoute, tourCost } from '../src/domain/route'
@@ -484,6 +484,53 @@ describe('meenemen per regel', () => {
     const s = await loadSnapshot(db)
     const product = s.products.find((p) => p.sku === 'LIG-AL-WT')!
     await expect(createOrder(db, { header: header(s.customers[0].id), lines: [lineFromProduct(product, { qty: 99, warehouse_id: s.warehouses[1].id, take_now: true })] })).rejects.toThrow(/om mee te nemen/)
+  })
+  it('afrekenen aan de kassa maakt meteen de factuur en mailt die als pdf', async () => {
+    const s = await loadSnapshot(db)
+    const product = s.products.find((p) => p.sku === 'LIG-AL-WT')!
+    const customer = s.customers[0]
+    await db.update('customers', customer.id, { email: '' })
+    const sent: EmailAttachment[] = []
+    db.sendEmail = async (_id, a) => { sent.push(a); return 'sent' }
+    const id = await createOrder(db, { header: header(customer.id), lines: [lineFromProduct(product, { qty: 1, warehouse_id: s.warehouses[1].id, take_now: true, unit_price: 121 })] },
+      { invoiceNow: true, invoiceEmail: 'kassa@voorbeeld.test', invoiceDate: TODAY })
+    const after = await loadSnapshot(db)
+    const inv = after.invoices.filter((i) => i.sales_order_id === id)
+    expect(inv).toMatchObject([{ kind: 'volledig', total: 121, invoice_date: TODAY }])
+    expect(after.deliveries.find((d) => d.sales_order_id === id)!.status).toBe('delivered')
+    const mail = after.email_outbox.find((m) => m.kind === 'factuur' && m.invoice_id === inv[0].id)!
+    expect(mail).toMatchObject({ to_email: 'kassa@voorbeeld.test', delivery_id: null, status: 'sent' })
+    // Het adres wordt bij de klant bewaard als die er nog geen had.
+    expect(after.customers.find((c) => c.id === customer.id)!.email).toBe('kassa@voorbeeld.test')
+    expect(sent[0].name).toContain(inv[0].number)
+    expect((await PDFDocument.load(Buffer.from(sent[0].base64, 'base64'))).getPageCount()).toBeGreaterThan(0)
+    // Opnieuw mailen werkt dezelfde regel bij.
+    expect(await mailInvoice(db, inv[0].id, 'ander@voorbeeld.test')).toBe('sent')
+    expect((await loadSnapshot(db)).email_outbox.filter((m) => m.invoice_id === inv[0].id)).toMatchObject([{ to_email: 'ander@voorbeeld.test' }])
+  })
+  it('afrekenen zonder e-mailadres factureert zonder mail; een ongeldig adres weigert alles', async () => {
+    const s = await loadSnapshot(db)
+    const product = s.products.find((p) => p.sku === 'LIG-AL-WT')!
+    const line = () => [lineFromProduct(product, { qty: 1, warehouse_id: s.warehouses[1].id, take_now: true })]
+    const orders = s.sales_orders.length
+    await expect(createOrder(db, { header: header(s.customers[0].id), lines: line() }, { invoiceNow: true, invoiceEmail: 'geen-adres' })).rejects.toThrow(/geldig e-mailadres/)
+    expect((await loadSnapshot(db)).sales_orders).toHaveLength(orders)
+    const id = await createOrder(db, { header: header(s.customers[0].id), lines: line() }, { invoiceNow: true, invoiceEmail: '', invoiceDate: TODAY })
+    const after = await loadSnapshot(db)
+    const inv = after.invoices.find((i) => i.sales_order_id === id)!
+    expect(after.email_outbox.some((m) => m.invoice_id === inv.id)).toBe(false)
+  })
+  it('factureert niet meteen als niet alles wordt meegenomen', async () => {
+    const s = await loadSnapshot(db)
+    const taken = s.products.find((p) => p.sku === 'LIG-AL-WT')!
+    const later = s.products.find((p) => p.sku === 'KST-EK-180')!
+    const id = await createOrder(db, { header: header(s.customers[0].id), lines: [
+      lineFromProduct(taken, { qty: 1, warehouse_id: s.warehouses[1].id, take_now: true }),
+      lineFromProduct(later, { qty: 1, source: 'bestelling' }),
+    ] }, { invoiceNow: true, invoiceEmail: 'kassa@voorbeeld.test' })
+    const after = await loadSnapshot(db)
+    expect(after.invoices.filter((i) => i.sales_order_id === id)).toHaveLength(0)
+    expect(after.deliveries.find((d) => d.sales_order_id === id)!.proforma_number).toBeTruthy()
   })
 })
 

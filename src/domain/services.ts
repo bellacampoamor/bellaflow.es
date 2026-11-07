@@ -9,6 +9,7 @@ import type {
 } from '../data/types'
 import { parseCsv, sameName } from './catalog'
 import { articleNumberFromScan } from './scan'
+import { INVOICE_MAIL } from './noteText'
 import { articleSources, categoryName, priceWithSurcharge, finishArticleSync, missingSupplierCodes, planArticleSync } from './articles'
 import { DETAIL_COLUMNS, SHOWROOM_COLUMNS, showroomDetailFromCsv, showroomItemFromCsv } from './showroom'
 import {
@@ -385,9 +386,10 @@ function validateOrder(s: Snapshot, input: OrderInput, opts: { checkTakeNow: boo
   }
 }
 
-export async function createOrder(db: Driver, raw: OrderInput, opts: { autoDeliverDate?: string } = {}) {
+export async function createOrder(db: Driver, raw: OrderInput, opts: NewOrderOptions = {}) {
   const s = await loadSnapshot(db)
   validateOrder(s, withPlaceholders(raw))
+  checkInvoiceEmail(opts)
   const input = await resolveArticleLines(db, raw)
   const id = newId()
   const number = await nextDocumentNumber(db, 'VO', 'prefix_sales_order', yearOf(input.header.order_date))
@@ -401,8 +403,19 @@ export async function createOrder(db: Driver, raw: OrderInput, opts: { autoDeliv
   return id
 }
 
+/**
+ * Opties bij een nieuwe of bevestigde verkooporder.
+ * invoiceNow: afrekenen aan de kassa (POS). Neemt de klant alles direct mee, dan ontstaat meteen de factuur (datum vandaag)
+ * in plaats van alleen een proforma. invoiceEmail: daar gaat de factuur als pdf naartoe; leeg = niet mailen.
+ */
+export interface NewOrderOptions { autoDeliverDate?: string; invoiceNow?: boolean; invoiceEmail?: string; invoiceDate?: string }
+
+function checkInvoiceEmail(opts: NewOrderOptions) {
+  if (opts.invoiceEmail?.trim() && !isEmail(opts.invoiceEmail)) fail(tx("Vul een geldig e-mailadres in voor de factuur."))
+}
+
 /** Vooruitbetaling en wat de klant direct meeneemt, bij een nieuwe of net bevestigde verkooporder. */
-async function finishNewOrder(db: Driver, id: string, input: OrderInput, lines: SalesOrderLine[], opts: { autoDeliverDate?: string }) {
+async function finishNewOrder(db: Driver, id: string, input: OrderInput, lines: SalesOrderLine[], opts: NewOrderOptions) {
   if (input.deposit?.amount) {
     await db.insert('payments', [{ id: newId(), sales_order_id: id, invoice_id: null, kind: 'vooruitbetaling', method: input.deposit.method, amount: input.deposit.amount, paid_at: input.header.order_date, reference: input.deposit.reference }])
   }
@@ -412,6 +425,18 @@ async function finishNewOrder(db: Driver, id: string, input: OrderInput, lines: 
     const date = opts.autoDeliverDate ?? input.header.order_date
     const did = await createDelivery(db, { sales_order_id: id, method: 'meenemen', planned_date: date, carrier: '', notes: '', lines: taken.map((l) => ({ sales_order_line_id: l.id, qty: l.qty })) })
     await markDelivered(db, did, { date, signed_by: input.header.delivery_name || '' })
+    // Afrekenen aan de kassa: alles gaat mee, dus meteen factureren en eventueel mailen.
+    if (opts.invoiceNow && taken.length === lines.length) {
+      const [invoiceId] = await invoiceProformas(db, { delivery_ids: [did], invoice_date: opts.invoiceDate ?? todayISO() })
+      const to = opts.invoiceEmail?.trim() ?? ''
+      if (to) {
+        const order = (await db.list('sales_orders')).find((o) => o.id === id)
+        const customer = order?.customer_id ? (await db.list('customers')).find((c) => c.id === order.customer_id) : undefined
+        // Het adres wordt bij de klant bewaard als die er nog geen had.
+        if (customer && !customer.email?.trim()) await db.update('customers', customer.id, { email: to })
+        await mailInvoice(db, invoiceId, to)
+      }
+    }
   }
 }
 
@@ -487,9 +512,10 @@ export async function saveProforma(db: Driver, id: string, raw: OrderInput) {
  * Rondt een proforma af: met klant, gecontroleerd als een nieuwe verkooporder. Pas nu krijgt hij het VO-nummer
  * en de status open; daarna volgen inkoop, levering en facturatie zoals bij elke verkooporder.
  */
-export async function confirmProforma(db: Driver, id: string, raw: OrderInput, opts: { autoDeliverDate?: string } = {}) {
+export async function confirmProforma(db: Driver, id: string, raw: OrderInput, opts: NewOrderOptions = {}) {
   const s = await loadSnapshot(db)
   const order = proformaOf(s, id)
+  checkInvoiceEmail(opts)
   const free = withoutOwnLines(s, id)
   validateOrder(free, withPlaceholders(raw))
   const input = await resolveArticleLines(db, raw)
@@ -733,17 +759,46 @@ export async function mailSignedNote(db: Driver, deliveryId: string): Promise<Em
   const co = s.settings[0]
   const to = isEmail(c.email ?? '') ? c.email.trim() : ''
   const text = MAIL_TEXT[c.language]
-  const existing = s.email_outbox.find((m) => m.delivery_id === deliveryId)
+  const existing = s.email_outbox.find((m) => m.kind !== 'factuur' && m.delivery_id === deliveryId)
   const id = existing?.id ?? newId()
   const status0: EmailStatus = to ? 'pending' : 'no_recipient'
   const fields = { to_email: to, bcc_email: co?.shop_email?.trim() ?? '', status: status0, error: to ? '' : tx("Geen e-mailadres bekend bij de klant.") }
   if (existing) await db.update('email_outbox', id, fields)
-  else await db.insert('email_outbox', [{ id, kind: 'getekende_afleverbon', delivery_id: deliveryId, subject: text.subject(d.number, co?.company_name ?? ''), body_text: text.body(c.name, d.number, co?.company_name ?? ''), created_at: new Date().toISOString(), sent_at: null, ...fields }])
+  else await db.insert('email_outbox', [{ id, kind: 'getekende_afleverbon', delivery_id: deliveryId, invoice_id: null, subject: text.subject(d.number, co?.company_name ?? ''), body_text: text.body(c.name, d.number, co?.company_name ?? ''), created_at: new Date().toISOString(), sent_at: null, ...fields }])
   if (!to) return 'no_recipient'
   try {
     const { signedNotePdf } = await import('./signedNotePdf')
     const result = await db.sendEmail(id, await signedNotePdf(s, deliveryId))
     await db.update('email_outbox', id, { status: result, error: '', sent_at: result === 'sent' ? new Date().toISOString() : null })
+    return result
+  } catch (e) {
+    await db.update('email_outbox', id, { status: 'failed', error: e instanceof Error ? e.message : String(e) })
+    return 'failed'
+  }
+}
+
+/** Mailt een factuur als pdf (zelfde document als afgedrukt) met een bcc naar de winkel. Opnieuw mailen werkt dezelfde regel in de wachtrij bij. */
+export async function mailInvoice(db: Driver, invoiceId: string, toEmail?: string): Promise<EmailStatus> {
+  const s = await loadSnapshot(db)
+  const inv = s.invoices.find((x) => x.id === invoiceId) ?? (fail(tx("Factuur niet gevonden.")) as never)
+  const c = s.customers.find((x) => x.id === inv.customer_id)!
+  const co = s.settings[0]
+  const raw = (toEmail ?? c.email ?? '').trim()
+  if (raw && !isEmail(raw)) fail(tx("Vul een geldig e-mailadres in voor de factuur."))
+  const to = raw
+  const text = INVOICE_MAIL[c.language]
+  const existing = s.email_outbox.find((m) => m.kind === 'factuur' && m.invoice_id === invoiceId)
+  const id = existing?.id ?? newId()
+  const status0: EmailStatus = to ? 'pending' : 'no_recipient'
+  const fields = { to_email: to, bcc_email: co?.shop_email?.trim() ?? '', status: status0, error: to ? '' : tx("Geen e-mailadres bekend bij de klant.") }
+  if (existing) await db.update('email_outbox', id, fields)
+  else await db.insert('email_outbox', [{ id, kind: 'factuur', delivery_id: null, invoice_id: invoiceId, subject: text.subject(inv.number, co?.company_name ?? ''), body_text: text.body(c.name, inv.number, co?.company_name ?? ''), created_at: new Date().toISOString(), sent_at: null, ...fields }])
+  if (!to) return 'no_recipient'
+  try {
+    const { invoicePdf } = await import('./invoicePdf')
+    const result = await db.sendEmail(id, await invoicePdf(s, invoiceId))
+    await db.update('email_outbox', id, { status: result, error: '', sent_at: result === 'sent' ? new Date().toISOString() : null })
+    if (result === 'sent') await db.insert('order_events', [event(inv.sales_order_id, 'mail', `Factuur ${inv.number} gemaild naar ${to}.`)])
     return result
   } catch (e) {
     await db.update('email_outbox', id, { status: 'failed', error: e instanceof Error ? e.message : String(e) })

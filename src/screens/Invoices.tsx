@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react'
-import { FileText } from 'lucide-react'
-import type { Language, Payment } from '../data/types'
-import { articleNo, deliveryValue, depositAvailable, documentLanguage, hasTaxId, invoiceBalance, invoiceQrUrl, invoiceState, todayISO, uninvoicedDeliveries, vatBreakdown } from '../domain/calc'
-import { ensureProformas, invoiceProformas, payInvoice } from '../domain/services'
+import { FileText, Mail } from 'lucide-react'
+import type { Payment } from '../data/types'
+import { IS_PRODUCTION, articleNo, deliveryValue, depositAvailable, documentLanguage, hasTaxId, invoiceBalance, invoiceQrUrl, invoiceState, todayISO, uninvoicedDeliveries, vatBreakdown } from '../domain/calc'
+import { ensureProformas, invoiceProformas, mailInvoice, payInvoice } from '../domain/services'
 import { go, useApp, useAutoPrint } from '../ui/app-context'
 import { Empty, eur, fmtDate, Head, Modal, NumberField, Pill, SelectField, Tabs, TextField, DocPaper, pickRow, PickMark, TaxQr, useScrollToFocus } from '../ui/kit'
 import { tx } from '../i18n'
+import { INVOICE_TEXT } from '../domain/noteText'
 
 const STATE = { betaald: ['Betaald', 'good'], open: ['Open', 'bill'], te_laat: ['Te laat', 'bad'] } as const
 
@@ -97,14 +98,9 @@ function InvoiceProformasModal({ ids, onClose, onDone }: { ids: string[]; onClos
   )
 }
 
-const T: Record<Language, Record<string, string>> = {
-  es: { title: 'Factura', code: 'Referencia', deelfactuur: 'Factura parcial', eindfactuur: 'Factura final', volledig: 'Factura', date: 'Fecha', due: 'Vencimiento', order: 'Pedido', to: 'Facturar a', desc: 'Descripción', qty: 'Cant.', price: 'Precio', disc: 'Dto.', total: 'Total', base: 'Base imponible', vat: 'IVA', deposit: 'Anticipo aplicado', paid: 'Pagado', due_amt: 'Importe a pagar', pay: 'Pago por transferencia a', tax: 'NIF' },
-  nl: { title: 'Factuur', code: 'Artikelnummer', deelfactuur: 'Deelfactuur', eindfactuur: 'Eindfactuur', volledig: 'Factuur', date: 'Datum', due: 'Vervaldatum', order: 'Order', to: 'Factuur aan', desc: 'Omschrijving', qty: 'Aantal', price: 'Prijs', disc: 'Korting', total: 'Totaal', base: 'Grondslag', vat: 'IVA', deposit: 'Vooruitbetaling verrekend', paid: 'Betaald', due_amt: 'Te betalen', pay: 'Betaling per overboeking op', tax: 'NIF' },
-  en: { title: 'Invoice', code: 'Item no.', deelfactuur: 'Partial invoice', eindfactuur: 'Final invoice', volledig: 'Invoice', date: 'Date', due: 'Due date', order: 'Order', to: 'Bill to', desc: 'Description', qty: 'Qty', price: 'Price', disc: 'Disc.', total: 'Total', base: 'Tax base', vat: 'IVA', deposit: 'Advance applied', paid: 'Paid', due_amt: 'Amount due', pay: 'Pay by bank transfer to', tax: 'Tax ID' },
-}
 
 export function InvoiceDetail({ id, autoPrint = false }: { id: string; autoPrint?: boolean }) {
-  const { s, run } = useApp()
+  const { s, run, toast } = useApp()
   const inv = s.invoices.find((i) => i.id === id)
   useAutoPrint(autoPrint, !!inv)
   const [pay, setPay] = useState(false)
@@ -112,13 +108,14 @@ export function InvoiceDetail({ id, autoPrint = false }: { id: string; autoPrint
   const [method, setMethod] = useState<Payment['method']>('overboeking')
   const [date, setDate] = useState(todayISO())
   const [ref, setRef] = useState('')
+  const [mailTo, setMailTo] = useState<string | null>(null)
   if (!inv) return <div className="panel">{tx("Factuur niet gevonden.")} <a href="#facturatie">{tx("Terug naar facturatie")}</a>.</div>
   const c = s.customers.find((x) => x.id === inv.customer_id)!
   const o = s.sales_orders.find((x) => x.id === inv.sales_order_id)!
   const lines = s.invoice_lines.filter((l) => l.invoice_id === id)
   const co = s.settings[0]
   const language = documentLanguage(co.language_invoice, inv.language)
-  const t = T[language]
+  const t = INVOICE_TEXT[language]
   // Facturen van voor het artikelnummer op de factuurregel
   const articleOf = (dl: string | null) => articleNo(s, s.sales_order_lines.find((x) => x.id === s.delivery_lines.find((y) => y.id === dl)?.sales_order_line_id)?.product_id)
   const b = vatBreakdown(lines.map((l) => ({ total: l.line_total, vat_rate: l.vat_rate })))
@@ -126,13 +123,22 @@ export function InvoiceDetail({ id, autoPrint = false }: { id: string; autoPrint
   const balance = invoiceBalance(s, inv)
   const [label, tone] = STATE[invoiceState(s, inv)]
   const canPrint = !import.meta.env.VITE_PREVIEW
+  const mail = s.email_outbox.find((m) => m.kind === 'factuur' && m.invoice_id === id)
+  const MAIL_STATE = { sent: ['Gemaild naar {0}', 'good'], demo: ['Testversie: niet echt gemaild naar {0}', 'info'], pending: ['Wordt gemaild naar {0}', 'info'], failed: ['Mailen mislukt', 'bad'], no_recipient: ['Geen e-mailadres', 'warn'] } as const
+  const sendMail = async () => {
+    let result = ''
+    const ok = await run(async (db) => { result = await mailInvoice(db, id, mailTo ?? '') })
+    if (ok) { setMailTo(null); toast(result === 'failed' ? tx("Mailen is mislukt. Zie de melding bij de factuur.") : result === 'demo' ? tx("Testversie: de mail is niet echt verstuurd.") : tx("Factuur gemaild"), result === 'failed') }
+  }
   return (
     <>
       <Head title={inv.number} sub={<>{c.company || c.name} <Pill tone={tone}>{tx(label)}</Pill></>} back={{ href: '#facturatie', label: tx("Facturatie") }}>
         <a className="btn" href={`#orders-${o.id}`}>{tx("Naar")} {o.number}</a>
         {canPrint && <button className="btn" onClick={() => window.print()}>{tx("Afdrukken of PDF")}</button>}
+        <button className="btn" onClick={() => setMailTo(mail?.to_email || c.email || '')}><Mail size={15} style={{ verticalAlign: -2, marginRight: 4 }} />{mail ? tx("Opnieuw mailen") : tx("Mailen")}</button>
         {balance > 0 && <button className="btn primary" onClick={() => { setAmount(balance); setPay(true) }}>{tx("Betaling registreren")}</button>}
       </Head>
+      {mail && <div className="no-print" style={{ marginBottom: 12 }}><Pill tone={MAIL_STATE[mail.status][1]}>{tx(MAIL_STATE[mail.status][0], mail.to_email)}</Pill>{mail.status === 'failed' && mail.error && <span className="small muted"> {mail.error}</span>}</div>}
       {!hasTaxId(co.tax_id) && <div className="note warn no-print" style={{ marginBottom: 12 }}>{tx("De QR-code op deze factuur klopt pas als het CIF is ingevuld onder Beheer.")}</div>}
       <DocPaper language={language}>
         <div className="paper-top invoice-top">
@@ -140,7 +146,7 @@ export function InvoiceDetail({ id, autoPrint = false }: { id: string; autoPrint
             <h2 style={{ fontSize: '1.3rem' }}>{co.company_name}</h2>
             <div className="small muted">{[co.address, `${co.postal_code} ${co.city}`.trim(), co.province, co.phone, co.email].filter(Boolean).join(', ')}<br />{t.tax}: {co.tax_id}</div>
           </div>
-          <TaxQr url={invoiceQrUrl({ nif: co.tax_id, number: inv.number, date: inv.invoice_date, total: inv.total }, import.meta.env.VITE_DATA_SOURCE === 'supabase')} />
+          <TaxQr url={invoiceQrUrl({ nif: co.tax_id, number: inv.number, date: inv.invoice_date, total: inv.total }, IS_PRODUCTION)} />
           <div style={{ textAlign: 'right' }}>
             <h1 style={{ fontSize: '1.45rem' }}>{t[inv.kind]}</h1>
             <div className="strong">{inv.number}</div>
@@ -166,6 +172,14 @@ export function InvoiceDetail({ id, autoPrint = false }: { id: string; autoPrint
         </div>
         <p className="small muted" style={{ marginTop: 26, marginBottom: 0 }}>{t.pay}: {co.iban}{co.invoice_footer ? <><br />{co.invoice_footer}</> : ''}</p>
       </DocPaper>
+      {mailTo !== null && (
+        <Modal title={tx("Factuur mailen")} onClose={() => setMailTo(null)} footer={<>
+          <button className="btn" onClick={() => setMailTo(null)}>{tx("Annuleren")}</button>
+          <button className="btn primary" onClick={sendMail}>{tx("Versturen")}</button>
+        </>}>
+          <TextField label={tx("E-mailadres")} type="email" value={mailTo} onChange={setMailTo} hint={tx("De factuur gaat als pdf mee, met een kopie (bcc) naar de winkel.")} />
+        </Modal>
+      )}
       {pay && (
         <Modal title={tx("Betaling registreren")} onClose={() => setPay(false)} footer={<>
           <button className="btn" onClick={() => setPay(false)}>{tx("Annuleren")}</button>

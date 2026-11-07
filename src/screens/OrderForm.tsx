@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { CreditCard, Layers, Plus, Trash2 } from 'lucide-react'
+import { CreditCard, Layers, Mail, Plus, Trash2 } from 'lucide-react'
 import type { CatalogArticle, Customer, Fulfilment, Payment } from '../data/types'
 import { inboundByProduct, lineTotal, onHandMap, plannedQty, reservedMap, round2, stockKey, todayISO, vatBreakdown } from '../domain/calc'
 import { catalogArticlesByNumber, confirmProforma, createOrder, lineFromProduct, saveProforma, saveRecord, splitLinesForStock, updateOrder, type OrderHeader, type OrderLineInput } from '../domain/services'
@@ -58,6 +58,8 @@ export function OrderForm({ id }: { id?: string }) {
   const [depositMethod, setDepositMethod] = useState<Payment['method']>('pin')
   const [depositRef, setDepositRef] = useState('')
   const [newCust, setNewCust] = useState<Omit<Customer, 'id'> | null>(null)
+  // Afrekenen aan de kassa: e-mailadres voor de factuur, standaard dat van de klant tot de medewerker het aanpast.
+  const [invoiceEmail, setInvoiceEmail] = useState<string | null>(null)
 
   const sellers = s.salespeople.filter((x) => x.is_active || x.id === h.salesperson_id)
   const set = (p: Partial<OrderHeader>) => setH((v) => ({ ...v, ...p }))
@@ -140,8 +142,10 @@ export function OrderForm({ id }: { id?: string }) {
     const missing = firstMissing()
     if (missing) return toast(missing, true)
     const payload = lines.map(({ key: _k, ...l }) => (id ? l : (({ id: _i, ...r }) => r)(l as Line & { id?: string })) as OrderLineInput)
+    const pos = allTaken ? { invoiceNow: true, invoiceEmail: mailTo } : {}
     if (isProforma) {
-      const ok = await run((db) => confirmProforma(db, id!, { header: h, lines: payload, deposit: deposit > 0 ? { amount: deposit, method: depositMethod, reference: depositRef } : undefined }), tx("Proforma bevestigd, de verkooporder heeft nu zijn VO-nummer"))
+      const ok = await run((db) => confirmProforma(db, id!, { header: h, lines: payload, deposit: deposit > 0 ? { amount: deposit, method: depositMethod, reference: depositRef } : undefined }, pos), allTaken ? undefined : tx("Proforma bevestigd, de verkooporder heeft nu zijn VO-nummer"))
+      if (ok && allTaken) return afterCheckout(id!)
       if (ok) go(`orders-${id}`)
       return
     }
@@ -152,9 +156,30 @@ export function OrderForm({ id }: { id?: string }) {
     let newId = ''
     const ok = await run(async (db) => {
       const finalLines = splitLinesForStock(await loadSnapshot(db), payload)
-      newId = await createOrder(db, { header: h, lines: finalLines, deposit: deposit > 0 ? { amount: deposit, method: depositMethod, reference: depositRef } : undefined })
-    }, allTaken ? tx("Verkooporder geregistreerd en meegegeven") : someTaken ? tx("Verkooporder aangemaakt, meegenomen artikelen afgeboekt") : tx("Verkooporder aangemaakt"))
+      newId = await createOrder(db, { header: h, lines: finalLines, deposit: deposit > 0 ? { amount: deposit, method: depositMethod, reference: depositRef } : undefined }, pos)
+    }, allTaken ? undefined : someTaken ? tx("Verkooporder aangemaakt, meegenomen artikelen afgeboekt") : tx("Verkooporder aangemaakt"))
+    if (ok && allTaken) return afterCheckout(newId)
     if (ok) go(`orders-${newId}`)
+  }
+  /** Na afrekenen: melding met factuur en mailstatus, daarna de factuur openen om af te drukken of te bekijken. */
+  const afterCheckout = async (orderId: string) => {
+    let note = tx("Verkooporder geregistreerd en meegegeven")
+    let invoiceId = ''
+    let failed = false
+    await run(async (db) => {
+      const snap = await loadSnapshot(db)
+      const inv = snap.invoices.find((i) => i.sales_order_id === orderId)
+      if (!inv) return
+      invoiceId = inv.id
+      const mail = snap.email_outbox.find((m) => m.kind === 'factuur' && m.invoice_id === inv.id)
+      note = !mail ? tx("Factuur {0} gemaakt.", inv.number)
+        : mail.status === 'sent' ? tx("Factuur {0} gemaakt en gemaild naar {1}.", inv.number, mail.to_email)
+        : mail.status === 'demo' ? tx("Factuur {0} gemaakt. Testversie: de mail naar {1} is niet echt verstuurd.", inv.number, mail.to_email)
+        : tx("Factuur {0} gemaakt, maar mailen is mislukt: {1}", inv.number, mail.error)
+      failed = !!mail && (mail.status === 'failed' || mail.status === 'no_recipient')
+    })
+    toast(note, failed)
+    go(invoiceId ? `facturatie-${invoiceId}` : `orders-${orderId}`)
   }
   const keepProforma = async () => {
     if (lines.some((l) => !l.product_id && !l.article)) return toast(tx("Kies bij elke regel een product of verwijder de regel."), true)
@@ -175,6 +200,7 @@ export function OrderForm({ id }: { id?: string }) {
   const someTaken = lines.some((l) => l.take_now)
   const needsAddress = !allTaken && h.fulfilment !== 'meenemen'
   const customer = s.customers.find((c) => c.id === h.customer_id)
+  const mailTo = (invoiceEmail ?? customer?.email ?? '').trim()
 
   return (
     <>
@@ -300,6 +326,13 @@ export function OrderForm({ id }: { id?: string }) {
               {lines.length > 0 && <div className="muted small"><span>{tx("Marge excl. IVA")}</span><span>{eur(margin)}</span></div>}
             </div>
           </section>
+          {fresh && allTaken && (
+            <section className="panel">
+              <h2><Mail size={16} style={{ verticalAlign: -2, marginRight: 6 }} />{tx("Factuur")}</h2>
+              <p className="small muted" style={{ marginTop: 0 }}>{tx("De klant neemt alles mee: bij afronden wordt meteen de factuur gemaakt, met de datum van vandaag.")}</p>
+              <TextField label={tx("Factuur mailen naar")} type="email" value={invoiceEmail ?? customer?.email ?? ''} onChange={setInvoiceEmail} placeholder={tx("naam@voorbeeld.es")} hint={customer && !customer.email && mailTo ? tx("Wordt ook bij de klant bewaard.") : tx("Leeg laten: niet mailen.")} />
+            </section>
+          )}
           {fresh && (
             <section className="panel">
               <h2><CreditCard size={16} style={{ verticalAlign: -2, marginRight: 6 }} />{tx("Vooruitbetaling")}</h2>
@@ -317,7 +350,7 @@ export function OrderForm({ id }: { id?: string }) {
             </section>
           )}
           {isProforma && <button className="btn" type="button" onClick={keepProforma}>{tx("Bewaren als proforma")}</button>}
-          <button className="btn primary" type="button" onClick={save}>{isProforma ? tx("Bevestigen als verkooporder") : existing ? tx("Wijzigingen opslaan") : allTaken ? tx("Verkooporder afronden en meegeven") : tx("Verkooporder aanmaken")}</button>
+          <button className="btn primary" type="button" onClick={save}>{isProforma ? tx("Bevestigen als verkooporder") : existing ? tx("Wijzigingen opslaan") : allTaken ? tx("Afrekenen, factureren en meegeven") : tx("Verkooporder aanmaken")}</button>
           <a className="btn" href={existing ? `#orders-${id}` : '#orders'}>{tx("Annuleren")}</a>
         </div>
       </div>

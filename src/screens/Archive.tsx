@@ -34,7 +34,7 @@ export function Archive() {
           <thead><tr><th>{tx("Verkooporder")}</th><th>{tx("Orderdatum")}</th><th>{tx("Klant")}</th><th>{tx("Afleverbon")}</th><th>{tx("Afleverdatum")}</th><th>{tx("Proforma")}</th><th>{tx("Factuur")}</th><th>{tx("Factuurdatum")}</th><th>{tx("Printen")}</th></tr></thead>
           <tbody>{rows.map(({ delivery: d, order: o, invoice: i }) => {
             const hasNote = d.method !== 'meenemen'
-            const mail = s.email_outbox.find((m) => m.delivery_id === d.id)
+            const mail = s.email_outbox.find((m) => m.kind !== 'factuur' && m.delivery_id === d.id)
             return (
               <tr key={d.id}>
                 <td><a className="rowlink" href={`#orders-${o.id}`}>{o.number}</a></td>

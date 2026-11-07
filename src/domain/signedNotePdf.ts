@@ -3,15 +3,15 @@ import type { Snapshot } from '../data/types'
 import { documentLanguage } from './calc'
 import { DOC_MARK, NOTE_TEXT } from './noteText'
 
-const A4: [number, number] = [595.28, 841.89]
-const MARGIN = 48
-const INK = rgb(0.067, 0.184, 0.271) // Midnight Navy
-const MUTED = rgb(0.353, 0.29, 0.298) // Smoky Taupe
+export const A4: [number, number] = [595.28, 841.89]
+export const MARGIN = 48
+export const INK = rgb(0.067, 0.184, 0.271) // Midnight Navy
+export const MUTED = rgb(0.353, 0.29, 0.298) // Smoky Taupe
 
 /** De standaardlettertypen kennen alleen West-Europese tekens; de rest mag de pdf niet laten mislukken. */
-const safe = (text: string) => text.replace(/[^\x20-\x7e\xa0-\xff]/g, (c) => c.normalize('NFD').replace(/[^\x20-\x7e]/g, '') || '?')
+export const safe = (text: string) => text.replace(/[^\x20-\x7e\xa0-\xff\u20ac]/g, (c) => c.normalize('NFD').replace(/[^\x20-\x7e]/g, '') || '?')
 
-const wrap = (text: string, font: PDFFont, size: number, width: number) => {
+export const wrap = (text: string, font: PDFFont, size: number, width: number) => {
   const out: string[] = []
   let line = ''
   for (const word of safe(text).split(/\s+/)) {
@@ -22,10 +22,10 @@ const wrap = (text: string, font: PDFFont, size: number, width: number) => {
   return out
 }
 
-const ymd = (iso: string | null | undefined) => (iso ? iso.slice(0, 10).split('-').reverse().join('-') : '')
+export const ymd = (iso: string | null | undefined) => (iso ? iso.slice(0, 10).split('-').reverse().join('-') : '')
 
 /** Klein logo met vermelding, midden onderaan elke pagina. Zonder logobestand blijft de tekst staan. */
-async function drawDocMark(doc: PDFDocument, font: PDFFont, text: string) {
+export async function drawDocMark(doc: PDFDocument, font: PDFFont, text: string) {
   let logo: PDFImage | null = null
   try {
     const res = await fetch(`${import.meta.env.BASE_URL}assets/brand/bellaflow-logo-small.png`)
