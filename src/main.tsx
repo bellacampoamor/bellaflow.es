@@ -23,6 +23,7 @@ async function loadCatalogFiles(d: LocalDriver) {
     } catch { /* blijft leeg; inlezen kan ook met de knop */ }
   }
   if (!(await d.list('supplier_showroom_items')).length) await load('supplier_showroom_items.csv', importShowroom)
+       if (!(await d.list('supplier_showroom_items')).some((x) => /ha-co/i.test(x.supplier_name))) await load('supplier_showroom_items_haco.csv', importShowroom)
   if (!(await d.list('supplier_showroom_details')).length) await load('supplier_showroom_details.csv', importShowroomDetails)
   // Eigen artikelnummers voor alle artikelen en elementen. In de browser in het geheugen; met de database blijven ze bewaard.
   try { await syncCatalogArticles(d) } catch { /* zonder nummers blijven de catalogi bruikbaar */ }
