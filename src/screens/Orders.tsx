@@ -4,7 +4,7 @@ import type { Delivery, Payment, SalesOrder } from '../data/types'
 import { articleNo, flowCounts, linePurchaseStatus, linesToPurchase, depositAvailable, depositPaid, invoiceBalance, lineTotal, onHandMap, orderLines, orderOutstanding, orderStage, orderTotal, plannedQty, shippedQty, stockKey, todayISO, uninvoicedDeliveries } from '../domain/calc'
 import { addOrderPayment, cancelOrder, createDelivery, defaultMethod, rescheduleOrder, setLineWarehouse } from '../domain/services'
 import { go, useApp } from '../ui/app-context'
-import { Check, Empty, eur, fmtDate, Head, Modal, NumberField, Pill, SelectField, Sku, Tabs, TextField, type Tone } from '../ui/kit'
+import { Check, Empty, eur, fmtDate, Head, Modal, NumberField, NumInput, Pill, SelectField, Sku, Tabs, TextField, type Tone } from '../ui/kit'
 import { tx } from '../i18n'
 import { activeIn, currentPhase, followRank, inOrdersTab, orderFlow, ordersHref, PHASES, PHASE_LABEL, type FollowUp, type OrdersTab, type PhaseKey } from '../domain/orderFlow'
 import { FlowTrack, FOLLOW_LABEL, MiniTrack, NextStep, PhaseCell, PHASE_ICON, phaseText } from '../ui/OrderFlowTrack'
@@ -390,7 +390,7 @@ export function PlanDeliveryModal({ order, onClose }: { order: SalesOrder; onClo
               <td>{l.description}<Sku code={articleNo(s, l.product_id)} /></td>
               <td>{l.warehouse_id ? s.warehouses.find((w) => w.id === l.warehouse_id)?.name : <Pill tone="warn">{tx("Nog niet binnen")}</Pill>}</td>
               <td className="num">{l.warehouse_id ? here : '–'}</td><td className="num">{open}</td>
-              <td><input className="qty" aria-label={tx("Aantal {0}", l.description)} type="number" min={0} max={open} disabled={!l.warehouse_id} value={qty[l.id]} onChange={(e) => setQty((v) => ({ ...v, [l.id]: Number(e.target.value) }))} /></td>
+              <td><NumInput className="qty" aria-label={tx("Aantal {0}", l.description)} min={0} max={open} disabled={!l.warehouse_id} value={qty[l.id]} onValue={(n) => setQty((v) => ({ ...v, [l.id]: n }))} /></td>
             </tr>
           )
         })}</tbody>

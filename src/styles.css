@@ -159,7 +159,7 @@ tr.is-proforma td { background: color-mix(in srgb, var(--sell) 45%, transparent)
 input, select, textarea { width: 100%; min-height: 38px; padding: 7px 10px; border: 1px solid var(--line-strong); border-radius: 7px; background: var(--surface); color: var(--fg); font: inherit; }
 textarea { min-height: 72px; resize: vertical; }
 input:focus, select:focus, textarea:focus { outline: 2px solid var(--brand-line); outline-offset: 0; border-color: var(--brand-line); }
-input[type="number"] { font-variant-numeric: tabular-nums; }
+input[type="number"], input[inputmode="decimal"], input[inputmode="numeric"] { font-variant-numeric: tabular-nums; }
 .check { display: inline-flex; align-items: center; gap: 8px; font-weight: 500; font-size: .92rem; min-height: 38px; cursor: pointer; }
 .check input { width: 18px; min-height: 18px; height: 18px; accent-color: var(--brand-strong); }
 td input, td select { min-width: 72px; }

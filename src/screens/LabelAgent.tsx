@@ -6,7 +6,7 @@ import {
   type PriceRule, type PrinterSettings,
 } from '../domain/labels'
 import { useApp } from '../ui/app-context'
-import { Check, Modal, NumberField, SelectField } from '../ui/kit'
+import { Check, Modal, NumberField, NumInput, SelectField } from '../ui/kit'
 import {
   fmtLabelPrice, labelImage, loadPrinterSettings, pairedPrinter, pairPrinter, printDirect, printViaDialog, savePrinterSettings,
   usbSupported, type LabelData, type UsbDevice,
@@ -227,7 +227,7 @@ function ListCard({ list, onRows, onPrint, onDialog }: { list: PrintList; onRows
                 {r.base !== null && r.price !== r.base && <s className="muted small">{fmtLabelPrice(r.base)}</s>}{' '}
                 <input className="lab-price" type="number" step="0.01" min="0" value={r.price ?? ''} placeholder="0,00" onChange={(e) => set(r.key, { price: e.target.value === '' ? null : Number(e.target.value) })} aria-label={tx("Prijs")} />
               </td>
-              <td><input className="lab-qty" type="number" min="0" max="99" value={r.qty} onChange={(e) => set(r.key, { qty: Math.max(0, Math.min(99, Math.floor(Number(e.target.value) || 0))) })} aria-label={tx("Aantal")} /></td>
+              <td><NumInput className="lab-qty" step="1" min={0} max={99} value={r.qty} onValue={(n) => set(r.key, { qty: Math.max(0, Math.min(99, Math.floor(n || 0))) })} aria-label={tx("Aantal")} /></td>
               <td><button className="btn icon sm" onClick={() => onRows(list.rows.filter((x) => x.key !== r.key))} aria-label={tx("Verwijderen")}><X size={14} /></button></td>
             </tr>
           ))}</tbody>

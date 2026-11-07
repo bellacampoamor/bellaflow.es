@@ -4,7 +4,7 @@ import { articleNo, inboundWarehouse, isDomesticShipment, openLinesOfShipments, 
 import { receiveGoods } from '../domain/services'
 import { tx } from '../i18n'
 import { go, useApp } from '../ui/app-context'
-import { AreaField, Empty, fmtDate, Head, Pill, Sku } from '../ui/kit'
+import { AreaField, Empty, NumInput, fmtDate, Head, Pill, Sku } from '../ui/kit'
 
 function TransportPicker({ value }: { value: string }) {
   const { s } = useApp()
@@ -185,7 +185,7 @@ export function ReceiptForm({ transportId, purchaseOrderId }: { transportId?: st
                   <td><select aria-label={tx("Locatie voor {0}", p.name)} value={r.warehouse_id} onChange={(e) => patch(r.key, { warehouse_id: e.target.value })}>
                     {locations.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
                   </select></td>
-                  <td><input className="qty" aria-label={tx("Ontvangen/Geteld {0}", p.name)} type="number" min={0} value={r.qty_received} onChange={(e) => patch(r.key, { qty_received: Number(e.target.value) })} /></td>
+                  <td><NumInput className="qty" aria-label={tx("Ontvangen/Geteld {0}", p.name)} min={0} value={r.qty_received} onValue={(n) => patch(r.key, { qty_received: n })} /></td>
                 </tr>
               )
             })}</tbody>

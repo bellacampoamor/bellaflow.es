@@ -5,6 +5,7 @@ import { imageSrc } from '../domain/catalog'
 import { locale, tx } from '../i18n'
 import qrcode from 'qrcode-generator'
 import { DOC_MARK } from '../domain/noteText'
+import { NumInput } from './NumInput'
 import type { Language } from '../data/types'
 
 const brandFile = (name: string) => `${import.meta.env.BASE_URL}assets/brand/${name}`/** QR als scherpe vector, foutcorrectie M en altijd 30 x 30 mm, de kleinste toegestane maat (Orden HAC/1177/2024, art. 21). */
@@ -76,8 +77,9 @@ type Common = { label: string; hint?: string; className?: string; required?: boo
 export const TextField = ({ label, hint, className, value, onChange, type = 'text', placeholder, required }: Common & { value: string | null; onChange: (v: string) => void; type?: string; placeholder?: string }) => (
   <Field label={label} hint={hint} className={className}>{(id) => <input id={id} type={type} value={value ?? ''} placeholder={placeholder} required={required} onChange={(e) => onChange(e.target.value)} />}</Field>
 )
+export { NumInput }
 export const NumberField = ({ label, hint, className, value, onChange, step = 'any', min }: Common & { value: number; onChange: (v: number) => void; step?: string; min?: number }) => (
-  <Field label={label} hint={hint} className={className}>{(id) => <input id={id} type="number" inputMode="decimal" step={step} min={min} value={Number.isNaN(value) ? '' : value} onChange={(e) => onChange(e.target.value === '' ? 0 : Number(e.target.value))} />}</Field>
+  <Field label={label} hint={hint} className={className}>{(id) => <NumInput id={id} inputMode="decimal" step={step} min={min} value={value} onValue={onChange} />}</Field>
 )
 export const AreaField = ({ label, hint, className, value, onChange }: Common & { value: string; onChange: (v: string) => void }) => (
   <Field label={label} hint={hint} className={className}>{(id) => <textarea id={id} value={value} onChange={(e) => onChange(e.target.value)} />}</Field>

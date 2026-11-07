@@ -8,7 +8,7 @@ import { FlowTrack, MiniTrack, NextStep, PhaseCell, PURCHASE_DEFS, PURCHASE_PHAS
 import type { PurchaseLabel } from '../data/types'
 import { tx } from '../i18n'
 import { go, useApp } from '../ui/app-context'
-import { AreaField, Combo, Empty, eur, fmtDate, Head, Modal, Pill, SelectField, Sku, Tabs, TextField, type Tone } from '../ui/kit'
+import { AreaField, Combo, Empty, eur, fmtDate, Head, Modal, NumInput, Pill, SelectField, Sku, Tabs, TextField, type Tone } from '../ui/kit'
 import { ConvertProformaModal, linesWithoutSupplier, proformasInSync, purchaseValue, salesOrdersOf } from './PurchaseQueue'
 
 type Snap = ReturnType<typeof useApp>['s']
@@ -292,8 +292,8 @@ export function PurchaseForm({ orderId }: { orderId?: string } = {}) {
                   <tr key={l.key}>
                     <td><Combo value={l.product_id} options={products} placeholder={tx("Zoek op naam of artikelnummer")} onChange={(v) => patchLine(l.key, { product_id: v, unit_cost: s.products.find((p) => p.id === v)?.purchase_price ?? 0 })} /><Sku code={s.products.find((p) => p.id === l.product_id)?.sku} /></td>
                     <td className="muted">{so ? so.number : tx("Voorraad")}</td>
-                    <td className="num"><input className="qty" aria-label={tx("Aantal")} type="number" min={1} value={l.qty} onChange={(e) => patchLine(l.key, { qty: Number(e.target.value) })} /></td>
-                    <td className="num"><input className="price" aria-label={tx("Inkoopprijs")} type="number" step="0.01" min={0} value={l.unit_cost} onChange={(e) => patchLine(l.key, { unit_cost: Number(e.target.value) })} /></td>
+                    <td className="num"><NumInput className="qty" aria-label={tx("Aantal")} min={1} value={l.qty} onValue={(n) => patchLine(l.key, { qty: n })} /></td>
+                    <td className="num"><NumInput className="price" aria-label={tx("Inkoopprijs")} inputMode="decimal" step="0.01" min={0} value={l.unit_cost} onValue={(n) => patchLine(l.key, { unit_cost: n })} /></td>
                     <td className="num">{eur(l.qty * l.unit_cost)}</td>
                     <td><button className="btn icon" aria-label={tx("Regel verwijderen")} onClick={() => setLines((v) => v.filter((x) => x.key !== l.key))}><Trash2 size={16} /></button></td>
                   </tr>

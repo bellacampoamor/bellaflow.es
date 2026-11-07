@@ -7,7 +7,7 @@ import { addToBasket, inBasket, removeFromBasket, stockShortage, type BasketRow 
 import { createProformaOrder, findArticleByCode } from '../domain/services'
 import { BarcodeScanner } from '../ui/BarcodeScanner'
 import { useApp } from '../ui/app-context'
-import { eur, Modal } from '../ui/kit'
+import { eur, Modal, NumInput } from '../ui/kit'
 import { tx } from '../i18n'
 
 const USER_KEY = 'bella-flow-scan-user'
@@ -143,7 +143,7 @@ export function ScanApp() {
           </section>
           <div className="scan-qty" role="group" aria-label={tx("Aantal")}>
             <button className="btn icon" onClick={() => setQty((q) => Math.max(1, q - 1))} aria-label={tx("Minder")}><Minus size={20} /></button>
-            <input type="number" inputMode="numeric" min={1} max={999} value={qty} onChange={(e) => setQty(Math.max(1, Math.min(999, Math.floor(Number(e.target.value) || 1))))} aria-label={tx("Aantal")} />
+            <NumInput step="1" min={1} max={999} value={qty} onValue={(n) => setQty(Math.max(1, Math.min(999, Math.floor(n || 1))))} aria-label={tx("Aantal")} />
             <button className="btn icon" onClick={() => setQty((q) => Math.min(999, q + 1))} aria-label={tx("Meer")}><Plus size={20} /></button>
           </div>
           <button className="btn primary scan-big" onClick={tryAdd}>{tx("Toevoegen")}</button>
