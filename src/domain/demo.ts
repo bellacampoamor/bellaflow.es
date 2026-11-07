@@ -66,10 +66,11 @@ export async function seedDemo(db: Driver, today = todayISO()) {
 
   const sup = (name: string, city: string, lead: number): Supplier => ({
     id: newId(), name, vat_number: '', contact_name: '', email: '', phone: '', address: '', postal_code: '', city, country: 'Nederland',
-    lead_time_days: lead, payment_terms: '30 dagen', notes: '', is_active: true,
+    lead_time_days: lead, payment_terms: '30 dagen', notes: '', is_active: true, code: null,
   })
   const oak = sup('Coöperatieve Inkoopvereniging Ha-Co U.A.', '', 28)
   const lounge = sup('Life Outdoor Living International B.V.', '', 21)
+  oak.code = 'HAC'; lounge.code = 'LOL'
   await db.insert('suppliers', [oak, lounge])
 
   const prod = (sku: string, name: string, collection: string, category: string, material: string, color: string, dim: string, kg: number, colli: number, buy: number, sell: number, s: Supplier, min: number): Product => ({

@@ -17,6 +17,8 @@ export interface Supplier {
   id: string; name: string; vat_number: string; contact_name: string; email: string; phone: string
   address: string; postal_code: string; city: string; country: string; lead_time_days: number; payment_terms: string
   notes: string; is_active: boolean
+  /** Afkorting van drie hoofdletters, het begin van het eigen artikelnummer (LOL-...). */
+  code?: string | null
 }
 export type Language = 'es' | 'nl' | 'en'
 export type DocumentLanguage = Language | 'klant'
@@ -30,6 +32,8 @@ export interface Product {
   id: string; sku: string; name: string; collection: string; category: string; material: string
   color: string; dimensions: string; weight_kg: number; colli: number; purchase_price: number
   sale_price: number; vat_rate: number; supplier_id: string | null; min_stock: number; is_active: boolean; volume_m3: number
+  /** Eigen artikelnummer van het catalogusartikel waar dit product uit komt. */
+  catalog_article_number?: string | null
 }
 /** Artikel uit de catalogus van een leverancier, zoals de leverancier het aanbiedt. Staat los van de eigen producten onder Beheer. */
 export interface CatalogCategory { name: string; url_path: string }
@@ -59,6 +63,25 @@ export interface SupplierShowroomDetail {
   /** Artikelnummers onder "Elementen" op de productpagina, in de volgorde van de showroom. */
   elements: string[]
   scraped_at: string
+}
+/**
+ * Artikel uit de catalogus van een leverancier met een eigen, vast artikelnummer: LLL-CCC-0000000000
+ * (afkorting leverancier, afkorting categorie, tiencijferig volgnummer). Ook elementen hebben er een.
+ * Staat niet in de Snapshot: met tienduizenden artikelen per leverancier zoekt de opslag zelf (zie Driver).
+ */
+export interface CatalogArticle {
+  id: string; article_number: string; supplier_id: string; supplier_sku: string; ean: string; name: string
+  category_code: string; series: string; price: number | null; currency: string; image_url: string
+  source: 'showroom' | 'webshop'; active: boolean; created_at: string
+}
+/** Koppeling artikel en element (subartikel), op de eigen id's. */
+export interface CatalogArticleElement { parent_id: string; element_id: string; position: number }
+export interface ArticleHit extends CatalogArticle { element_count: number }
+export interface ArticleQuery {
+  q: string
+  /** Alleen deze leveranciers; null of weglaten is alle catalogi. */
+  supplierIds?: string[] | null
+  limit?: number
 }
 export type OrderType = 'direct' | 'bestelling'
 export type Fulfilment = 'meenemen' | 'verzenden' | 'bezorgen'

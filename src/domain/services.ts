@@ -5,9 +5,10 @@ import { loadSnapshot, newId, type Driver } from '../data/driver'
 import type {
   EmailStatus, Language,
   Delivery, Fulfilment, InboundShipment, InvoiceLine, OrderType, Payment, Product, PurchaseLabel, SalesOrder, Settings,
-  SalesOrderLine, Snapshot, StockMovement, SupplierCatalogItem, SupplierShowroomDetail, SupplierShowroomItem, TableName,
+  SalesOrderLine, Snapshot, StockMovement, SupplierCatalogItem, CatalogArticle, Supplier, ArticleQuery, SupplierShowroomDetail, SupplierShowroomItem, TableName,
 } from '../data/types'
 import { CATALOG_COLUMNS, catalogItemFromCsv, parseCsv, sameName } from './catalog'
+import { articleSources, categoryName, finishArticleSync, missingSupplierCodes, planArticleSync } from './articles'
 import { DETAIL_COLUMNS, SHOWROOM_COLUMNS, showroomDetailFromCsv, showroomItemFromCsv } from './showroom'
 import {
   addDays, depositAvailable, freeAt, linesToPurchase, invoicedDeliveryLineIds, lineTotal, onHandMap, orderLines, plannedQty, round2,
@@ -268,7 +269,16 @@ export async function correctStock(db: Driver, input: { product_id: string; ware
 // Verkooporders ----------------------------------------------------------------
 
 export type OrderHeader = Omit<SalesOrder, 'id' | 'number' | 'status'>
-export type OrderLineInput = Omit<SalesOrderLine, 'id' | 'sales_order_id'> & { id?: string }
+/** Een regel met article is een catalogusartikel dat nog geen product onder Beheer heeft; dat product ontstaat pas als de verkooporder klopt. */
+export type OrderLineInput = Omit<SalesOrderLine, 'id' | 'sales_order_id'> & { id?: string; article?: CatalogArticle }
+
+const withPlaceholders = (input: OrderInput): OrderInput => ({ ...input, lines: input.lines.map((l) => (!l.product_id && l.article ? { ...l, product_id: `artikel:${l.article.article_number}` } : l)) })
+/** Maakt de producten voor gekozen catalogusartikelen, nadat de verkooporder is gecontroleerd. */
+async function resolveArticleLines(db: Driver, input: OrderInput): Promise<OrderInput> {
+  const lines: OrderLineInput[] = []
+  for (const { article, ...l } of input.lines) lines.push(article && !l.product_id ? { ...l, product_id: await productForArticle(db, article) } : l)
+  return { ...input, lines }
+}
 export interface OrderInput {
   header: OrderHeader; lines: OrderLineInput[]
   deposit?: { amount: number; method: Payment['method']; reference: string }
@@ -302,9 +312,10 @@ function validateOrder(s: Snapshot, input: OrderInput, opts: { checkTakeNow: boo
   }
 }
 
-export async function createOrder(db: Driver, input: OrderInput, opts: { autoDeliverDate?: string } = {}) {
+export async function createOrder(db: Driver, raw: OrderInput, opts: { autoDeliverDate?: string } = {}) {
   const s = await loadSnapshot(db)
-  validateOrder(s, input)
+  validateOrder(s, withPlaceholders(raw))
+  const input = await resolveArticleLines(db, raw)
   const id = newId()
   const number = await nextDocumentNumber(db, 'VO', 'prefix_sales_order', yearOf(input.header.order_date))
   const allTaken = input.lines.every((l) => l.take_now)
@@ -325,10 +336,11 @@ export async function createOrder(db: Driver, input: OrderInput, opts: { autoDel
   return id
 }
 
-export async function updateOrder(db: Driver, id: string, input: OrderInput) {
+export async function updateOrder(db: Driver, id: string, raw: OrderInput) {
   const s = await loadSnapshot(db)
-  validateOrder({ ...s, sales_order_lines: s.sales_order_lines.filter((l) => l.sales_order_id !== id) }, input, { checkTakeNow: false })
+  validateOrder({ ...s, sales_order_lines: s.sales_order_lines.filter((l) => l.sales_order_id !== id) }, withPlaceholders(raw), { checkTakeNow: false })
   const order = s.sales_orders.find((o) => o.id === id) ?? fail(tx("Verkooporder niet gevonden."))
+  const input = await resolveArticleLines(db, raw)
   const existing = orderLines(s, id)
   const kept = new Set(input.lines.map((l) => l.id).filter(Boolean))
   for (const old of existing) {
@@ -731,8 +743,62 @@ export async function importShowroomDetails(db: Driver, csv: string) {
 /** Kiest aan de kopregel welke export het is: showroom, details van de showroom of webshopcatalogus. */
 export async function importSupplierFile(db: Driver, csv: string) {
   const head = csv.replace(/^\uFEFF/, '').split(/\r?\n/, 1)[0]
-  if (/(^|,)specifications(,|$)/.test(head)) return { kind: 'details' as const, ...(await importShowroomDetails(db, csv)) }
-  return /(^|,)available_text(,|$)|(^|,)ean(,|$)/.test(head) ? { kind: 'showroom' as const, ...(await importShowroom(db, csv)) } : { kind: 'catalogus' as const, ...(await importCatalog(db, csv)) }
+  const result = /(^|,)specifications(,|$)/.test(head) ? { kind: 'details' as const, ...(await importShowroomDetails(db, csv)) }
+    : /(^|,)available_text(,|$)|(^|,)ean(,|$)/.test(head) ? { kind: 'showroom' as const, ...(await importShowroom(db, csv)) } : { kind: 'catalogus' as const, ...(await importCatalog(db, csv)) }
+  return { ...result, articles: await syncCatalogArticles(db) }
+}
+
+// Eigen artikelnummers -------------------------------------------------------------
+
+/**
+ * Werkt de artikelen met eigen artikelnummer bij uit alle ingelezen catalogi. Nieuwe artikelen en elementen krijgen een
+ * nummer, bestaande houden het hunne. Een leverancier zonder afkorting krijgt er een voorgesteld (aan te passen onder Beheer).
+ */
+export async function syncCatalogArticles(db: Driver, now = new Date().toISOString()) {
+  const s = await loadSnapshot(db)
+  const { sources, links, unknownSuppliers } = articleSources(s)
+  const codes = missingSupplierCodes(s.suppliers, sources.map((x) => x.supplier_id))
+  for (const c of codes) await db.update('suppliers', c.id, { code: c.code })
+  const codeOf = new Map<string, string>([...s.suppliers.map((x) => [x.id, x.code ?? ''] as [string, string]), ...codes.map((c) => [c.id, c.code] as [string, string])])
+  const existing = await db.articleIndex()
+  const plan = planArticleSync(sources, links, existing, (id) => codeOf.get(id)!)
+  const first = plan.fresh.length ? await db.reserveArticleNumbers(plan.fresh.length) : 0
+  const done = finishArticleSync(plan, existing, first, newId, now)
+  await db.saveArticles([...plan.updates, ...done.created], done.links)
+  return { added: done.created.length, updated: plan.updates.length, links: done.links.length, codes, unknownSuppliers }
+}
+
+/** Afkorting van de leverancier: drie hoofdletters, uniek. Wijzigen geldt alleen voor nieuwe artikelen. */
+export async function saveSupplier(db: Driver, row: Supplier | Omit<Supplier, 'id'>) {
+  const code = (row.code ?? '').trim().toUpperCase() || null
+  if (code && !/^[A-Z]{3}$/.test(code)) fail(tx("De afkorting van de leverancier bestaat uit precies drie letters, bijvoorbeeld LOL."))
+  const others = (await db.list('suppliers')).filter((x) => !('id' in row) || x.id !== row.id)
+  if (code && others.some((x) => (x.code ?? '').toUpperCase() === code)) fail(tx("De afkorting {0} is al in gebruik bij een andere leverancier.", code))
+  return saveRecord(db, 'suppliers', { ...row, code } as Supplier)
+}
+
+// Schermen lezen catalogusartikelen via deze functies; de opslag zoekt zelf.
+export const searchCatalogArticles = (db: Driver, q: ArticleQuery) => db.searchArticles(q)
+export const catalogArticlesBySku = (db: Driver, supplierId: string, skus: string[]) => (skus.length ? db.findArticles({ supplierId, skus }) : Promise.resolve([]))
+export const catalogArticlesByNumber = (db: Driver, numbers: string[]) => (numbers.length ? db.findArticles({ numbers }) : Promise.resolve([]))
+export const catalogArticleElements = (db: Driver, parentId: string) => db.articleElements(parentId)
+export const catalogArticleParents = (db: Driver, elementId: string) => db.articleParents(elementId)
+export const catalogArticleCounts = (db: Driver) => db.articleCounts()
+
+/**
+ * Het product onder Beheer voor een catalogusartikel. Bestaat het nog niet, dan wordt het aangemaakt met het eigen
+ * artikelnummer, de leverancier en de prijs van de leverancier als voorstel voor de verkoopprijs.
+ */
+export async function productForArticle(db: Driver, a: CatalogArticle) {
+  const found = (await db.list('products')).find((p) => p.catalog_article_number === a.article_number)
+  if (found) return found.id
+  const id = newId()
+  await db.insert('products', [{
+    id, sku: a.article_number, name: a.name, collection: a.series, category: categoryName(a.category_code), material: '', color: '', dimensions: '',
+    weight_kg: 0, colli: 1, purchase_price: 0, sale_price: a.price ?? 0, vat_rate: 21, supplier_id: a.supplier_id, min_stock: 0, is_active: true,
+    volume_m3: 0, catalog_article_number: a.article_number,
+  }])
+  return id
 }
 
 // Stamgegevens -----------------------------------------------------------------

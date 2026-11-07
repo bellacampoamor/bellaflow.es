@@ -1,6 +1,7 @@
 import type { Driver } from './driver'
 import { tx } from '../i18n'
-import { TABLES, type EmailAttachment, type Snapshot, type TableName } from './types'
+import { ArticleStore } from '../domain/articles'
+import { TABLES, type ArticleQuery, type CatalogArticle, type CatalogArticleElement, type EmailAttachment, type Snapshot, type TableName } from './types'
 
 const KEY = 'bella-flow-v1'
 /** Catalogi zijn groot en komen uit de bestanden van de leverancier. Ze blijven in het geheugen en gaan niet in de browseropslag. */
@@ -13,6 +14,8 @@ export function emptySnapshot(): Snapshot {
 /** Bewaart alles in de browser. Als opslag geblokkeerd is, blijft het in het geheugen werken. */
 export class LocalDriver implements Driver {
   data: Snapshot
+  /** Catalogusartikelen met eigen artikelnummer, alleen in het geheugen; ze worden bij elke start opnieuw opgebouwd uit de catalogi. */
+  articles = new ArticleStore()
   constructor(private persist = true) {
     this.data = emptySnapshot()
     if (persist) {
@@ -45,7 +48,15 @@ export class LocalDriver implements Driver {
     if (!this.persist) return
     try { localStorage.setItem(KEY, this.serialize()) } catch { /* geheugen volstaat */ }
   }
-  clear() { this.data = emptySnapshot(); this.save() }
+  clear() { this.data = emptySnapshot(); this.articles = new ArticleStore(); this.save() }
+  async searchArticles(q: ArticleQuery) { return this.articles.search(q) }
+  async findArticles(f: { ids?: string[]; numbers?: string[]; supplierId?: string; skus?: string[] }) { return this.articles.find(f) }
+  async articleElements(parentId: string) { return this.articles.elements(parentId) }
+  async articleParents(elementId: string) { return this.articles.parentsOf(elementId) }
+  async articleCounts() { return this.articles.counts() }
+  async articleIndex() { return { articles: structuredClone(this.articles.articles), links: structuredClone(this.articles.links) } }
+  async saveArticles(articles: CatalogArticle[], links: CatalogArticleElement[]) { this.articles.save(articles, links) }
+  async reserveArticleNumbers(count: number) { return this.articles.reserve(count) }
   async list<T extends TableName>(table: T) {
     this.sync();
     return structuredClone(this.data[table]) as Snapshot[T]

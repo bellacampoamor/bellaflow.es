@@ -1,13 +1,15 @@
-import { useMemo, useState } from 'react'
-import { CreditCard, Plus, Trash2 } from 'lucide-react'
-import type { Customer, Fulfilment, Payment } from '../data/types'
+import { useEffect, useMemo, useState } from 'react'
+import { CreditCard, Layers, Plus, Trash2 } from 'lucide-react'
+import type { CatalogArticle, Customer, Fulfilment, Payment } from '../data/types'
 import { inboundByProduct, lineTotal, onHandMap, plannedQty, reservedMap, round2, stockKey, todayISO, vatBreakdown } from '../domain/calc'
-import { createOrder, lineFromProduct, saveRecord, splitLinesForStock, updateOrder, type OrderHeader, type OrderLineInput } from '../domain/services'
+import { catalogArticlesByNumber, createOrder, lineFromProduct, saveRecord, splitLinesForStock, updateOrder, type OrderHeader, type OrderLineInput } from '../domain/services'
+import { ArticleSearch, ElementsModal, SearchSourceChips, useSearchSources, type ArticlePick } from '../ui/ArticleSearch'
 import { loadSnapshot } from '../data/driver'
 import { go, useApp } from '../ui/app-context'
-import { AreaField, Check, Combo, Empty, eur, Field, Head, Modal, NumberField, SelectField, TextField, Sku } from '../ui/kit'
+import { AreaField, Check, Combo, Empty, eur, Field, Head, Modal, NumberField, SelectField, TextField } from '../ui/kit'
 import { tx } from '../i18n'
 
+/** Een regel kan een catalogusartikel zijn dat nog geen product onder Beheer heeft; dat product ontstaat bij opslaan. */
 type Line = OrderLineInput & { key: number }
 let k = 1
 
@@ -33,7 +35,11 @@ export function CustomerFields({ c, set }: { c: Omit<Customer, 'id'>; set: (p: P
 }
 
 export function OrderForm({ id }: { id?: string }) {
-  const { s, run, toast } = useApp()
+  const { s, db, run, toast } = useApp()
+  const [sources, setSources] = useSearchSources()
+  const [elementsFor, setElementsFor] = useState<CatalogArticle | null>(null)
+  // Catalogusartikelen achter de producten op de regels, voor het artikelnummer van de leverancier en de elementen.
+  const [arts, setArts] = useState<Map<string, CatalogArticle>>(new Map())
   const today = todayISO()
   const existing = id ? s.sales_orders.find((o) => o.id === id) : undefined
 
@@ -53,10 +59,13 @@ export function OrderForm({ id }: { id?: string }) {
   const stock = onHandMap(s), reserved = reservedMap(s), inbound = inboundByProduct(s)
   const warehouses = s.warehouses.filter((w) => w.is_active)
   const custOptions = useMemo(() => s.customers.map((c) => ({ value: c.id, label: c.company || c.name, sub: [c.company ? c.name : '', c.city, c.phone].filter(Boolean).join(', '), search: `${c.email} ${c.tax_id}` })), [s.customers])
-  const prodOptions = useMemo(() => s.products.filter((p) => p.is_active).map((p) => {
-    const free = s.warehouses.reduce((n, w) => n + (stock.get(stockKey(p.id, w.id)) ?? 0) - (reserved.get(stockKey(p.id, w.id)) ?? 0), 0)
-    return { value: p.id, label: p.name, sub: tx("{0}, {1}, {2} vrij", p.sku, eur(p.sale_price), free), search: `${p.sku} ${p.collection} ${p.category}` }
-  }), [s.products, s.stock_movements, s.sales_order_lines]) // eslint-disable-line
+  const productOf = (pid: string) => s.products.find((p) => p.id === pid)
+  const lineArticle = (l: Line) => l.article ?? arts.get(productOf(l.product_id)?.catalog_article_number ?? '')
+  const numbers = lines.map((l) => productOf(l.product_id)?.catalog_article_number).filter((x): x is string => !!x && !arts.has(x))
+  useEffect(() => {
+    if (!numbers.length) return
+    catalogArticlesByNumber(db, numbers).then((r) => setArts((m) => new Map([...m, ...r.map((a) => [a.article_number, a] as const)]))).catch(() => {})
+  }, [db, numbers.join('|')]) // eslint-disable-line
 
   const freeAt = (pid: string, wid: string) => (stock.get(stockKey(pid, wid)) ?? 0) - (reserved.get(stockKey(pid, wid)) ?? 0)
   // Bij wijzigen telt wat deze regel zelf al reserveert niet mee als bezet.
@@ -79,8 +88,23 @@ export function OrderForm({ id }: { id?: string }) {
     const cur = lines.find((l) => l.key === key)!
     const wid = bestWarehouse(pid, cur.qty)
     const onOrder = !wid
-    patch(key, { product_id: pid, description: p.name, unit_price: p.sale_price, vat_rate: p.vat_rate, source: onOrder ? 'bestelling' : 'voorraad', take_now: false, warehouse_id: onOrder ? null : wid })
+    patch(key, { product_id: pid, article: undefined, description: p.name, unit_price: p.sale_price, vat_rate: p.vat_rate, source: onOrder ? 'bestelling' : 'voorraad', take_now: false, warehouse_id: onOrder ? null : wid })
   }
+  // Een catalogusartikel zonder product onder Beheer staat nergens op voorraad en gaat dus op bestelling.
+  const pickArticle = (key: number, pick: ArticlePick) => {
+    if (pick.kind === 'product') return pickProduct(key, pick.product.id)
+    const a = pick.article
+    patch(key, { product_id: '', article: a, description: a.name, unit_price: a.price ?? 0, vat_rate: 21, source: 'bestelling', take_now: false, warehouse_id: null })
+  }
+  const addArticleLine = (a: CatalogArticle) => {
+    const p = s.products.find((x) => x.catalog_article_number === a.article_number)
+    const wid = p ? bestWarehouse(p.id, 1) : null
+    const line: Line = p
+      ? { ...lineFromProduct(p, { source: wid ? 'voorraad' : 'bestelling', warehouse_id: wid }), key: k++ }
+      : { ...lineFromProduct({ id: '', name: a.name, sale_price: a.price ?? 0, vat_rate: 21 } as never, { source: 'bestelling' }), article: a, key: k++ }
+    setLines((v) => [...v, line])
+  }
+
   const setHandling = (l: Line, v: 'meenemen' | 'voorraad' | 'bestelling') => {
     if (v === 'bestelling') return patch(l.key, { source: 'bestelling', take_now: false, warehouse_id: null })
     const showroom = warehouses.find((w) => w.kind === 'winkel' && freeAt(l.product_id, w.id) >= l.qty)
@@ -97,6 +121,7 @@ export function OrderForm({ id }: { id?: string }) {
   }, 0))
 
   const save = async () => {
+    if (lines.some((l) => !l.product_id && !l.article)) return toast(tx("Kies bij elke regel een product of verwijder de regel."), true)
     const payload = lines.map(({ key: _k, ...l }) => (id ? l : (({ id: _i, ...r }) => r)(l as Line & { id?: string })) as OrderLineInput)
     if (existing) {
       if (await run((db) => updateOrder(db, id!, { header: h, lines: payload }), tx("Verkooporder opgeslagen"))) go(`orders-${id}`)
@@ -144,6 +169,7 @@ export function OrderForm({ id }: { id?: string }) {
 
           <section className="panel">
             <div className="panel-head"><h2>{tx("Producten")}</h2><button className="btn sm" type="button" onClick={addLine}><Plus size={14} />{tx("Product toevoegen")}</button></div>
+            <div style={{ marginBottom: 12 }}><SearchSourceChips value={sources} onChange={setSources} /></div>
             {lines.length === 0 && <Empty>{tx("Voeg het eerste product toe.")}</Empty>}
             <div className="stack">
               {lines.map((l) => {
@@ -153,9 +179,21 @@ export function OrderForm({ id }: { id?: string }) {
                 const others = l.product_id ? warehouses.filter((w) => w.id !== l.warehouse_id && freeAt(l.product_id, w.id) > 0) : []
                 return (
                   <div key={l.key} style={{ borderBottom: '1px solid var(--line)', paddingBottom: 14 }}>
-                    {l.product_id && <div className="small" style={{ marginBottom: 4 }}><span className="muted">{tx("Artikelnummer")}: </span><Sku code={s.products.find((p) => p.id === l.product_id)?.sku} /></div>}
+                    {(l.product_id || l.article) && (() => {
+                      const art = lineArticle(l)
+                      return (
+                        <div className="small" style={{ marginBottom: 4, display: 'flex', gap: 10, alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap' }}>
+                          <span style={{ minWidth: 0 }}>
+                            <span className="muted">{tx("Artikelnummer")}: </span><span className="strong">{art?.article_number ?? productOf(l.product_id)?.sku}</span>
+                            {art && <><span className="muted"> · {tx("Artikelnummer leverancier")}: </span>{art.supplier_sku}<span className="muted"> · {s.suppliers.find((x) => x.id === art.supplier_id)?.name}</span></>}
+                            {l.article && !l.product_id && <span className="muted"> · {tx("Komt bij opslaan onder Beheer")}</span>}
+                          </span>
+                          {art && <button type="button" className="btn sm" onClick={() => setElementsFor(art)}><Layers size={14} />{tx("Elementen")}{l.article && 'element_count' in l.article ? ` (${(l.article as { element_count: number }).element_count})` : ''}</button>}
+                        </div>
+                      )
+                    })()}
                     <div className="form-grid">
-                      <Field className="span-2" label={tx("Product")}>{(fid) => <Combo id={fid} value={l.product_id} options={prodOptions} placeholder={tx("Zoek op naam of artikelnummer")} onChange={(v) => pickProduct(l.key, v)} />}</Field>
+                      <Field className="span-2" label={tx("Product")}>{(fid) => <ArticleSearch id={fid} label={l.description || productOf(l.product_id)?.name || ''} sources={sources} onPick={(p) => pickArticle(l.key, p)} />}</Field>
                       <TextField label={tx("Uitvoering")} value={l.options} onChange={(v) => patch(l.key, { options: v })} placeholder={tx("Stof, kleur, afwerking")} />
                       <NumberField label={tx("Aantal")} value={l.qty} min={Math.max(1, locked)} step="1" hint={locked ? tx("{0} staat op een levering", locked) : undefined} onChange={(v) => patch(l.key, { qty: v })} />
                       <NumberField label={tx("Prijs incl. IVA")} value={l.unit_price} step="0.01" min={0} onChange={(v) => patch(l.key, { unit_price: v })} />
@@ -247,6 +285,7 @@ export function OrderForm({ id }: { id?: string }) {
         </div>
       </div>
 
+      {elementsFor && <ElementsModal article={elementsFor} onAdd={addArticleLine} onClose={() => setElementsFor(null)} />}
       {newCust && (
         <Modal wide title={tx("Nieuwe klant")} onClose={() => setNewCust(null)} footer={<>
           <button className="btn" onClick={() => setNewCust(null)}>{tx("Annuleren")}</button>

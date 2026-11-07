@@ -5,7 +5,7 @@ import { App } from './App'
 import { LocalDriver } from './data/localDriver'
 import { createSupabase, SupabaseDriver } from './data/supabaseDriver'
 import { renameOldSuppliers, restoreSettings, restoreSuppliers, seedDemo } from './domain/demo'
-import { importCatalog, importShowroom, importShowroomDetails } from './domain/services'
+import { importCatalog, importShowroom, importShowroomDetails, syncCatalogArticles } from './domain/services'
 import { AppProvider } from './ui/app-context'
 import { LogoFull } from './ui/kit'
 import './styles.css'
@@ -25,6 +25,8 @@ async function loadCatalogFiles(d: LocalDriver) {
   if (!(await d.list('supplier_catalog_items')).length) await load('supplier_catalog_items.csv', importCatalog)
   if (!(await d.list('supplier_showroom_items')).length) await load('supplier_showroom_items.csv', importShowroom)
   if (!(await d.list('supplier_showroom_details')).length) await load('supplier_showroom_details.csv', importShowroomDetails)
+  // Eigen artikelnummers voor alle artikelen en elementen. In de browser in het geheugen; met de database blijven ze bewaard.
+  try { await syncCatalogArticles(d) } catch { /* zonder nummers blijven de catalogi bruikbaar */ }
 }
 
 // Eén driver per paginabezoek, ook als React een effect dubbel uitvoert.

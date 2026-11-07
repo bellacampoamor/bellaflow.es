@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Plus } from 'lucide-react'
 import type { Customer, DocumentLanguage, Language, Product, Salesperson, Settings, Supplier, Warehouse } from '../data/types'
-import { saveRecord, saveSettings, type PrefixField } from '../domain/services'
+import { saveRecord, saveSettings, saveSupplier, type PrefixField } from '../domain/services'
 import { useApp } from '../ui/app-context'
 import { AreaField, Check, eur, Head, Modal, NumberField, Pill, SelectField, Tabs, TextField } from '../ui/kit'
 import { CustomerFields } from './OrderForm'
@@ -54,8 +54,8 @@ export function Admin() {
       </table></div></section>}
 
       {tab === 'leveranciers' && <section className="panel"><div className="table-wrap"><table>
-        <thead><tr><th>{tx("Naam")}</th><th>{tx("Postcode")}</th><th>{tx("Plaats")}</th><th>{tx("Land")}</th><th>{tx("Contact")}</th><th className="num">{tx("Levertijd")}</th></tr></thead>
-        <tbody>{s.suppliers.map((x) => <tr key={x.id} className="click" onClick={() => setSu(x)}><td className="strong">{x.name}</td><td className="muted">{x.postal_code || '–'}</td><td>{x.city}</td><td>{x.country}</td><td className="muted">{x.contact_name || x.email || '–'}</td><td className="num">{x.lead_time_days} {tx("dagen")}</td></tr>)}</tbody>
+        <thead><tr><th>{tx("Naam")}</th><th>{tx("Afkorting")}</th><th>{tx("Postcode")}</th><th>{tx("Plaats")}</th><th>{tx("Land")}</th><th>{tx("Contact")}</th><th className="num">{tx("Levertijd")}</th></tr></thead>
+        <tbody>{s.suppliers.map((x) => <tr key={x.id} className="click" onClick={() => setSu(x)}><td className="strong">{x.name}</td><td>{x.code || '–'}</td><td className="muted">{x.postal_code || '–'}</td><td>{x.city}</td><td>{x.country}</td><td className="muted">{x.contact_name || x.email || '–'}</td><td className="num">{x.lead_time_days} {tx("dagen")}</td></tr>)}</tbody>
       </table></div></section>}
 
       {tab === 'klanten' && <section className="panel"><div className="table-wrap"><table>
@@ -188,11 +188,12 @@ export function Admin() {
 
       {su && <Modal wide title={su.id ? su.name : tx("Leverancier toevoegen")} onClose={() => setSu(null)} footer={<>
         <button className="btn" onClick={() => setSu(null)}>{tx("Annuleren")}</button>
-        <button className="btn primary" onClick={async () => { if (need(su.name, tx("Vul de naam in.")) && await run((db) => saveRecord(db, 'suppliers', su as Supplier), tx("Leverancier opgeslagen"))) setSu(null) }}>{tx("Opslaan")}</button>
+        <button className="btn primary" onClick={async () => { if (need(su.name, tx("Vul de naam in.")) && await run((db) => saveSupplier(db, su as Supplier), tx("Leverancier opgeslagen"))) setSu(null) }}>{tx("Opslaan")}</button>
       </>}>
         <div className="form-grid">
           <TextField className="span-2" label={tx("Naam")} value={su.name} onChange={(v) => setSu({ ...su, name: v })} />
           <TextField label={tx("BTW-nummer")} value={su.vat_number} onChange={(v) => setSu({ ...su, vat_number: v })} />
+          <TextField label={tx("Afkorting (3 letters)")} value={su.code ?? ''} onChange={(v) => setSu({ ...su, code: v.toUpperCase().replace(/[^A-Z]/g, '').slice(0, 3) })} hint={tx("Begin van het eigen artikelnummer, bijvoorbeeld LOL-LOU-0000000001. Wijzigen geldt alleen voor nieuwe artikelen.")} />
           <TextField label={tx("Contactpersoon")} value={su.contact_name} onChange={(v) => setSu({ ...su, contact_name: v })} />
           <TextField label={tx("E-mail")} value={su.email} onChange={(v) => setSu({ ...su, email: v })} />
           <TextField label={tx("Telefoon")} value={su.phone} onChange={(v) => setSu({ ...su, phone: v })} />

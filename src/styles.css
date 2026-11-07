@@ -489,3 +489,11 @@ body.route-dragging, body.route-dragging * { cursor: grabbing !important; user-s
 .cat-specs > div { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; padding: 7px 0; border-bottom: 1px solid var(--line); }
 .cat-specs > div:last-child { border-bottom: 0; }
 .cat-specs dd { text-align: right; }
+
+/* Artikel zoeken in de verkooporder: eigen en leveranciersartikelnummer, naam, prijs. */
+.article-list .article-row { display: grid; grid-template-columns: 48px minmax(0, 1fr) auto; gap: 10px; align-items: center; border-bottom: 1px solid var(--line); }
+.article-list .article-row:last-child { border-bottom: 0; }
+.article-row .cat-photo.thumb { width: 48px; height: 48px; }
+.article-main { display: flex; flex-direction: column; min-width: 0; }
+.article-main > span { overflow: hidden; text-overflow: ellipsis; }
+.article-side { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; text-align: right; white-space: nowrap; }

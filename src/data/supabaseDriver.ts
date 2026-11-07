@@ -1,8 +1,9 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import type { Driver } from './driver'
-import type { EmailAttachment, Snapshot, TableName } from './types'
+import type { ArticleHit, ArticleQuery, CatalogArticle, CatalogArticleElement, EmailAttachment, Snapshot, TableName } from './types'
 
 const PAGE = 1000
+const ARTICLE_COLUMNS = 'id, article_number, supplier_id, supplier_sku, ean, name, category_code, series, price, currency, image_url, source, active, created_at'
 
 export function createSupabase(url: string, key: string) {
   return createClient(url, key)
@@ -47,6 +48,86 @@ export class SupabaseDriver implements Driver {
     const { error } = await this.sb.functions.invoke('send-email', { body: { id } })
     if (error) throw new Error(error.message)
     return 'sent' as const
+  }
+  async searchArticles(q: ArticleQuery) {
+    if (!q.q.trim()) return []
+    const { data, error } = await this.sb.rpc('search_catalog_articles', { p_q: q.q, p_suppliers: q.supplierIds ?? null, p_limit: q.limit ?? 30 })
+    if (error) throw new Error(error.message)
+    return (data ?? []).map(toNumbers) as ArticleHit[]
+  }
+  async findArticles(f: { ids?: string[]; numbers?: string[]; supplierId?: string; skus?: string[] }) {
+    const out: CatalogArticle[] = []
+    const keys = f.ids ?? f.numbers ?? f.skus ?? []
+    for (let i = 0; i < keys.length; i += 200) {
+      let query = this.sb.from('catalog_articles').select(ARTICLE_COLUMNS)
+      query = f.ids ? query.in('id', keys.slice(i, i + 200)) : f.numbers ? query.in('article_number', keys.slice(i, i + 200)) : query.eq('supplier_id', f.supplierId!).in('supplier_sku', keys.slice(i, i + 200))
+      const { data, error } = await query
+      if (error) throw new Error(error.message)
+      out.push(...((data ?? []) as unknown as Record<string, unknown>[]).map(toNumbers) as unknown as CatalogArticle[])
+    }
+    return out
+  }
+  async articleElements(parentId: string) {
+    const { data, error } = await this.sb.from('catalog_article_elements').select('position, element_id').eq('parent_id', parentId).order('position')
+    if (error) throw new Error(error.message)
+    const rows = (data ?? []) as { element_id: string }[]
+    const arts = await this.findArticles({ ids: rows.map((r) => r.element_id) })
+    const counts = new Map<string, number>()
+    if (arts.length) {
+      const { data: sub, error: e2 } = await this.sb.from('catalog_article_elements').select('parent_id').in('parent_id', arts.map((a) => a.id))
+      if (e2) throw new Error(e2.message)
+      for (const r of (sub ?? []) as { parent_id: string }[]) counts.set(r.parent_id, (counts.get(r.parent_id) ?? 0) + 1)
+    }
+    const byId = new Map(arts.map((a) => [a.id, a]))
+    return rows.map((r) => byId.get(r.element_id)).filter((a): a is CatalogArticle => !!a).map((a) => ({ ...a, element_count: counts.get(a.id) ?? 0 }))
+  }
+  async articleParents(elementId: string) {
+    const { data, error } = await this.sb.from('catalog_article_elements').select('parent_id').eq('element_id', elementId)
+    if (error) throw new Error(error.message)
+    return this.findArticles({ ids: ((data ?? []) as { parent_id: string }[]).map((r) => r.parent_id) })
+  }
+  async articleCounts() {
+    const out: { supplier_id: string; n: number }[] = []
+    const { data, error } = await this.sb.from('suppliers').select('id')
+    if (error) throw new Error(error.message)
+    for (const { id } of (data ?? []) as { id: string }[]) {
+      const { count, error: e2 } = await this.sb.from('catalog_articles').select('id', { count: 'exact', head: true }).eq('supplier_id', id).eq('active', true)
+      if (e2) throw new Error(e2.message)
+      if (count) out.push({ supplier_id: id, n: count })
+    }
+    return out
+  }
+  async articleIndex() {
+    const page = async <T,>(table: string, cols: string, order: string) => {
+      const rows: T[] = []
+      for (let from = 0; ; from += PAGE) {
+        const { data, error } = await this.sb.from(table).select(cols).order(order).range(from, from + PAGE - 1)
+        if (error) throw new Error(error.message)
+        rows.push(...((data ?? []) as unknown as Record<string, unknown>[]).map(toNumbers) as unknown as T[])
+        if (!data || data.length < PAGE) break
+      }
+      return rows
+    }
+    const [articles, links] = await Promise.all([
+      page<CatalogArticle>('catalog_articles', ARTICLE_COLUMNS, 'article_number'),
+      page<CatalogArticleElement>('catalog_article_elements', 'parent_id, element_id, position', 'parent_id'),
+    ])
+    return { articles, links }
+  }
+  async saveArticles(articles: CatalogArticle[], links: CatalogArticleElement[]) {
+    for (let i = 0; i < articles.length; i += 500) {
+      const { error } = await this.sb.from('catalog_articles').upsert(articles.slice(i, i + 500) as never)
+      if (error) throw new Error(error.message)
+    }
+    for (let i = 0; i < links.length; i += 1000) {
+      const { error } = await this.sb.from('catalog_article_elements').upsert(links.slice(i, i + 1000) as never, { onConflict: 'parent_id,element_id', ignoreDuplicates: true })
+      if (error) throw new Error(error.message)
+    }
+  }
+  async reserveArticleNumbers(count: number) {
+    const { data, error } = await this.sb.rpc('reserve_article_numbers', { p_count: count })
+    if (error) throw new Error(error.message)
+    return Number(data)
   }
   async nextNumber(series: string, year: number) {
     const { data, error } = await this.sb.rpc('next_number', { p_series: series, p_year: year })

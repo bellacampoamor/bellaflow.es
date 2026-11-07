@@ -7,6 +7,8 @@ import { importSupplierFile } from '../domain/services'
 import { showroomOf, showroomParts } from '../domain/showroom'
 import { ShowroomList } from './CatalogShowroom'
 import { useApp } from '../ui/app-context'
+import { ArticleNumbers, useArticleNumbers, useStoredElements } from '../ui/ArticleSearch'
+import { categoryName } from '../domain/articles'
 import { BackToTop, CatalogPhoto as Photo, Empty, Tabs, eur, fmtDate, Head, Modal, Pager, Pill } from '../ui/kit'
 import { tx } from '../i18n'
 
@@ -43,6 +45,7 @@ export function Catalogs({ supplierId }: { supplierId: string }) {
   const goPage = (p: number) => { setPage(p); listTop.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }) }
   const open = s.supplier_catalog_items.find((x) => x.id === openId)
   const countOf = useMemo(() => elementCounts(s.supplier_catalog_items), [s])
+  const nrs = useArticleNumbers(supplier?.id, shown.map((x) => x.supplier_sku))
 
   const pick = (id: string) => { setQ(''); setCategory(''); setPage(1); setSource(null); location.hash = `catalogi-${id}` }
   const onFile = async (f: File | undefined) => {
@@ -98,11 +101,11 @@ export function Catalogs({ supplierId }: { supplierId: string }) {
             <div className="table-wrap"><table>
               <thead><tr><th></th><th>{tx("Artikelnummer")}</th><th>{tx("Artikel")}</th><th>{tx("Categorie")}</th><th>{tx("Voorraad webshop")}</th><th className="num">{tx("Adviesprijs")}</th><th></th></tr></thead>
               <tbody>{shown.map((x) => {
-                const own = productForItem(s, x)
+                const own = productForItem(s, x) ?? nrs.product(x.supplier_sku)
                 return (
                   <tr key={x.id} className="click" onClick={() => setOpenId(x.id)}>
                     <td style={{ width: 64 }}><Photo url={x.image_urls[0]?.url} alt={x.name} className="thumb" /></td>
-                    <td className="strong" style={{ whiteSpace: 'nowrap' }}>{x.supplier_sku}</td>
+                    <td style={{ whiteSpace: 'nowrap' }}><ArticleNumbers own={nrs.article(x.supplier_sku)?.article_number} supplier={x.supplier_sku} /></td>
                     <td><span className="strong">{x.name}</span>{x.short_description_html && <div className="muted small cat-short">{plainText(x.short_description_html)}</div>}</td>
                     <td>{mainCategory(x) || '–'}{subCategory(x) && <div className="muted small">{subCategory(x)}</div>}</td>
                     <td>{x.stock_status ? <Pill tone={STOCK_STATUS[x.stock_status] ?? ''}>{stockLabel(x.stock_status)}</Pill> : '–'}</td>
@@ -119,18 +122,24 @@ export function Catalogs({ supplierId }: { supplierId: string }) {
       )}
 
       <BackToTop />
-      {open && <ArticleCard key={open.id} item={open} onOpen={setOpenId} onClose={() => setOpenId(null)} />}
+      {open && <ArticleCard key={open.id} supplierId={supplier?.id} item={open} onOpen={setOpenId} onClose={() => setOpenId(null)} />}
     </>
   )
 }
 
-function ArticleCard({ item, onOpen, onClose }: { item: SupplierCatalogItem; onOpen: (id: string) => void; onClose: () => void }) {
+function ArticleCard({ supplierId, item, onOpen, onClose }: { supplierId?: string; item: SupplierCatalogItem; onOpen: (id: string) => void; onClose: () => void }) {
   const { s } = useApp()
   const elements = useMemo(() => elementsOf(s, item), [s, item])
   const series = seriesCode(item.supplier_sku)
   const [photo, setPhoto] = useState(0)
   const images = item.image_urls
-  const own = productForItem(s, item)
+  const nrs = useArticleNumbers(supplierId, [item.supplier_sku, ...elements.map((x) => x.supplier_sku)])
+  const art = nrs.article(item.supplier_sku)
+  const own = productForItem(s, item) ?? nrs.product(item.supplier_sku)
+  // Vastgelegde elementen gaan voor de berekening op serie; die koppeling blijft bestaan als de leverancier zijn lijst wijzigt.
+  const stored = useStoredElements(art)
+  const rows = stored && stored.length ? stored.map((a) => ({ a, x: s.supplier_catalog_items.find((y) => y.supplier_name === item.supplier_name && y.supplier_sku === a.supplier_sku) }))
+    : elements.map((x) => ({ a: nrs.article(x.supplier_sku), x }))
   const free = useMemo(() => {
     if (!own) return 0
     const hand = onHandMap(s), res = reservedMap(s)
@@ -155,9 +164,10 @@ function ArticleCard({ item, onOpen, onClose }: { item: SupplierCatalogItem; onO
         </div>
         <div className="cat-facts">
           <dl className="cat-dl">
-            <dt>{tx("Artikelnummer")}</dt><dd className="strong">{item.supplier_sku}</dd>
+            <dt>{tx("Artikelnummer")}</dt><dd className="strong">{art?.article_number ?? '–'}</dd>
+            <dt>{tx("Artikelnummer leverancier")}</dt><dd>{item.supplier_sku}</dd>
             <dt>{tx("Leverancier")}</dt><dd>{item.supplier_name}</dd>
-            <dt>{tx("Categorie")}</dt><dd>{item.categories.length ? item.categories.map((c) => c.name).join(' › ') : '–'}</dd>
+            <dt>{tx("Categorie")}</dt><dd>{art ? categoryName(art.category_code) : '–'}{item.categories.length > 0 && <div className="muted small">{tx("Leverancier")}: {item.categories.map((c) => c.name).join(' › ')}</div>}</dd>
             {type && <><dt>{tx("Soort")}</dt><dd>{type}</dd></>}
             <dt>{tx("Voorraad webshop")}</dt><dd>{item.stock_status ? <Pill tone={STOCK_STATUS[item.stock_status] ?? ''}>{stockLabel(item.stock_status)}</Pill> : '–'}</dd>
             <dt>{tx("Adviesprijs")}</dt><dd className="strong">{money(item.price_regular, item.currency)}</dd>
@@ -173,15 +183,21 @@ function ArticleCard({ item, onOpen, onClose }: { item: SupplierCatalogItem; onO
         </div>
       </div>
       {item.description_html && <div className="cat-description" dangerouslySetInnerHTML={{ __html: safeHtml(item.description_html) }} />}
-      {series && elements.length > 0 && (
+      {rows.length > 0 && (
         <section className="cat-elements">
-          <h3>{tx("Elementen")} <span className="muted small">({elements.length})</span></h3>
-          <p className="muted small" style={{ margin: 0 }}>{tx("Losse artikelen uit dezelfde serie ({0}) die bij deze set besteld kunnen worden, volgens het artikelnummer van de leverancier.", series)}</p>
+          <h3>{tx("Elementen")} <span className="muted small">({rows.length})</span></h3>
+          {series && <p className="muted small" style={{ margin: 0 }}>{tx("Losse artikelen uit dezelfde serie ({0}) die bij deze set besteld kunnen worden, volgens het artikelnummer van de leverancier.", series)}</p>}
           <div className="table-wrap flush"><table>
             <thead><tr><th></th><th>{tx("Artikelnummer")}</th><th>{tx("Artikel")}</th><th>{tx("Categorie")}</th><th className="num">{tx("Adviesprijs")}</th></tr></thead>
             <tbody>
-              {elements.map((x) => (
-                <tr key={x.id} className="click" onClick={() => onOpen(x.id)}><td><Photo url={x.image_urls[0]?.url} alt={x.name} className="thumb" /></td><td className="strong" style={{ whiteSpace: 'nowrap' }}>{x.supplier_sku}</td><td>{x.name}</td><td>{subCategory(x) || mainCategory(x) || '–'}</td><td className="num" style={{ whiteSpace: 'nowrap' }}><Price item={x} /></td></tr>
+              {rows.map(({ a, x }) => (
+                <tr key={a?.id ?? x?.id} className={x ? 'click' : ''} onClick={() => x && onOpen(x.id)}>
+                  <td><Photo url={x?.image_urls[0]?.url ?? a?.image_url} alt={x?.name ?? a?.name ?? ''} className="thumb" /></td>
+                  <td style={{ whiteSpace: 'nowrap' }}><ArticleNumbers own={a?.article_number} supplier={x?.supplier_sku ?? a?.supplier_sku ?? ''} /></td>
+                  <td>{x?.name ?? a?.name}{!x && <div className="muted small">{tx("Niet meer in de catalogus van de leverancier")}</div>}</td>
+                  <td>{x ? subCategory(x) || mainCategory(x) || '–' : a ? categoryName(a.category_code) : '–'}</td>
+                  <td className="num" style={{ whiteSpace: 'nowrap' }}>{x ? <Price item={x} /> : a?.price != null ? eur(a.price) : '–'}</td>
+                </tr>
               ))}
             </tbody>
           </table></div>

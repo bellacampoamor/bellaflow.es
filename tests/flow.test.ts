@@ -1,5 +1,8 @@
 import { readdirSync, readFileSync } from 'node:fs'
-import { PGlite } from '@electric-sql/pglite'
+import { PGlite as BasePGlite } from '@electric-sql/pglite'
+import { pg_trgm } from '@electric-sql/pglite/contrib/pg_trgm'
+// De migraties gebruiken pg_trgm voor het zoeken in catalogusartikelen, zoals Supabase die aanbiedt.
+class PGlite extends BasePGlite { constructor() { super({ extensions: { pg_trgm } }) } }
 import { PDFDocument } from 'pdf-lib'
 import type { EmailAttachment } from '../src/data/types'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
