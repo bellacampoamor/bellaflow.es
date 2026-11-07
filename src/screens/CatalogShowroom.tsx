@@ -6,6 +6,7 @@ import { countBy, partOf, productForShowroom, showroomCategories, showroomOf, sh
 import { useApp } from '../ui/app-context'
 import { ArticleNumbers, useArticleNumbers, useStoredElements } from '../ui/ArticleSearch'
 import { categoryName } from '../domain/articles'
+import { requiredProperties, variantsOf } from '../domain/properties'
 import { CatalogPhoto as Photo, Empty, eur, fmtDate, Modal, Pager, Pill } from '../ui/kit'
 import { tx } from '../i18n'
 
@@ -100,6 +101,8 @@ function ShowroomCard({ supplierId, item, parts, parent, specs, fromShowroom, on
     return s.warehouses.reduce((n, w) => n + (hand.get(stockKey(own.id, w.id)) ?? 0) - (res.get(stockKey(own.id, w.id)) ?? 0), 0)
   }, [s, own])
   const part = partOf(item.name)
+  const props = requiredProperties(item)
+  const variants = useMemo(() => variantsOf(s.supplier_showroom_items, item), [s, item])
   const safeUrl = /^https:\/\//i.test(item.product_url) ? item.product_url : ''
   return (
     <Modal wide title={item.name} onClose={onClose} footer={<>
@@ -123,6 +126,7 @@ function ShowroomCard({ supplierId, item, parts, parent, specs, fromShowroom, on
             <dt>{tx("Prijs")}</dt><dd className="strong">{price(item)}</dd>
             {part && <><dt>{tx("Onderdeel")}</dt><dd>{tx("Deel {0} van {1}", part.n, part.of)}</dd></>}
             {parent && <><dt>{tx("Element van")}</dt><dd><button type="button" className="linklike" onClick={() => onOpen(parent.id)}>{parent.name}</button></dd></>}
+            {props.length > 0 && <><dt>{tx("Bij bestellen invullen")}</dt><dd>{props.join(', ')}</dd></>}
           </dl>
           {own ? (
             <div className="note"><span className="strong">{tx("In assortiment")}</span>: {own.name}, {tx("verkoopprijs")} {eur(own.sale_price)}, {tx("{0} vrij op voorraad", free)}.</div>
@@ -133,6 +137,21 @@ function ShowroomCard({ supplierId, item, parts, parent, specs, fromShowroom, on
         <section className="cat-elements">
           <h3>{tx("Product specificaties")}</h3>
           <dl className="cat-dl cat-specs">{specs.map((x, i) => <div key={i}><dt>{x.label}</dt><dd>{x.value || '–'}</dd></div>)}</dl>
+        </section>
+      )}
+      {variants.length > 0 && (
+        <section className="cat-elements">
+          <h3>{tx("Andere uitvoeringen")} <span className="muted small">({variants.length})</span></h3>
+          <div className="table-wrap flush"><table>
+            <thead><tr><th>{tx("Artikelnummer leverancier")}</th><th>{tx("Artikel")}</th><th className="num">{tx("Prijs")}</th></tr></thead>
+            <tbody>{variants.map((x) => (
+              <tr key={x.id} className="click" onClick={() => onOpen(x.id)}>
+                <td style={{ whiteSpace: 'nowrap' }}>{x.supplier_sku}</td>
+                <td>{x.name}</td>
+                <td className="num" style={{ whiteSpace: 'nowrap' }}>{price(x)}</td>
+              </tr>
+            ))}</tbody>
+          </table></div>
         </section>
       )}
       {rows.length > 0 && (

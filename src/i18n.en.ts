@@ -1151,4 +1151,9 @@ export const en: Record<string, string> = {
   "{0}, {1} ({2})": "{0}, {1} ({2})",
   "Voeg het eerste product toe, of neem de regels over uit een verkooporder.": "Add the first product, or take over the lines from a sales order.",
   "Regels uit een verkooporder gaan bij het aanmaken van de proforma-inkooporder af.": "Lines from a sales order are removed from the proforma purchase order when this is created.",
+  "Vul bij {0} nog in: {1}.": "Still to fill in for {0}: {1}.",
+  "{0} (verplicht)": "{0} (required)",
+  "Overige uitvoering": "Other options",
+  "Bij bestellen invullen": "To fill in when ordering",
+  "Andere uitvoeringen": "Other versions",
 }

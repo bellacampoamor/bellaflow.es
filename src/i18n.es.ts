@@ -1151,4 +1151,9 @@ export const es: Record<string, string> = {
   "{0}, {1} ({2})": "{0}, {1} ({2})",
   "Voeg het eerste product toe, of neem de regels over uit een verkooporder.": "Añade el primer producto o toma las líneas de un pedido de venta.",
   "Regels uit een verkooporder gaan bij het aanmaken van de proforma-inkooporder af.": "Las líneas de un pedido de venta se quitan del pedido de compra proforma al crearlo.",
+  "Vul bij {0} nog in: {1}.": "Falta rellenar en {0}: {1}.",
+  "{0} (verplicht)": "{0} (obligatorio)",
+  "Overige uitvoering": "Otras opciones",
+  "Bij bestellen invullen": "A rellenar al pedir",
+  "Andere uitvoeringen": "Otras versiones",
 }

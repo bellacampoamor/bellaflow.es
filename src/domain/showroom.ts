@@ -26,6 +26,8 @@ export function showroomItemFromCsv(r: Record<string, string>): Omit<SupplierSho
     product_url: (r.product_url ?? '').trim(), scraped_at: (r.scraped_at ?? '').trim() || new Date().toISOString(),
     ...(r.active !== undefined && r.active !== '' ? { active: r.active === 'true' } : {}),
     ...(r.listed !== undefined && r.listed !== '' ? { listed: r.listed === 'true' } : {}),
+    ...(r.properties ? { properties: r.properties.split('|').map((x) => x.trim()).filter(Boolean) } : {}),
+    ...(r.parent_sku?.trim() ? { parent_sku: r.parent_sku.trim() } : {}),
   }
 }
 

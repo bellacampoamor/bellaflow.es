@@ -46,6 +46,10 @@ export interface SupplierShowroomItem {
   image_url: string; product_url: string; scraped_at: string
   /** Gezet door de nachtelijke sync: false = niet meer in de showroom; listed false = alleen als element. */
   active?: boolean; listed?: boolean
+  /** Eigenschappen die bij bestellen ingevuld moeten worden, zoals Stofkleur of Pootkleur (HA-CO). */
+  properties?: string[]
+  /** Artikelnummer van de leverancier waar dit een andere uitvoering van is (HA-CO: Parent). */
+  parent_sku?: string
 }
 /** Details van een showroomartikel van de productpagina: specificaties en de elementen die erbij besteld kunnen worden. */
 export interface ShowroomSpec { label: string; value: string }

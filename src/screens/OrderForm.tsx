@@ -4,6 +4,7 @@ import type { CatalogArticle, Customer, Fulfilment, Payment } from '../data/type
 import { inboundByProduct, lineTotal, onHandMap, plannedQty, reservedMap, round2, stockKey, todayISO, vatBreakdown } from '../domain/calc'
 import { catalogArticlesByNumber, confirmProforma, createOrder, lineFromProduct, saveProforma, saveRecord, splitLinesForStock, updateOrder, type OrderHeader, type OrderLineInput } from '../domain/services'
 import { priceWithSurcharge } from '../domain/articles'
+import { formatOptions, missingProperties, parseOptions, requiredProperties, showroomItemForArticle } from '../domain/properties'
 import { ArticleSearch, ElementsModal, SearchSourceChips, useSearchSources, type ArticlePick } from '../ui/ArticleSearch'
 import { loadSnapshot } from '../data/driver'
 import { go, useApp } from '../ui/app-context'
@@ -65,6 +66,15 @@ export function OrderForm({ id }: { id?: string }) {
   const custOptions = useMemo(() => s.customers.map((c) => ({ value: c.id, label: c.company || c.name, sub: [c.company ? c.name : '', c.city, c.phone].filter(Boolean).join(', '), search: `${c.email} ${c.tax_id}` })), [s.customers])
   const productOf = (pid: string) => s.products.find((p) => p.id === pid)
   const lineArticle = (l: Line) => l.article ?? arts.get(productOf(l.product_id)?.catalog_article_number ?? '')
+  // Verplichte eigenschappen van de leverancier (HA-CO: Stofkleur, Pootkleur, ...), in te vullen op de regel.
+  const propsOf = (l: Line) => requiredProperties(showroomItemForArticle(s, lineArticle(l)))
+  const firstMissing = () => {
+    for (const l of lines) {
+      const m = missingProperties(l.options, propsOf(l))
+      if (m.length) return tx("Vul bij {0} nog in: {1}.", l.description || productOf(l.product_id)?.name || '', m.join(', '))
+    }
+    return null
+  }
   const numbers = lines.map((l) => productOf(l.product_id)?.catalog_article_number).filter((x): x is string => !!x && !arts.has(x))
   useEffect(() => {
     if (!numbers.length) return
@@ -127,6 +137,8 @@ export function OrderForm({ id }: { id?: string }) {
 
   const save = async () => {
     if (lines.some((l) => !l.product_id && !l.article)) return toast(tx("Kies bij elke regel een product of verwijder de regel."), true)
+    const missing = firstMissing()
+    if (missing) return toast(missing, true)
     const payload = lines.map(({ key: _k, ...l }) => (id ? l : (({ id: _i, ...r }) => r)(l as Line & { id?: string })) as OrderLineInput)
     if (isProforma) {
       const ok = await run((db) => confirmProforma(db, id!, { header: h, lines: payload, deposit: deposit > 0 ? { amount: deposit, method: depositMethod, reference: depositRef } : undefined }), tx("Proforma bevestigd, de verkooporder heeft nu zijn VO-nummer"))
@@ -210,7 +222,15 @@ export function OrderForm({ id }: { id?: string }) {
                     })()}
                     <div className="form-grid">
                       <Field className="span-2" label={tx("Product")}>{(fid) => <ArticleSearch id={fid} label={l.description || productOf(l.product_id)?.name || ''} sources={sources} onPick={(p) => pickArticle(l.key, p)} />}</Field>
-                      <TextField label={tx("Uitvoering")} value={l.options} onChange={(v) => patch(l.key, { options: v })} placeholder={tx("Stof, kleur, afwerking")} />
+                      {(() => {
+                        const props = propsOf(l)
+                        if (!props.length) return <TextField label={tx("Uitvoering")} value={l.options} onChange={(v) => patch(l.key, { options: v })} placeholder={tx("Stof, kleur, afwerking")} />
+                        const { values, rest } = parseOptions(l.options, props)
+                        return <>
+                          {props.map((p) => <TextField key={p} label={tx("{0} (verplicht)", p)} value={values[p] ?? ''} onChange={(v) => patch(l.key, { options: formatOptions({ ...values, [p]: v }, props, rest) })} />)}
+                          <TextField label={tx("Overige uitvoering")} value={rest} onChange={(v) => patch(l.key, { options: formatOptions(values, props, v) })} placeholder={tx("Stof, kleur, afwerking")} />
+                        </>
+                      })()}
                       <NumberField label={tx("Aantal")} value={l.qty} min={Math.max(1, locked)} step="1" hint={locked ? tx("{0} staat op een levering", locked) : undefined} onChange={(v) => patch(l.key, { qty: v })} />
                       <NumberField label={tx("Prijs incl. IVA")} value={l.unit_price} step="0.01" min={0} onChange={(v) => patch(l.key, { unit_price: v })} />
                       <NumberField label={tx("Korting %")} value={l.discount_pct} step="0.5" min={0} onChange={(v) => patch(l.key, { discount_pct: v })} />
