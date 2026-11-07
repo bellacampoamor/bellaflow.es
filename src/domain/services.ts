@@ -14,7 +14,7 @@ import { DETAIL_COLUMNS, SHOWROOM_COLUMNS, showroomDetailFromCsv, showroomItemFr
 import {
   addDays, depositAvailable, freeAt, linesToPurchase, invoicedDeliveryLineIds, lineTotal, onHandMap, orderLines, plannedQty, round2,
   shipmentLineOpen, shippedQty, stockKey, todayISO, vatBreakdown,
-  inboundWarehouse, scanWarehouse,
+  inboundWarehouse, scanWarehouse, shipmentIsOpen, defaultReceiptWarehouse,
 } from './calc'
 
 export class FlowError extends Error {}
@@ -59,13 +59,14 @@ export async function createPurchaseOrder(db: Driver, input: PurchaseInput) {
   if (!input.supplier_id) fail(tx("Kies een leverancier."))
   if (!input.lines.length || input.lines.some((l) => !l.product_id || l.qty <= 0)) fail(tx("Voeg minimaal één regel toe met product en aantal."))
   const warehouses = await db.list('warehouses')
-  const warehouseId = input.warehouse_id ?? inboundWarehouse(warehouses)?.id
-  if (!warehouseId) fail(tx("Stel onder Beheer een actief magazijn in waar de route start."))
   const transports = await db.list('transports')
   const supplier = (await db.list('suppliers')).find((x) => x.id === input.supplier_id)
   // Regels voor een klant maken het altijd een verkoop-inkoop; anders volgt het label de keuze of de bestemming.
-  const destination = warehouses.find((w) => w.id === warehouseId)
-  const label: PurchaseLabel = input.lines.some((l) => l.sales_order_line_id) ? 'verkoop' : input.label ?? (destination?.kind === 'winkel' ? 'showroom' : 'magazijn')
+  const given = warehouses.find((w) => w.id === input.warehouse_id)
+  const label: PurchaseLabel = input.lines.some((l) => l.sales_order_line_id) ? 'verkoop' : input.label ?? (given?.kind === 'winkel' ? 'showroom' : 'magazijn')
+  // Voorgestelde locatie bij ontvangst: de showroom voor label Showroom, anders het magazijn waar de route start. Bij inboeken te wijzigen.
+  const warehouseId = input.warehouse_id ?? defaultReceiptWarehouse(warehouses, label)?.id
+  if (!warehouseId) fail(tx("Stel onder Beheer een actief magazijn in waar de route start."))
   // Regels voor een verkooporder: nooit meer inkopen dan nog nodig is, en alleen bij de leverancier van het artikel.
   const snap = await loadSnapshot(db)
   const open = linesToPurchase(snap)
@@ -89,7 +90,7 @@ export async function createPurchaseOrder(db: Driver, input: PurchaseInput) {
     const transport = transports.find((t) => t.id === (transport_id ?? input.transport_id))
     // Zonder transport is de datum alleen een interne schatting; het scherm toont hem pas na koppeling.
     const expected = transport?.arrival_date ?? addDays(input.order_date, supplier?.lead_time_days ?? 21)
-    await db.insert('inbound_shipments', [{ id: sid, purchase_order_id: id, sequence, expected_date: expected, original_date: expected, warehouse_id: (warehouse_id ?? warehouseId)!, carrier: transport?.carrier ?? '', status: 'expected', notes: '', transport_id: transport?.id ?? null }])
+    await db.insert('inbound_shipments', [{ id: sid, purchase_order_id: id, sequence, expected_date: expected, original_date: expected, warehouse_id: (warehouse_id ?? warehouseId)!, carrier: transport?.carrier ?? '', status: 'expected', notes: '', transport_id: transport?.id ?? null, nl_received_at: transport ? input.order_date : null }])
     await db.insert('inbound_shipment_lines', [{ id: newId(), shipment_id: sid, purchase_order_line_id: polId, qty: line.qty }])
   }
   // Wat nu definitief is ingekocht, verdwijnt van de proforma.
@@ -148,7 +149,10 @@ export async function syncPurchaseProformas(db: Driver) {
   for (const p of proformas) if (!left.some((l) => l.purchase_order_id === p.id)) await db.remove('purchase_orders', p.id)
 }
 
-/** Zet aangevinkte proforma-inkooporders om: per leverancier één definitieve inkooporder met IO-nummer. */
+/**
+ * Zet proforma-inkooporders om naar definitieve inkooporders (besluit Rick 7 november 2026: per verkooporder, niet gebundeld).
+ * Elke proforma (één verkooporder, één leverancier) wordt één inkooporder met een IO-nummer.
+ */
 export async function convertPurchaseProformas(db: Driver, input: { ids: string[]; order_date: string; supplier_reference?: string }) {
   if (!input.ids.length) fail(tx("Selecteer minimaal één proforma-inkooporder."))
   if (!input.order_date) fail(tx("Vul de besteldatum in."))
@@ -156,17 +160,30 @@ export async function convertPurchaseProformas(db: Driver, input: { ids: string[
   const s = await loadSnapshot(db)
   const chosen = input.ids.map((id) => s.purchase_orders.find((p) => p.id === id && p.status === 'proforma') ?? fail(tx("Een van de proforma's bestaat niet meer of is al omgezet. Ververs het overzicht.")))
   const ids: string[] = []
-  for (const supplier_id of new Set(chosen.map((p) => p.supplier_id))) {
-    const group = chosen.filter((p) => p.supplier_id === supplier_id)
-    const lines = s.purchase_order_lines.filter((l) => group.some((p) => p.id === l.purchase_order_id))
-    for (const p of group) await db.remove('purchase_orders', p.id)
+  for (const p of chosen) {
+    const lines = s.purchase_order_lines.filter((l) => l.purchase_order_id === p.id)
+    await db.remove('purchase_orders', p.id)
     for (const l of lines) await db.remove('purchase_order_lines', l.id)
     ids.push(await createPurchaseOrder(db, {
-      supplier_id, order_date: input.order_date, supplier_reference: input.supplier_reference ?? '', notes: '', label: 'verkoop',
+      supplier_id: p.supplier_id, order_date: input.order_date, supplier_reference: input.supplier_reference ?? '', notes: '', label: 'verkoop',
       lines: lines.map((l) => ({ product_id: l.product_id, qty: l.qty, unit_cost: l.unit_cost, sales_order_line_id: l.sales_order_line_id })),
     }))
   }
   return ids
+}
+
+/** Registreert dat inkoopregels in Nederland klaarstaan (null maakt het ongedaan, zolang de regel niet op een transport staat). */
+export async function markReceivedInNl(db: Driver, shipmentIds: string[], date: string | null) {
+  if (!shipmentIds.length) fail(tx("Selecteer minimaal één inkoopregel."))
+  const s = await loadSnapshot(db)
+  for (const id of shipmentIds) {
+    const x = s.inbound_shipments.find((r) => r.id === id) ?? (fail(tx("Inkoopregel niet gevonden.")) as never)
+    if (!shipmentIsOpen(x)) fail(tx("Deze regel is al ontvangen in Spanje."))
+    if (!date && x.transport_id) fail(tx("Deze regel staat al op een transport. Koppel hem eerst los."))
+    const po = s.purchase_orders.find((p) => p.id === x.purchase_order_id)
+    if (date && po && date < po.order_date) fail(tx("De datum in Nederland kan niet voor de besteldatum liggen."))
+  }
+  for (const id of shipmentIds) await db.update('inbound_shipments', id, { nl_received_at: date })
 }
 
 export async function closeShipment(db: Driver, shipmentId: string, reason: string) {
@@ -218,6 +235,7 @@ export async function assignShipmentsToTransport(db: Driver, shipmentIds: string
   for (const id of shipmentIds) {
     const x = s.inbound_shipments.find((r) => r.id === id) ?? (fail(tx("Inkoopregel niet gevonden.")) as never)
     if (x.status === 'received' || x.status === 'closed') fail(tx("Deze regel is al ontvangen."))
+    if (t && !x.nl_received_at) fail(tx("Een regel kan pas op een transport als hij in Nederland is ontvangen."))
     const current = s.transports.find((r) => r.id === x.transport_id)
     if (current && current.status !== 'planned') fail(tx("Dit transport is al vertrokken. De regel kan er niet meer af."))
   }
@@ -249,8 +267,10 @@ export interface ReceiptInput { transport_id?: string | null; received_date: str
 
 export async function receiveGoods(db: Driver, input: ReceiptInput) {
   const s = await loadSnapshot(db)
-  const standard = inboundWarehouse(s.warehouses)?.id
-  const rows = input.rows.filter((r) => r.qty_received > 0 || r.qty_damaged > 0).map((r) => ({ ...r, warehouse_id: r.warehouse_id ?? standard as string }))
+  // Zonder keuze komt het binnen op de voorgestelde locatie van de inkoopregel.
+  const planned = (slId: string) => s.inbound_shipments.find((x) => x.id === s.inbound_shipment_lines.find((l) => l.id === slId)?.shipment_id)?.warehouse_id
+  const rows = input.rows.filter((r) => r.qty_received > 0 || r.qty_damaged > 0).map((r) => ({ ...r, warehouse_id: r.warehouse_id || planned(r.shipment_line_id) || inboundWarehouse(s.warehouses)?.id as string }))
+  if (rows.some((r) => !s.warehouses.some((w) => w.id === r.warehouse_id && w.is_active))) fail(tx("Kies bij elke regel een actieve locatie."))
   if (!rows.length) fail(tx("Vul bij minimaal één regel een ontvangen aantal in."))
   if (rows.some((r) => !r.warehouse_id)) fail(tx("Stel onder Beheer een actief magazijn in waar de route start."))
   const perLine = new Map<string, number>()

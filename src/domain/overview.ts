@@ -94,7 +94,7 @@ export function overview(s: Snapshot, today = todayISO()) {
     { key: 'pro', flow: 'sell', n: salesProformas.length, label: 'Proforma-verkooporders', href: ordersHref('opvolgen', 'proforma'), urgent: false },
     { key: 'plannen', flow: 'sell', n: toPlan.length, label: 'Verkooporders te plannen', href: ordersHref('opvolgen', 'planning'), urgent: false },
     { key: 'pf', flow: 'bill', n: toBill.length, label: 'Proforma\'s te factureren', href: '#facturatie', urgent: false },
-    { key: 'pio', flow: 'buy', n: purchaseProformas.length, label: 'Proforma-inkooporders om te zetten', href: '#inkoop-proforma', urgent: false },
+    { key: 'pio', flow: 'buy', n: purchaseProformas.length, label: 'Proforma-inkooporders om te zetten', href: '#inkoop-lijst-opvolgen-proforma', urgent: false },
   ].filter((a) => a.n > 0) as OverviewAction[]
 
   const links = { proformas: ordersHref('opvolgen', 'proforma'), toPlan: ordersHref('opvolgen', 'planning'), waiting: ordersHref('alle', 'goederen'), all: ordersHref('alle') }

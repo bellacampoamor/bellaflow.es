@@ -299,9 +299,17 @@ export const articleNo = (s: Snapshot, productId: string | null | undefined) => 
 /** Voorlopig komt alle inkoop binnen op het magazijn waar de route start (Magazijn Campoamor). Verhuizen kan daarna via Voorraad. */
 export const inboundWarehouse = (warehouses: Warehouse[]) => warehouses.find((w) => w.is_route_origin && w.is_active && w.receives_goods)
 
-/** Waar een inkoopregel terechtkomt: nog open is altijd het vaste magazijn, ontvangen is waar hij is ingeboekt. */
-export const shipmentDestination = (s: Snapshot, x: InboundShipment) =>
-  (shipmentIsOpen(x) ? inboundWarehouse(s.warehouses) : s.warehouses.find((w) => w.id === x.warehouse_id))?.name ?? ''
+/** Voorgestelde locatie bij ontvangst: Showroom Campoamor voor label Showroom, anders het magazijn waar de route start. */
+export const defaultReceiptWarehouse = (warehouses: Warehouse[], label: string | undefined) =>
+  (label === 'showroom' ? warehouses.find((w) => w.kind === 'winkel' && w.is_active && w.receives_goods) : undefined) ?? inboundWarehouse(warehouses)
+
+/** Waar een inkoopregel terechtkomt: nog open is de voorgestelde locatie (bij inboeken te wijzigen), ontvangen is waar hij is ingeboekt. */
+export function shipmentDestination(s: Snapshot, x: InboundShipment) {
+  const lineIds = new Set(s.inbound_shipment_lines.filter((l) => l.shipment_id === x.id).map((l) => l.id))
+  const booked = [...new Set(s.goods_receipt_lines.filter((r) => lineIds.has(r.shipment_line_id) && r.qty_received > 0).map((r) => r.warehouse_id))]
+  if (booked.length) return booked.map((id) => s.warehouses.find((w) => w.id === id)?.name ?? '').join(', ')
+  return s.warehouses.find((w) => w.id === x.warehouse_id)?.name ?? inboundWarehouse(s.warehouses)?.name ?? ''
+}
 
 // Rapportage -------------------------------------------------------------------
 

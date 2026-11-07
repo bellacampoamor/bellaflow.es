@@ -66,7 +66,9 @@ export function Receipts() {
   const history = [...s.goods_receipts].sort((a, b) => b.received_date.localeCompare(a.received_date) || b.number.localeCompare(a.number))
   return (
     <>
-      <Head title={tx("Goederenontvangst")} sub={tx("Boek per transport in wat er binnenkomt, op de locatie waar het echt ligt. Eén regel mag over meerdere locaties verdeeld worden.")} />
+      <Head title={tx("Goederenontvangst")} sub={tx("Boek per transport in wat er binnenkomt, op de locatie waar het echt ligt. Eén regel mag over meerdere locaties verdeeld worden.")}>
+        <a className="btn" href="#rapportage-leverbaar">{tx("Welke verkooporders zijn leverbaar?")}</a>
+      </Head>
       <TransportPicker value="" />
       <div className="stack">
         <section className="panel">
@@ -110,7 +112,7 @@ export function Receipts() {
   )
 }
 
-interface Row { key: number; shipment_line_id: string; qty_received: number; qty_damaged: number; location_bin: string }
+interface Row { key: number; shipment_line_id: string; warehouse_id: string; qty_received: number; qty_damaged: number; location_bin: string }
 let k = 1
 
 export function ReceiptForm({ transportId }: { transportId: string }) {
@@ -118,10 +120,12 @@ export function ReceiptForm({ transportId }: { transportId: string }) {
   const transport = s.transports.find((t) => t.id === transportId)
   const [notes, setNotes] = useState('')
   const [rows, setRows] = useState<Row[]>(() => openLinesOnTransport(s, transportId).map((l) => ({
-    key: k++, shipment_line_id: l.id, qty_received: shipmentLineOpen(s, l.id), qty_damaged: 0, location_bin: '',
+    // Voorstel: de locatie van de inkoopregel (Showroom voor label Showroom, anders Magazijn Campoamor). Per regel te wijzigen.
+    key: k++, shipment_line_id: l.id, warehouse_id: s.inbound_shipments.find((x) => x.id === l.shipment_id)?.warehouse_id ?? inboundWarehouse(s.warehouses)?.id ?? '', qty_received: shipmentLineOpen(s, l.id), qty_damaged: 0, location_bin: '',
   })))
   if (!transport) return <div className="panel">{tx("Transport niet gevonden.")} <a href="#ontvangst">{tx("Terug naar ontvangst")}</a>.</div>
-  const standard = inboundWarehouse(s.warehouses)?.name
+  const locations = s.warehouses.filter((w) => w.is_active && w.receives_goods)
+  const nameOf = (id: string) => s.warehouses.find((w) => w.id === id)?.name ?? ''
   const lineInfo = (lineId: string) => {
     const sl = s.inbound_shipment_lines.find((l) => l.id === lineId)!
     const pol = s.purchase_order_lines.find((l) => l.id === sl.purchase_order_line_id)!
@@ -134,7 +138,8 @@ export function ReceiptForm({ transportId }: { transportId: string }) {
   const missing = [...received].reduce((n, [id, got]) => n + Math.max(0, shipmentLineOpen(s, id) - got), 0)
   const save = async () => {
     const ok = await run((db) => receiveGoods(db, { transport_id: transportId, received_date: todayISO(), delivery_note: '', received_by: '', notes, rows: rows.map(({ key: _k, ...r }) => r) }), tx("Goederen ingeboekt, voorraad bijgewerkt"))
-    if (ok) go('ontvangst')
+    // Daarna de match: welke verkooporders kunnen nu worden afgeleverd.
+    if (ok) go('rapportage-leverbaar')
   }
   return (
     <>
@@ -144,7 +149,7 @@ export function ReceiptForm({ transportId }: { transportId: string }) {
       {rows.length > 0 && <div className="stack">
         <section className="panel">
           <h2>{tx("Goederenontvangst")}</h2>
-          <p className="muted small" style={{ marginTop: -6 }}>{tx("Vul per regel in wat er daadwerkelijk is ontvangen. Wat ontbreekt blijft open staan.")}</p>
+          <p className="muted small" style={{ marginTop: -6 }}>{tx("Vul per regel in wat er daadwerkelijk is ontvangen en kies de locatie: Showroom Campoamor, Magazijn Campoamor of Magazijn Almoradí. Wat ontbreekt blijft open staan.")}</p>
           <div className="table-wrap"><table>
             <thead><tr><th style={{ minWidth: 200 }}>{tx("Product")}</th><th>{tx("Inkooporder")}</th><th className="num">{tx("Besteld")}</th><th style={{ minWidth: 190 }}>{tx("Locatie")}</th><th>{tx("Ontvangen/Geteld")}</th></tr></thead>
             <tbody>{rows.map((r) => {
@@ -156,14 +161,16 @@ export function ReceiptForm({ transportId }: { transportId: string }) {
                   <td><span className="strong">{p.name}</span><Sku code={p.sku} />{so && <div className="small"><Pill tone="sell">{tx("Voor {0}", so.number)}</Pill></div>}</td>
                   <td className="muted">{po.number}</td>
                   <td className="num">{shipmentLineOpen(s, r.shipment_line_id)}</td>
-                  <td>{standard}</td>
+                  <td><select aria-label={tx("Locatie voor {0}", p.name)} value={r.warehouse_id} onChange={(e) => patch(r.key, { warehouse_id: e.target.value })}>
+                    {locations.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
+                  </select></td>
                   <td><input className="qty" aria-label={tx("Ontvangen/Geteld {0}", p.name)} type="number" min={0} value={r.qty_received} onChange={(e) => patch(r.key, { qty_received: Number(e.target.value) })} /></td>
                 </tr>
               )
             })}</tbody>
           </table></div>
           <div className="note" style={{ marginTop: 14 }}>
-            {tx("Wordt ingeboekt:")} {total > 0 ? tx("{0} op {1}", total, standard) : tx("nog niets")}.
+            {tx("Wordt ingeboekt:")} {total > 0 ? [...new Set(rows.map((r) => r.warehouse_id))].map((w) => tx("{0} op {1}", rows.filter((r) => r.warehouse_id === w).reduce((n, r) => n + r.qty_received, 0), nameOf(w))).join(', ') : tx("nog niets")}.
             {missing > 0 && tx(" {0} stuks niet ontvangen, die blijven open staan.", missing)}
           </div>
         </section>

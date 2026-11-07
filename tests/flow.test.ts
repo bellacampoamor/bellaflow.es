@@ -12,7 +12,7 @@ import { TABLES } from '../src/data/types'
 import { archiveRows, openLinesOnTransport, linePurchaseStatus, linesToPurchase, documentLanguage, flowCounts, freeAt, transportLoad, invoiceBalance, onHandMap, orderStage, reservedMap, stockKey, vatBreakdown , invoiceReport, periodRange, invoiceQrUrl, hasTaxId, driverStops } from '../src/domain/calc'
 import { renameOldSuppliers, restoreSettings, restoreSuppliers, seedDemo } from '../src/domain/demo'
 import {
-  importShowroom, importShowroomDetails, importSupplierFile, createDelivery, createInvoice, markDeliveriesReady, createOrder, createPurchaseOrder, invoiceProformas, lineFromProduct, markDelivered, assignShipmentsToTransport, cancelTransport, convertPurchaseProformas, syncPurchaseProformas, cancelOrder, cancelPurchaseOrder, createTransport, markReady, receiveGoods, rescheduleDelivery, rescheduleOrder, saveRouteOrder, saveSettings, mailSignedNote, setPurchaseLabel, signDelivery, splitLinesForStock, setDeliveryInTransit, setTransportStatus, updateTransport, transferStock,
+  importShowroom, importShowroomDetails, importSupplierFile, createDelivery, createInvoice, markDeliveriesReady, createOrder, createPurchaseOrder, invoiceProformas, lineFromProduct, markDelivered, assignShipmentsToTransport, cancelTransport, convertPurchaseProformas, syncPurchaseProformas, markReceivedInNl, cancelOrder, cancelPurchaseOrder, createTransport, markReady, receiveGoods, rescheduleDelivery, rescheduleOrder, saveRouteOrder, saveSettings, mailSignedNote, setPurchaseLabel, signDelivery, splitLinesForStock, setDeliveryInTransit, setTransportStatus, updateTransport, transferStock,
 } from '../src/domain/services'
 import { estimateMatrix, parseRouterTable } from '../src/data/geo'
 import { dropIndex, googleMapsRouteUrl, moveItem, optimizeRoute, tourCost } from '../src/domain/route'
@@ -393,19 +393,26 @@ describe('transport en labels', () => {
     await expect(assignShipmentsToTransport(db, [shipment.id], null)).rejects.toThrow(/al vertrokken/)
     await expect(cancelTransport(db, transport)).rejects.toThrow(/al vertrokken/)
   })
-  it('zonder keuze komt alle inkoop binnen op Magazijn Campoamor, ook de ontvangst', async () => {
+  it('stelt de locatie voor per label en boekt in waar gekozen wordt (Showroom, Magazijn Campoamor of Almoradí)', async () => {
     const s = await loadSnapshot(db)
     const campoamor = s.warehouses.find((w) => w.is_route_origin)!
-    expect(campoamor.name).toBe('Magazijn Campoamor')
+    const showroom = s.warehouses.find((w) => w.kind === 'winkel')!
+    const almoradi = s.warehouses.find((w) => w.name === 'Magazijn Almoradí')!
     const product = s.products[0]
-    const id = await createPurchaseOrder(db, { supplier_id: s.suppliers[0].id, order_date: TODAY, supplier_reference: '', notes: '', label: 'showroom', lines: [{ product_id: product.id, qty: 2, unit_cost: 1, sales_order_line_id: null }] })
-    const after = await loadSnapshot(db)
-    const shipment = after.inbound_shipments.find((x) => x.purchase_order_id === id)!
-    expect(shipment.warehouse_id).toBe(campoamor.id)
-    const line = after.inbound_shipment_lines.find((l) => l.shipment_id === shipment.id)!
-    await receiveGoods(db, { received_date: TODAY, delivery_note: '', received_by: '', notes: '', rows: [{ shipment_line_id: line.id, qty_received: 2, qty_damaged: 0, location_bin: '' }] })
+    const make = (label: 'showroom' | 'magazijn') => createPurchaseOrder(db, { supplier_id: s.suppliers[0].id, order_date: TODAY, supplier_reference: '', notes: '', label, lines: [{ product_id: product.id, qty: 2, unit_cost: 1, sales_order_line_id: null }] })
+    const shipOf = async (id: string) => (await loadSnapshot(db)).inbound_shipments.find((x) => x.purchase_order_id === id)!
+    const forShowroom = await shipOf(await make('showroom'))
+    const forStock = await shipOf(await make('magazijn'))
+    expect(forShowroom.warehouse_id).toBe(showroom.id)
+    expect(forStock.warehouse_id).toBe(campoamor.id)
+    const lineOf = async (x: { id: string }) => (await loadSnapshot(db)).inbound_shipment_lines.find((l) => l.shipment_id === x.id)!.id
+    // Zonder keuze: de voorgestelde locatie. Met keuze: daar.
+    await receiveGoods(db, { received_date: TODAY, delivery_note: '', received_by: '', notes: '', rows: [
+      { shipment_line_id: await lineOf(forShowroom), qty_received: 2, qty_damaged: 0, location_bin: '' },
+      { shipment_line_id: await lineOf(forStock), warehouse_id: almoradi.id, qty_received: 2, qty_damaged: 0, location_bin: '' },
+    ] })
     const moves = (await loadSnapshot(db)).stock_movements.filter((m) => m.kind === 'ontvangst' && m.product_id === product.id && m.moved_at === TODAY)
-    expect(moves[moves.length - 1].warehouse_id).toBe(campoamor.id)
+    expect(moves.map((m) => m.warehouse_id).sort()).toEqual([showroom.id, almoradi.id].sort())
   })
   it('annuleren koppelt zendingen los', async () => {
     const { shipment, transport } = await setup()
@@ -510,7 +517,7 @@ describe('proforma-inkooporders', () => {
     expect(after.purchase_orders.some((p) => p.id === pol.purchase_order_id)).toBe(false)
   })
 
-  it('omzetten maakt per leverancier één inkooporder, gekoppeld aan de regels en het transport', async () => {
+  it('omzetten maakt per proforma (verkooporder en leverancier) één inkooporder, niet gebundeld', async () => {
     const s = await loadSnapshot(db)
     const queue = linesToPurchase(s)
     const proformas = s.purchase_orders.filter((p) => p.status === 'proforma')
@@ -518,7 +525,8 @@ describe('proforma-inkooporders', () => {
     expect(suppliersIn.size).toBeGreaterThan(1)
     const transport = s.transports.find((t) => t.status === 'planned')!
     const ids = await convertPurchaseProformas(db, { ids: proformas.map((p) => p.id), order_date: TODAY })
-    expect(ids).toHaveLength(suppliersIn.size)
+    expect(ids).toHaveLength(proformas.length)
+    expect(proformas.length).toBeGreaterThan(suppliersIn.size)
     const after = await loadSnapshot(db)
     expect(after.purchase_orders.filter((p) => p.status === 'proforma')).toHaveLength(0)
     expect(ids.every((id) => after.purchase_orders.find((p) => p.id === id)!.status === 'open')).toBe(true)
@@ -527,7 +535,8 @@ describe('proforma-inkooporders', () => {
     // Elke regel eigen rij, nog zonder transport. Na koppelen volgt de verwachte datum uit het transport.
     const rows = after.inbound_shipments.filter((x) => ids.includes(x.purchase_order_id))
     expect(rows).toHaveLength(queue.length)
-    expect(rows.every((x) => x.transport_id === null)).toBe(true)
+    expect(rows.every((x) => x.transport_id === null && !x.nl_received_at)).toBe(true)
+    await markReceivedInNl(db, [rows[0].id], TODAY)
     await assignShipmentsToTransport(db, [rows[0].id], transport.id)
     const linked = await loadSnapshot(db)
     expect(linked.inbound_shipments.find((x) => x.id === rows[0].id)).toMatchObject({ transport_id: transport.id, expected_date: transport.arrival_date })
@@ -752,10 +761,10 @@ describe('vertalingen', () => {
     const missing = files.flatMap((f) => [...readFileSync(`src/${f}`, 'utf8').matchAll(/\btx\(("(?:[^"\\\\]|\\\\.)*")/g)].map((m) => JSON.parse(m[1]) as string)).filter((k) => !(k in en))
     expect(missing).toEqual([])
   })
-  it('heeft een Engelse tekst voor elke fasetekst van de verkoop-flow', () => {
+  it('heeft een Engelse tekst voor elke fasetekst van de verkoop-flow en de inkoop-flow', () => {
     // Fasen en hun teksten staan als gewone tekst in het domein; het scherm vertaalt ze met tx().
-    const texts = [...readFileSync('src/domain/orderFlow.ts', 'utf8').matchAll(/'([A-Z{][^'\\]*(?:\\'[^'\\]*)*)'/g)].map((m) => m[1].replace(/\\'/g, "'")).filter((t) => t.trim() === t)
-    expect(texts.length).toBeGreaterThan(30)
+    const texts = ['src/domain/orderFlow.ts', 'src/domain/purchaseFlow.ts'].flatMap((f) => [...readFileSync(f, 'utf8').matchAll(/'([A-Z{][^'\\]*(?:\\'[^'\\]*)*)'/g)].map((m) => m[1].replace(/\\'/g, "'"))).filter((t) => t.trim() === t)
+    expect(texts.length).toBeGreaterThan(60)
     expect(texts.filter((k) => !(k in en))).toEqual([])
   })
 })

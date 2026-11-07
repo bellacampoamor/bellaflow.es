@@ -1,77 +1,122 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { ArrowRight, FileText, Plus, Trash2 } from 'lucide-react'
-import { inboundWarehouse, linesToPurchase, round2, shipmentDestination, shipmentIsOpen, todayISO } from '../domain/calc'
-import { assignShipmentsToTransport, cancelPurchaseOrder, createPurchaseOrder, setPurchaseLabel } from '../domain/services'
+import { defaultReceiptWarehouse, inboundWarehouse, linesToPurchase, round2, shipmentDestination, shipmentIsOpen, todayISO } from '../domain/calc'
+import { assignShipmentsToTransport, cancelPurchaseOrder, createPurchaseOrder, markReceivedInNl, setPurchaseLabel, syncPurchaseProformas } from '../domain/services'
+import { followRank, inOrdersTab } from '../domain/orderFlow'
+import { PURCHASE_PHASE_LABEL, PURCHASE_PHASES, PURCHASE_TABS, purchaseActiveIn, purchaseFlow, purchasesHref, type PurchasePhaseKey, type PurchaseTab } from '../domain/purchaseFlow'
+import { FlowTrack, MiniTrack, NextStep, PhaseCell, PURCHASE_DEFS, PURCHASE_PHASE_ICON, phaseText } from '../ui/OrderFlowTrack'
 import type { PurchaseLabel } from '../data/types'
 import { tx } from '../i18n'
 import { go, useApp } from '../ui/app-context'
 import { AreaField, Combo, Empty, eur, fmtDate, Head, Modal, Pill, SelectField, Sku, Tabs, TextField, type Tone } from '../ui/kit'
-import { ConvertProformaModal, PurchaseProformas, salesOrdersOf } from './PurchaseQueue'
+import { ConvertProformaModal, linesWithoutSupplier, proformasInSync, purchaseValue, salesOrdersOf } from './PurchaseQueue'
 
 type Snap = ReturnType<typeof useApp>['s']
 
-/** Stand van een inkooporder. Ingekocht is altijd alles; de vraag is of elke regel op een transport staat. */
-export function poProgress(s: Snap, poId: string) {
-  const lines = s.inbound_shipments.filter((x) => x.purchase_order_id === poId)
-  return { total: lines.length, planned: lines.filter((x) => x.transport_id).length, received: lines.filter((x) => !shipmentIsOpen(x)).length }
-}
+type PurchaseFilter = PurchaseTab
 
-export function Purchases({ tab: initialTab = 'orders' }: { tab?: 'proforma' | 'orders' } = {}) {
-  const { s } = useApp()
-  const proformaCount = s.purchase_orders.filter((p) => p.status === 'proforma').length
-  const [tab, setTab] = useState<'proforma' | 'orders'>(initialTab)
+/**
+ * Inkooporders als flow van links naar rechts (besluit Rick 7 november 2026), net als Verkooporders:
+ * Proforma → Inkooporder → Ontvangen in NL → Transport → Ontvangst in Spanje → Aflevering.
+ * Proforma's staan er ook in; omzetten gaat per proforma (per verkooporder), niet gebundeld.
+ */
+export function Purchases({ tab = 'opvolgen', phase: initialPhase = null }: { tab?: PurchaseTab; phase?: PurchasePhaseKey | null } = {}) {
+  const { s, run } = useApp()
+  const today = todayISO()
+  const inSync = proformasInSync(s)
+  useEffect(() => { if (!inSync) void run((db) => syncPurchaseProformas(db)) }, [inSync, run])
+  const [filter, setFilterState] = useState<PurchaseFilter>(tab)
+  const [phase, setPhaseState] = useState<PurchasePhaseKey | null>(initialPhase)
   const [labelFilter, setLabelFilter] = useState<PurchaseLabel | ''>('')
   const [supplierFilter, setSupplierFilter] = useState('')
-  const all = s.purchase_orders.filter((po) => po.status !== 'proforma').sort((a, b) => b.order_date.localeCompare(a.order_date) || b.number.localeCompare(a.number))
-  // De aantallen op de labels volgen de gekozen leverancier, zodat ze kloppen met wat je te zien krijgt.
-  const forSupplier = all.filter((po) => !supplierFilter || po.supplier_id === supplierFilter)
-  const rows = forSupplier.filter((po) => !labelFilter || (po.label ?? 'magazijn') === labelFilter)
-  const labelCount = (l: PurchaseLabel | '') => forSupplier.filter((po) => !l || (po.label ?? 'magazijn') === l).length
-  const usedSuppliers = s.suppliers.filter((x) => all.some((po) => po.supplier_id === x.id)).sort((a, b) => a.name.localeCompare(b.name))
+  const [q, setQ] = useState('')
+  const remember = (f: PurchaseFilter, p: PurchasePhaseKey | null) => history.replaceState(null, '', purchasesHref(f, p ?? undefined))
+  const setFilter = (f: PurchaseFilter) => { setFilterState(f); setPhaseState(null); remember(f, null) }
+  const setPhase = (p: PurchasePhaseKey | null) => { setPhaseState(p); remember(filter, p) }
+  const missing = linesWithoutSupplier(s)
+  const rows = useMemo(() => s.purchase_orders.map((po) => ({ po, flow: purchaseFlow(s, po, today), orders: salesOrdersOf(s, po.id) }))
+    .sort((a, b) => followRank(a.flow.follow) - followRank(b.flow.follow) || b.po.order_date.localeCompare(a.po.order_date) || b.po.number.localeCompare(a.po.number)), [s, today])
+  const t = q.trim().toLowerCase()
+  const supplierName = (id: string) => s.suppliers.find((x) => x.id === id)?.name ?? ''
+  const matches = (r: typeof rows[number]) => (!supplierFilter || r.po.supplier_id === supplierFilter) && (!labelFilter || (r.po.label ?? 'magazijn') === labelFilter)
+    && (!t || `${r.po.number} ${r.po.supplier_reference} ${supplierName(r.po.supplier_id)} ${r.orders.map((o) => o.number).join(' ')}`.toLowerCase().includes(t))
+  const inTab = rows.filter((r) => inOrdersTab(filter, r.flow.follow) && matches(r))
+  const shown = inTab.filter((r) => !phase || purchaseActiveIn(r.flow, phase))
+  const late = rows.filter((r) => r.flow.follow === 'te_laat' && matches(r)).length
+  const usedSuppliers = s.suppliers.filter((x) => s.purchase_orders.some((po) => po.supplier_id === x.id)).sort((a, b) => a.name.localeCompare(b.name))
   return (
     <>
-      <Head title={tx("Inkooporders")} sub={tx("Koop rechtstreeks in bij een leverancier met Nieuwe inkooporder, of zet een proforma om die vanzelf ontstaat uit een verkooporder met artikelen die niet op voorraad zijn.")}>
+      <Head title={tx("Inkooporders")} sub={tx("Elke inkooporder loopt van links naar rechts door de flow, van proforma tot aflevering aan de klant. Koperkleur vraagt actie, rood is te laat, blauw loopt, groen is klaar.")}>
         <a className="btn primary" href="#inkoop-nieuw"><Plus size={16} />{tx("Nieuwe inkooporder")}</a>
       </Head>
-      <Tabs<'proforma' | 'orders'> value={tab} onChange={(v) => { setTab(v); go(v === 'proforma' ? 'inkoop-proforma' : 'inkoop') }} tabs={[{ value: 'orders', label: tx("Inkooporders"), n: all.length }, { value: 'proforma', label: tx("Proforma"), n: proformaCount }]} />
-      {tab === 'proforma' && <PurchaseProformas onDone={() => { setTab('orders'); go('inkoop') }} />}
-      {tab === 'orders' && <section className="panel">
-        <div className="panel-head">
+      <section className="panel">
+        <div className="panel-head" style={{ alignItems: 'flex-end' }}>
+          <Tabs<PurchaseFilter> value={filter} onChange={setFilter} tabs={PURCHASE_TABS.map((f) => ({ value: f, label: { opvolgen: tx("Opvolgen"), loopt: tx("Loopt"), afgerond: tx("Afgerond"), alle: tx("Alles") }[f], n: rows.filter((r) => inOrdersTab(f, r.flow.follow) && matches(r)).length }))} />
+          <input style={{ maxWidth: 260, marginBottom: 14 }} aria-label={tx("Inkooporders zoeken")} placeholder={tx("Zoek op nummer, leverancier of verkooporder")} value={q} onChange={(e) => setQ(e.target.value)} />
+        </div>
+        <div className="panel-head" style={{ marginTop: -6 }}>
           <div className="chips" role="group" aria-label={tx("Filter op label")}>
             {([['', tx("Alle labels")], ['verkoop', tx("Verkoop")], ['magazijn', tx("Magazijn")], ['showroom', tx("Showroom")]] as [PurchaseLabel | '', string][]).map(([value, text]) => (
-              <button key={value || 'alle'} type="button" className={`chip${labelFilter === value ? ' on' : ''}`} aria-pressed={labelFilter === value} onClick={() => setLabelFilter(value)}>{text} <span>{labelCount(value)}</span></button>
+              <button key={value || 'alle'} type="button" className={`chip${labelFilter === value ? ' on' : ''}`} aria-pressed={labelFilter === value} onClick={() => setLabelFilter(value)}>{text}</button>
             ))}
           </div>
-          <select id="inkoop-leverancier" style={{ width: 'auto', maxWidth: 340 }} aria-label={tx("Filter op leverancier")} value={supplierFilter} onChange={(e) => setSupplierFilter(e.target.value)}>
+          <select style={{ width: 'auto', maxWidth: 'min(340px, 100%)' }} aria-label={tx("Filter op leverancier")} value={supplierFilter} onChange={(e) => setSupplierFilter(e.target.value)}>
             <option value="">{tx("Alle leveranciers")}</option>
             {usedSuppliers.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
           </select>
-          <span className="small muted">{tx("{0} van {1} inkooporders", rows.length, all.length)}</span>
         </div>
-        {rows.length === 0 && <Empty>{all.length ? tx("Geen inkooporders met dit filter.") : tx("Nog geen inkooporders. Maak de eerste met de knop rechtsboven.")}</Empty>}
-        <div className="table-wrap"><table>
-          <thead><tr><th aria-label="PDF" /><th>{tx("Nummer")}</th><th>{tx("Leverancier")}</th><th>{tx("Besteld")}</th><th>{tx("Label")}</th><th>{tx("Verkooporder")}</th><th>{tx("Referentie")}</th><th className="num">{tx("Op transport")}</th><th className="num">{tx("Waarde")}</th><th>{tx("Status")}</th></tr></thead>
-          <tbody>{rows.map((po) => {
-            const { total, planned, received } = poProgress(s, po.id)
-            const value = round2(s.purchase_order_lines.filter((l) => l.purchase_order_id === po.id).reduce((n, l) => n + l.qty * l.unit_cost, 0))
-            // Een inkooporder kan regels voor meerdere verkooporders hebben.
-            const salesOrders = salesOrdersOf(s, po.id)
-            const [label, tone]: [string, Tone] = po.status === 'cancelled' ? [tx("Geannuleerd"), ''] : received === total ? [tx("Ontvangen"), 'good'] : planned === total ? [tx("Ingepland"), 'info'] : [tx("Besteld"), 'warn']
+        {missing.length > 0 && (
+          <div className="note warn" style={{ marginBottom: 12 }}>
+            <strong>{tx("Geen leverancier bij het artikel, dus geen proforma:")}</strong>{' '}
+            {missing.map((l, i) => {
+              const o = s.sales_orders.find((x) => x.id === l.sales_order_id)
+              return <span key={l.id}>{i > 0 && ', '}<a className="rowlink" href={`#orders-${l.sales_order_id}`}>{o?.number}</a> {l.description}</span>
+            })}. <a href="#beheer">{tx("Vul de leverancier in onder Beheer.")}</a>
+          </div>
+        )}
+        <p className="small muted" style={{ marginTop: 0 }}>
+          {{ opvolgen: tx("Inkooporders waar iemand iets moet doen: proforma omzetten, op een transport zetten of inboeken. Wat te laat is staat bovenaan."), loopt: tx("Inkooporders die op schema lopen: bij de leverancier, onderweg, of ontvangen en verder in de verkooporder."), afgerond: tx("Ontvangen en, bij een verkooporder, geleverd aan de klant."), alle: tx("Alle inkooporders en proforma's, ook geannuleerde.") }[filter]}
+          {filter === 'opvolgen' && late > 0 && <> <strong style={{ color: 'var(--bad)' }}>{tx("{0} te laat.", late)}</strong></>}
+        </p>
+        {inTab.length === 0 && <Empty>{filter === 'opvolgen' ? tx("Niets op te volgen. Alles loopt.") : tx("Geen inkooporders in dit overzicht.")}</Empty>}
+        {inTab.length > 0 && <div className="table-wrap"><table className="flow-table">
+          <thead><tr>
+            <th aria-label="PDF" /><th>{tx("Inkooporder")}</th>
+            {PURCHASE_PHASES.map((k, i) => {
+              const Icon = PURCHASE_PHASE_ICON[k]
+              const n = inTab.filter((r) => purchaseActiveIn(r.flow, k)).length
+              return (
+                <th key={k} className={`ph-head${phase === k ? ' on' : ''}`}>
+                  <button type="button" onClick={() => setPhase(phase === k ? null : k)} aria-pressed={phase === k} title={phase === k ? tx("Filter op deze fase opheffen") : tx("Alleen inkooporders in deze fase")}>
+                    <span className="ph-head-n"><Icon size={14} />{i + 1}</span>
+                    <span className="ph-head-l">{tx(PURCHASE_PHASE_LABEL[k])}</span>
+                    <span className="ph-head-c">{n > 0 ? n : ''}</span>
+                  </button>
+                </th>
+              )
+            })}
+            <th>{tx("Volgende stap")}</th>
+          </tr></thead>
+          <tbody>{shown.map(({ po, flow, orders }) => {
+            const cur = (flow.phases.find((p) => p.state !== 'done' && p.state !== 'skip') ?? flow.phases[5]).key
             return (
-              <tr key={po.id} className="click" onClick={() => go(`inkoop-${po.id}`)}>
+              <tr key={po.id} className={`click fl-${flow.follow}${po.status === 'proforma' ? ' is-proforma' : ''}`} onClick={() => go(`inkoop-${po.id}`)}>
                 <td><a className="pdf-ic" href={`#inkoop-print-${po.id}`} title={tx("Inkooporder {0} afdrukken als PDF", po.number)} aria-label={tx("Inkooporder {0} afdrukken als PDF", po.number)} onClick={(e) => e.stopPropagation()}><FileText size={18} /><span>PDF</span></a></td>
-                <td><a className="rowlink" href={`#inkoop-${po.id}`}>{po.number}</a></td>
-                <td>{s.suppliers.find((x) => x.id === po.supplier_id)?.name}</td>
-                <td>{fmtDate(po.order_date)}</td><td><LabelPill label={po.label} /></td>
-                <td>{salesOrders.length ? salesOrders.map((o) => <div key={o.id}><a className="rowlink" href={`#orders-${o.id}`} onClick={(e) => e.stopPropagation()}>{o.number}</a></div>) : <span className="muted">–</span>}</td>
-                <td className="muted">{po.supplier_reference || '–'}</td>
-                <td className="num">{tx("{0} van {1} regels", planned, total)}</td><td className="num">{eur(value)}</td>
-                <td><Pill tone={tone}>{label}</Pill></td>
+                <td className="fl-who">
+                  <a className="rowlink" href={`#inkoop-${po.id}`}>{po.number}</a> <LabelPill label={po.label} />
+                  <div>{supplierName(po.supplier_id)}</div>
+                  <div className="muted small">{fmtDate(po.order_date)}, {eur(purchaseValue(s, po.id))}{orders.map((o) => <span key={o.id}>, <a href={`#orders-${o.id}`} onClick={(e) => e.stopPropagation()}>{o.number}</a></span>)}{po.status === 'cancelled' && <> <Pill>{tx("Geannuleerd")}</Pill></>}</div>
+                  <MiniTrack flow={flow} />
+                </td>
+                {flow.phases.map((p) => <td key={p.key} className="ph-td"><PhaseCell phase={p} defs={PURCHASE_DEFS} current={p.key === cur && flow.follow !== 'afgerond'} /></td>)}
+                <td className="fl-next"><NextStep flow={flow} defs={PURCHASE_DEFS} /></td>
               </tr>
             )
           })}</tbody>
-        </table></div>
-      </section>}
+        </table></div>}
+        {inTab.length > 0 && shown.length === 0 && <Empty>{tx("Geen inkooporders in deze fase.")}</Empty>}
+        {phase && <p className="small muted">{tx("Gefilterd op fase {0}.", tx(PURCHASE_PHASE_LABEL[phase]))} <button type="button" className="btn sm" onClick={() => setPhase(null)}>{tx("Toon alle fasen")}</button></p>}
+      </section>
     </>
   )
 }
@@ -80,10 +125,11 @@ const LABELS: Record<PurchaseLabel, [string, Tone]> = { showroom: ['Showroom', '
 // Testgegevens uit een oudere versie hebben nog geen label.
 export const LabelPill = ({ label = 'magazijn' }: { label?: PurchaseLabel }) => <Pill tone={LABELS[label][1]}>{tx(LABELS[label][0])}</Pill>
 
-export function PurchaseDetail({ id }: { id: string }) {
+export function PurchaseDetail({ id, convert: convertNow = false }: { id: string; convert?: boolean }) {
   const { s, run } = useApp()
   const [confirm, setConfirm] = useState(false)
-  const [convert, setConvert] = useState(false)
+  // Vanaf de verkooporder ("Inkooporder maken") opent het omzetten direct.
+  const [convert, setConvert] = useState(convertNow && s.purchase_orders.find((p) => p.id === id)?.status === 'proforma')
   const po = s.purchase_orders.find((p) => p.id === id)
   if (!po) return <div className="panel">{tx("Inkooporder niet gevonden.")} <a href="#inkoop">{tx("Terug naar inkoop")}</a>.</div>
   const lines = s.purchase_order_lines.filter((l) => l.purchase_order_id === id)
@@ -92,10 +138,12 @@ export function PurchaseDetail({ id }: { id: string }) {
   const supplier = s.suppliers.find((x) => x.id === po.supplier_id)
   const forSale = lines.some((l) => l.sales_order_line_id)
   const isProforma = po.status === 'proforma'
+  const flow = purchaseFlow(s, po)
+  const today = todayISO()
   const hasReceipts = lines.some((l) => s.goods_receipt_lines.some((r) => r.shipment_line_id === s.inbound_shipment_lines.find((x) => x.purchase_order_line_id === l.id)?.id))
   return (
     <>
-      <Head title={<>{po.number} {isProforma && <Pill tone="warn">{tx("Proforma")}</Pill>} {forSale && <LabelPill label="verkoop" />}</>} sub={isProforma ? tx("{0}, ontstaan op {1}", supplier?.name, fmtDate(po.order_date)) : tx("{0}, besteld op {1}{2}", supplier?.name, fmtDate(po.order_date), po.supplier_reference ? tx(", referentie {0}", po.supplier_reference) : '')} back={isProforma ? { href: '#inkoop-proforma', label: tx("Proforma-inkooporders") } : { href: '#inkoop', label: tx("Inkooporders") }}>
+      <Head title={<>{po.number} {isProforma && <Pill tone="warn">{tx("Proforma")}</Pill>} {forSale && <LabelPill label="verkoop" />}</>} sub={isProforma ? tx("{0}, ontstaan op {1}", supplier?.name, fmtDate(po.order_date)) : tx("{0}, besteld op {1}{2}", supplier?.name, fmtDate(po.order_date), po.supplier_reference ? tx(", referentie {0}", po.supplier_reference) : '')} back={{ href: '#inkoop', label: tx("Inkooporders") }}>
         {isProforma && <button className="btn primary" onClick={() => setConvert(true)}>{tx("Omzetten naar inkooporder")}<ArrowRight size={16} /></button>}
         {!forSale && <select style={{ width: 'auto' }} aria-label={tx("Label")} value={po.label ?? 'magazijn'} onChange={(e) => run((db) => setPurchaseLabel(db, id, e.target.value as PurchaseLabel), tx("Label aangepast"))}>
           <option value="showroom">{tx("Showroom")}</option>
@@ -104,6 +152,19 @@ export function PurchaseDetail({ id }: { id: string }) {
         {po.status === 'open' && !hasReceipts && <button className="btn danger" onClick={() => setConfirm(true)}>{tx("Inkooporder annuleren")}</button>}
       </Head>
       <div className="stack">
+        <section className="panel">
+          <FlowTrack flow={flow} defs={PURCHASE_DEFS} />
+          {flow.next && flow.follow !== 'geannuleerd' && !isProforma && (
+            <div className={`flow-next fl-${flow.follow}`}>
+              <div>
+                <span className="lbl">{flow.follow === 'wacht' ? tx("Loopt, nu geen actie") : flow.follow === 'te_laat' ? tx("Te laat, eerst doen") : tx("Volgende stap")}</span>
+                <strong>{tx(PURCHASE_PHASE_LABEL[flow.next.key])}: {phaseText(flow.next)}</strong>
+              </div>
+              {flow.next.href && flow.follow !== 'wacht' && <a className="btn primary" href={flow.next.href}>{tx("Naar {0}", tx(PURCHASE_PHASE_LABEL[flow.next.key]).toLowerCase())}</a>}
+            </div>
+          )}
+          {flow.follow === 'afgerond' && <div className="flow-next fl-afgerond"><strong>{tx("Afgerond: ontvangen en, bij een verkooporder, geleverd aan de klant.")}</strong></div>}
+        </section>
         {isProforma && (
           <div className="note proforma">
             <div>
@@ -115,7 +176,7 @@ export function PurchaseDetail({ id }: { id: string }) {
         <section className="panel">
           <h2>{isProforma ? tx("Producten") : tx("Bestelde producten")}</h2>
           <div className="table-wrap"><table>
-            <thead><tr><th>{tx("Product")}</th><th>{tx("Voor")}</th><th className="num">{tx("Aantal")}</th><th className="num">{tx("Inkoopprijs")}</th><th className="num">{tx("Totaal")}</th><th style={{ minWidth: 190 }}>{tx("Transport")}</th><th>{tx("Verwacht")}</th><th style={{ minWidth: 170 }}>{tx("Bestemming")}</th></tr></thead>
+            <thead><tr><th>{tx("Product")}</th><th>{tx("Voor")}</th><th className="num">{tx("Aantal")}</th><th className="num">{tx("Inkoopprijs")}</th><th className="num">{tx("Totaal")}</th><th style={{ minWidth: 150 }}>{tx("In Nederland")}</th><th style={{ minWidth: 190 }}>{tx("Transport")}</th><th>{tx("Verwacht")}</th><th style={{ minWidth: 170 }}>{tx("Locatie")}</th></tr></thead>
             <tbody>{lines.map((l) => {
               const sol = s.sales_order_lines.find((x) => x.id === l.sales_order_line_id)
               const so = sol && s.sales_orders.find((o) => o.id === sol.sales_order_id)
@@ -127,14 +188,18 @@ export function PurchaseDetail({ id }: { id: string }) {
                   <td className="strong">{s.products.find((p) => p.id === l.product_id)?.name}<Sku code={s.products.find((p) => p.id === l.product_id)?.sku} />{sol?.options && <div className="muted small" style={{ fontWeight: 400 }}>{sol.options}</div>}</td>
                   <td>{so ? <a className="rowlink" href={`#orders-${so.id}`}>{so.number}</a> : <span className="muted">{tx("Voorraad")}</span>}</td>
                   <td className="num">{l.qty}</td><td className="num">{eur(l.unit_cost)}</td><td className="num">{eur(l.qty * l.unit_cost)}</td>
-                  <td>{x && open && (!t || t.status === 'planned')
+                  <td>{!x || po.status !== 'open' ? <span className="muted">–</span>
+                    : x.nl_received_at ? <>{fmtDate(x.nl_received_at)}{open && !x.transport_id && <div><button className="btn sm" style={{ marginTop: 4 }} onClick={() => run((db) => markReceivedInNl(db, [x.id], null), tx("Ontvangst in NL ongedaan gemaakt"))}>{tx("Ongedaan maken")}</button></div>}</>
+                    : open ? <><span className={x.original_date < today ? 'small' : 'muted small'} style={x.original_date < today ? { color: 'var(--bad)' } : undefined}>{tx("Verwacht {0}", fmtDate(x.original_date))}</span><div><button className="btn sm primary" style={{ marginTop: 4 }} onClick={() => run((db) => markReceivedInNl(db, [x.id], today), tx("Ontvangen in NL"))}>{tx("Ontvangen in NL")}</button></div></>
+                    : <span className="muted">–</span>}</td>
+                  <td>{x && open && x.nl_received_at && (!t || t.status === 'planned')
                     ? <select aria-label={tx("Transport voor {0}", s.products.find((p) => p.id === l.product_id)?.name)} value={x.transport_id ?? ''} onChange={(e) => run((db) => assignShipmentsToTransport(db, [x.id], e.target.value || null), tx("Transport aangepast"))}>
                         <option value="">{tx("Nog niet ingepland")}</option>
                         {planned.map((r) => <option key={r.id} value={r.id}>{tx("{0}, vertrek {1}", r.number, fmtDate(r.departure_date))}</option>)}
                       </select>
                     : t?.number ?? '–'}</td>
                   <td>{x && t ? fmtDate(x.expected_date) : <span className="muted">–</span>}</td>
-                  <td>{x ? <>{shipmentDestination(s, x)}{x.status === 'received' && <> <Pill tone="good">{tx("Ontvangen")}</Pill></>}</> : inboundWarehouse(s.warehouses)?.name}</td>
+                  <td>{x ? <>{shipmentDestination(s, x)}{x.status === 'received' ? <> <Pill tone="good">{tx("Ontvangen")}</Pill></> : <div className="muted small">{tx("Voorstel, te kiezen bij inboeken")}</div>}</> : defaultReceiptWarehouse(s.warehouses, po.label)?.name}</td>
                 </tr>
               )
             })}</tbody>
@@ -211,7 +276,7 @@ export function PurchaseForm({ orderId }: { orderId?: string } = {}) {
             {isSale
               ? <div className="field"><span className="lbl">{tx("Label")}</span><div style={{ minHeight: 38, display: 'flex', alignItems: 'center' }}><LabelPill label="verkoop" /></div></div>
               : <SelectField label={tx("Label")} value={label} onChange={setLabel} options={[{ value: 'magazijn', label: tx("Magazijn") }, { value: 'showroom', label: tx("Showroom") }]} />}
-            <div className="field span-2"><span className="lbl">{tx("Bestemming")}</span><div style={{ minHeight: 38, display: 'flex', alignItems: 'center' }}>{inboundWarehouse(s.warehouses)?.name}</div></div>
+            <div className="field span-2"><span className="lbl">{tx("Locatie bij ontvangst")}</span><div style={{ minHeight: 38, display: 'flex', alignItems: 'center' }}>{tx("{0}, te wijzigen bij inboeken", defaultReceiptWarehouse(s.warehouses, isSale ? 'verkoop' : label)?.name ?? '')}</div></div>
           </div>
         </section>
         <section className="panel">

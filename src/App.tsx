@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { BookOpen, FileBarChart, Headset, Languages, Moon, Store, Sun, Boxes, ClipboardList, FileText, LayoutDashboard, PackageCheck, Settings2, ShoppingCart, Truck, Warehouse as WarehouseIcon } from 'lucide-react'
 import { flowCounts } from './domain/calc'
 import { followUpCount, parseOrdersParam } from './domain/orderFlow'
+import { parsePurchasesParam, purchaseFollowUpCount } from './domain/purchaseFlow'
 import { useApp, useHash } from './ui/app-context'
 import { Logo, Modal } from './ui/kit'
 import { Overview } from './screens/Overview'
@@ -37,7 +38,7 @@ const FLOWS = {
   inkoop: {
     label: 'Inkoop', icon: ShoppingCart, home: 'inkoop',
     steps: [
-      { key: 'inkoop', label: '1. Inkooporders', sub: (n: number) => tx("{0} nog in te kopen", n), icon: ShoppingCart, tint: '' },
+      { key: 'inkoop', label: '1. Inkooporders', sub: (n: number) => tx("{0} op te volgen", n), icon: ShoppingCart, tint: '' },
       { key: 'inkomend', label: '2. Gepland transport', sub: (n: number) => (n ? tx("{0} te laat", n) : tx("op schema")), icon: Truck, tint: '' },
       { key: 'ontvangst', label: '3. Ontvangst', sub: (n: number) => tx("{0} binnen 7 dagen", n), icon: PackageCheck, tint: '' },
     ],
@@ -89,7 +90,7 @@ export function App({ onResetDemo, onSignOut }: { onResetDemo?: () => Promise<vo
   const dash = hash.indexOf('-')
   const screen = dash < 0 ? hash : hash.slice(0, dash)
   const param = dash < 0 ? '' : hash.slice(dash + 1)
-  const counts = { ...flowCounts(s), orders: followUpCount(s) }
+  const counts = { ...flowCounts(s), orders: followUpCount(s), inkoop: purchaseFollowUpCount(s) }
   const flow = flowOf(screen)
 
   if (screen === 'chauffeur') return <Driver param={param} />
@@ -167,8 +168,8 @@ export function App({ onResetDemo, onSignOut }: { onResetDemo?: () => Promise<vo
 function Route({ screen, param }: { screen: string; param: string }) {
   switch (screen) {
     case 'overzicht': return <Overview />
-    case 'inkoop': return param.startsWith('print-') ? <PurchaseOrderDocument key={param} id={param.slice(6)} /> : param === 'nieuw' ? <PurchaseForm /> : param.startsWith('nieuw-order-') ? <PurchaseForm orderId={param.slice(12)} /> : param === 'proforma' ? <Purchases key="proforma" tab="proforma" /> : param ? <PurchaseDetail id={param} /> : <Purchases key="orders" />
-    case 'inkomend': return <Inbound />
+    case 'inkoop': return param.startsWith('print-') ? <PurchaseOrderDocument key={param} id={param.slice(6)} /> : param === 'nieuw' ? <PurchaseForm /> : param.startsWith('nieuw-order-') ? <PurchaseForm orderId={param.slice(12)} /> : param.startsWith('omzetten-') ? <PurchaseDetail key={param} id={param.slice(9)} convert /> : param && param !== 'proforma' && !param.startsWith('lijst-') ? <PurchaseDetail key={param} id={param} /> : (() => { const l = parsePurchasesParam(param); return <Purchases key={param} tab={l.tab} phase={l.phase} /> })()
+    case 'inkomend': return <Inbound key={param} focus={param.replace(/^(nl|klaar)-/, '') || undefined} />
     case 'ontvangst': return param ? <ReceiptForm key={param} transportId={param} /> : <Receipts />
     case 'orders':
       if (param === 'nieuw') return <OrderForm />
@@ -178,7 +179,7 @@ function Route({ screen, param }: { screen: string; param: string }) {
       return <OrderDetail id={param} />
     case 'levering': return param.startsWith('print-') ? <DeliveryNote key={param} id={param.slice(6)} autoPrint /> : param.startsWith('archief-') ? <DeliveryNote key={param} id={param.slice(8)} fromArchive /> : param.startsWith('naar-') ? <Deliveries key={param} focus={param.slice(5)} /> : param ? <DeliveryNote key={param} id={param} /> : <Deliveries />
     case 'facturatie': return param.startsWith('print-') ? <InvoiceDetail key={param} id={param.slice(6)} autoPrint /> : param.startsWith('naar-') ? <Invoices key={param} focus={param.slice(5)} /> : param ? <InvoiceDetail key={param} id={param} /> : <Invoices />
-    case 'rapportage': return <Reports tab="facturen" />
+    case 'rapportage': return <Reports key={param} tab={param === 'leverbaar' ? 'leverbaar' : 'facturen'} />
     case 'archief': return <Reports tab="archief" />
     case 'catalogi': return <Catalogs supplierId={param} />
     case 'voorraad': return <Stock />

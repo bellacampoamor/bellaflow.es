@@ -2,10 +2,10 @@ import { useState } from 'react'
 import { Plus, Truck } from 'lucide-react'
 import type { InboundShipment, Snapshot, Transport } from '../data/types'
 import { addDays, ordersAffectedByShipment, shipmentDestination, shipmentIsOpen, shipmentLoad, todayISO, transportLoad } from '../domain/calc'
-import { assignShipmentsToTransport, cancelTransport, closeShipment, createTransport, setTransportStatus, updateTransport, type TransportInput } from '../domain/services'
+import { assignShipmentsToTransport, cancelTransport, closeShipment, createTransport, markReceivedInNl, setTransportStatus, updateTransport, type TransportInput } from '../domain/services'
 import { tx } from '../i18n'
 import { useApp } from '../ui/app-context'
-import { AreaField, Empty, fmtDate, fmtShort, Head, Modal, NumberField, pickRow, PickMark, Pill, Sku, Tabs, TextField, type Tone } from '../ui/kit'
+import { AreaField, Empty, fmtDate, fmtShort, Head, Modal, NumberField, pickRow, PickMark, Pill, Sku, Tabs, TextField, useScrollToFocus, type Tone } from '../ui/kit'
 import { LabelPill } from './Purchases'
 
 const DEFAULT_CAPACITY = 90
@@ -37,19 +37,28 @@ export function lineInfo(s: Snapshot, x: InboundShipment) {
   }
 }
 
-export function Inbound() {
+/** focus: inkoopregel waar het scherm naartoe scrolt en die al geselecteerd staat (vanaf een verkooporder of inkooporder). */
+export function Inbound({ focus }: { focus?: string } = {}) {
   const { s, run } = useApp()
   const [tab, setTab] = useState<'plan' | 'done'>('plan')
+  const [nlPicked, setNlPicked] = useState<Set<string>>(() => new Set(focus ? [focus] : []))
+  const [nlDate, setNlDate] = useState(todayISO())
+  useScrollToFocus(focus ? `il-${focus}` : null)
   const [close, setClose] = useState<InboundShipment | null>(null)
   const [edit, setEdit] = useState<(TransportInput & { id?: string }) | null>(null)
   const [reason, setReason] = useState('')
-  const [picked, setPicked] = useState<Set<string>>(new Set())
+  const [picked, setPicked] = useState<Set<string>>(() => new Set(focus ? [focus] : []))
   const [target, setTarget] = useState('')
   const today = todayISO()
   const active = s.transports.filter((t) => t.status === 'planned' || t.status === 'departed').sort((a, b) => a.departure_date.localeCompare(b.departure_date))
   const done = s.transports.filter((t) => t.status === 'arrived').sort((a, b) => b.arrival_date.localeCompare(a.arrival_date))
   const planned = active.filter((t) => t.status === 'planned')
-  const unassigned = s.inbound_shipments.filter((x) => shipmentIsOpen(x) && !x.transport_id)
+  // Inkoop-flow: eerst ontvangen in NL (bij leverancier of verzamelpunt), pas dan op een transport.
+  const atSupplier = s.inbound_shipments.filter((x) => shipmentIsOpen(x) && !x.transport_id && !x.nl_received_at && s.purchase_orders.find((p) => p.id === x.purchase_order_id)?.status === 'open')
+    .sort((a, b) => a.original_date.localeCompare(b.original_date))
+  const unassigned = s.inbound_shipments.filter((x) => shipmentIsOpen(x) && !x.transport_id && !!x.nl_received_at)
+  const readyM3 = round1(unassigned.reduce((n, x) => n + shipmentLoad(s, x.id).m3, 0))
+  const nlIds = atSupplier.filter((x) => nlPicked.has(x.id)).map((x) => x.id)
   const chosenTarget = target || planned[0]?.id || ''
   const pickedIds = unassigned.filter((x) => picked.has(x.id)).map((x) => x.id)
 
@@ -61,28 +70,70 @@ export function Inbound() {
 
   return (
     <>
-      <Head title={tx("Gepland transport")} sub={tx("Zodra de transportlijst uit Nederland bekend is, koppel je de inkoopregels aan het transport. De verkooporder toont dan wanneer het product wordt verwacht.")}>
+      <Head title={tx("Gepland transport")} sub={tx("Registreer wat in Nederland klaarstaat en koppel het aan een transport zodra er genoeg is. De verkooporder toont dan wanneer het product wordt verwacht.")}>
         <button className="btn primary" onClick={newTransport}><Plus size={16} />{tx("Nieuw transport")}</button>
       </Head>
-      <Tabs<'plan' | 'done'> value={tab} onChange={setTab} tabs={[{ value: 'plan', label: tx("Inplannen"), n: unassigned.length }, { value: 'done', label: tx("Afgerond"), n: done.length }]} />
+      <Tabs<'plan' | 'done'> value={tab} onChange={setTab} tabs={[{ value: 'plan', label: tx("Inplannen"), n: unassigned.length + atSupplier.length }, { value: 'done', label: tx("Afgerond"), n: done.length }]} />
 
       {tab === 'plan' && <div className="stack">
         <section className="panel">
           <div className="panel-head">
             <div>
-              <h2>{tx("Ingekocht, nog niet ingepland")}</h2>
+              <h2>{tx("Besteld, nog bij de leverancier")}</h2>
+              <div className="small muted">{tx("Staat een regel klaar in Nederland, selecteer hem door erop te klikken en registreer Ontvangen in NL. Pas dan kan hij op een transport.")}</div>
+            </div>
+            {atSupplier.length > 0 && <button className="btn sm" onClick={() => setNlPicked(new Set(nlIds.length === atSupplier.length ? [] : atSupplier.map((x) => x.id)))}>{nlIds.length === atSupplier.length ? tx("Niets selecteren") : tx("Alles selecteren")}</button>}
+          </div>
+          {atSupplier.length === 0 && <Empty>{tx("Alles wat besteld is, staat in Nederland klaar of is onderweg.")}</Empty>}
+          {atSupplier.length > 0 && <>
+            <div className="table-wrap"><table className="queue">
+              <thead><tr><th>{tx("Inkooporder")}</th><th>{tx("Leverancier")}</th><th>{tx("Product")}</th><th className="num">{tx("Aantal")}</th><th className="num">m³</th><th>{tx("Voor")}</th><th>{tx("Verwacht in NL")}</th><th aria-label={tx("Selectie")} /></tr></thead>
+              <tbody>{atSupplier.map((x) => {
+                const i = lineInfo(s, x)
+                return (
+                  <tr key={x.id} id={`il-${x.id}`} {...pickRow(nlPicked.has(x.id), () => setNlPicked((v) => { const n = new Set(v); if (n.has(x.id)) n.delete(x.id); else n.add(x.id); return n }))}>
+                    <td><a className="rowlink" href={`#inkoop-${i.po.id}`}>{i.po.number}</a></td><td>{i.supplier}</td><td className="strong">{i.product?.name}<Sku code={i.product?.sku} /></td><td className="num">{i.qty}</td><td className="num">{round1(shipmentLoad(s, x.id).m3)}</td>
+                    <td>{i.salesOrder ? <a className="rowlink" href={`#orders-${i.salesOrder.id}`}>{i.salesOrder.number}</a> : <LabelPill label={i.po.label} />}</td>
+                    <td>{x.original_date < today ? <Pill tone="bad">{fmtShort(x.original_date)}</Pill> : fmtShort(x.original_date)}</td>
+                    <PickMark on={nlPicked.has(x.id)} />
+                  </tr>
+                )
+              })}</tbody>
+            </table></div>
+            <div className="queue-bar">
+              <span>{nlIds.length ? tx("{0} geselecteerd", nlIds.length) : tx("Nog niets geselecteerd")}</span>
+              <div className="btn-row">
+                <input type="date" style={{ width: 'auto' }} aria-label={tx("Datum ontvangen in NL")} value={nlDate} onChange={(e) => setNlDate(e.target.value)} />
+                <button className="btn primary" disabled={!nlIds.length} onClick={async () => { if (await run((db) => markReceivedInNl(db, nlIds, nlDate), tx("Ontvangen in NL"))) setNlPicked(new Set()) }}>{tx("Ontvangen in NL")}</button>
+              </div>
+            </div>
+          </>}
+        </section>
+
+        <section className="panel">
+          <div className="panel-head">
+            <div>
+              <h2>{tx("Klaar in NL, nog niet op transport")}</h2>
               {unassigned.length > 0 && <div className="small muted">{tx("Klik op een regel om die te selecteren.")}</div>}
             </div>
             {unassigned.length > 0 && <button className="btn sm" onClick={() => setPicked(new Set(pickedIds.length === unassigned.length ? [] : unassigned.map((x) => x.id)))}>{pickedIds.length === unassigned.length ? tx("Niets selecteren") : tx("Alles selecteren")}</button>}
           </div>
-          {unassigned.length === 0 && <Empty>{tx("Alle ingekochte regels staan op een transport.")}</Empty>}
+          {unassigned.length > 0 && planned[0] && (() => {
+            const free = round1(Math.max(0, planned[0].capacity_m3 - transportLoad(s, planned[0].id).m3))
+            const enough = planned[0].capacity_m3 > 0 && readyM3 >= free
+            return <div className={`note${enough ? '' : ' warn'}`} style={{ marginBottom: 12 }}>
+              {tx("Klaar voor transport: {0} m³. {1} heeft nog {2} m³ vrij (vertrek {3}).", readyM3, planned[0].number, free, fmtShort(planned[0].departure_date))}{' '}
+              <strong>{enough ? tx("Genoeg om het transport te vullen.") : tx("Nog niet vol: koppelen kan, of wachten op meer inkooporders.")}</strong>
+            </div>
+          })()}
+          {unassigned.length === 0 && <Empty>{tx("Niets staat klaar in Nederland zonder transport.")}</Empty>}
           {unassigned.length > 0 && <>
             <div className="table-wrap"><table className="queue">
               <thead><tr><th>{tx("Inkooporder")}</th><th>{tx("Leverancier")}</th><th>{tx("Product")}</th><th className="num">{tx("Aantal")}</th><th className="num">m³</th><th>{tx("Voor")}</th><th style={{ minWidth: 180 }}>{tx("Bestemming")}</th><th aria-label={tx("Selectie")} /></tr></thead>
               <tbody>{unassigned.map((x) => {
                 const i = lineInfo(s, x)
                 return (
-                  <tr key={x.id} {...pickRow(picked.has(x.id), () => setPicked((v) => { const n = new Set(v); if (n.has(x.id)) n.delete(x.id); else n.add(x.id); return n }))}>
+                  <tr key={x.id} id={`il-${x.id}`} {...pickRow(picked.has(x.id), () => setPicked((v) => { const n = new Set(v); if (n.has(x.id)) n.delete(x.id); else n.add(x.id); return n }))}>
                     <td><a className="rowlink" href={`#inkoop-${i.po.id}`}>{i.po.number}</a></td><td>{i.supplier}</td><td className="strong">{i.product?.name}<Sku code={i.product?.sku} /></td><td className="num">{i.qty}</td><td className="num">{round1(shipmentLoad(s, x.id).m3)}</td>
                     <td>{i.salesOrder ? <a className="rowlink" href={`#orders-${i.salesOrder.id}`}>{i.salesOrder.number}</a> : <LabelPill label={i.po.label} />}</td>
                     <td>{shipmentDestination(s, x)}</td>

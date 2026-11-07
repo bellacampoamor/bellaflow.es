@@ -115,6 +115,8 @@ export interface Transport {
 export interface InboundShipment {
   id: string; purchase_order_id: string; sequence: number; expected_date: string; original_date: string
   warehouse_id: string; carrier: string; status: 'expected' | 'partial' | 'received' | 'closed'; notes: string; transport_id: string | null
+  /** Datum waarop de regel klaarstaat in Nederland (bij de leverancier of het verzamelpunt). Pas dan kan hij op een transport. */
+  nl_received_at?: string | null
 }
 export interface InboundShipmentLine { id: string; shipment_id: string; purchase_order_line_id: string; qty: number }
 export interface GoodsReceipt {

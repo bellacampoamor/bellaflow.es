@@ -6,8 +6,9 @@ import { tx } from '../i18n'
 import { go, useApp } from '../ui/app-context'
 import { DocPaper, Empty, eur, fmtDate, Head, Tabs, TextField } from '../ui/kit'
 import { Archive } from './Archive'
+import { Deliverable } from './Deliverable'
 
-export type ReportTab = 'facturen' | 'archief'
+export type ReportTab = 'facturen' | 'leverbaar' | 'archief'
 
 // Vaste teksten van de afgedrukte lijst, in de taal uit Beheer.
 const T: Record<Language, { title: string; period: (from: string, to: string) => string; empty: string; number: string; date: string; order: string; customer: string; base: string; vat: string; total: string; sum: (n: number) => string }> = {
@@ -20,13 +21,13 @@ const T: Record<Language, { title: string; period: (from: string, to: string) =>
 export function Reports({ tab }: { tab: ReportTab }) {
   return (
     <>
-      <Head title={tx("Rapportage")} sub={tab === 'archief' ? tx("Alle afgeleverde leveringen met hun afleverbonnen en facturen.") : tx("Kies een periode en druk de lijst af.")}>
+      <Head title={tx("Rapportage")} sub={tab === 'archief' ? tx("Alle afgeleverde leveringen met hun afleverbonnen en facturen.") : tab === 'leverbaar' ? tx("Welke verkooporders kunnen worden afgeleverd met wat er binnen is.") : tx("Kies een periode en druk de lijst af.")}>
         {tab === 'facturen' && <button className="btn primary" onClick={() => window.print()}><Printer size={16} />{tx("Afdrukken of PDF")}</button>}
       </Head>
       <div className="no-print">
-        <Tabs<ReportTab> value={tab} onChange={(v) => go(v === 'archief' ? 'archief' : 'rapportage')} tabs={[{ value: 'facturen', label: tx("Factuuroverzicht") }, { value: 'archief', label: tx("Archief") }]} />
+        <Tabs<ReportTab> value={tab} onChange={(v) => go(v === 'archief' ? 'archief' : v === 'leverbaar' ? 'rapportage-leverbaar' : 'rapportage')} tabs={[{ value: 'facturen', label: tx("Factuuroverzicht") }, { value: 'leverbaar', label: tx("Leverbaar") }, { value: 'archief', label: tx("Archief") }]} />
       </div>
-      {tab === 'facturen' ? <InvoiceList /> : <Archive />}
+      {tab === 'facturen' ? <InvoiceList /> : tab === 'leverbaar' ? <Deliverable /> : <Archive />}
     </>
   )
 }

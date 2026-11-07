@@ -5,7 +5,7 @@ import { addDays } from '../src/domain/calc'
 import { seedDemo } from '../src/domain/demo'
 import { activeIn, followUpCount, inOrdersTab, orderFlow, ordersHref, parseOrdersParam, PHASES } from '../src/domain/orderFlow'
 import { overview } from '../src/domain/overview'
-import { assignShipmentsToTransport, convertPurchaseProformas, createDelivery, createOrder, invoiceProformas, lineFromProduct, markDelivered, markReady } from '../src/domain/services'
+import { assignShipmentsToTransport, convertPurchaseProformas, createDelivery, createOrder, invoiceProformas, lineFromProduct, markDelivered, markReady, markReceivedInNl } from '../src/domain/services'
 
 const TODAY = '2026-11-04'
 let db: LocalDriver
@@ -68,11 +68,16 @@ describe('verkoop-flow per verkooporder', () => {
     s = await loadSnapshot(db)
     const line = s.sales_order_lines.find((l) => l.sales_order_id === id)!
     const pf = s.purchase_orders.find((p) => p.status === 'proforma' && s.purchase_order_lines.some((l) => l.purchase_order_id === p.id && l.sales_order_line_id === line.id))!
+    expect((await flowOf(id)).next?.href).toBe(`#inkoop-omzetten-${pf.id}`)
     const [po] = await convertPurchaseProformas(db, { ids: [pf.id], order_date: TODAY })
-    expect(await flowOf(id)).toMatchObject({ follow: 'actie', next: { key: 'goederen', label: 'Op transport zetten' } })
     s = await loadSnapshot(db)
     const transport = s.transports.find((t) => t.status === 'planned')!
     const shipment = s.inbound_shipments.find((x) => x.purchase_order_id === po)!
+    // Besteld, nog bij de leverancier: wachten tot het in Nederland klaarstaat. Pas dan kan het op een transport.
+    expect(await flowOf(id)).toMatchObject({ follow: 'wacht', next: { key: 'goederen', state: 'wacht', args: [shipment.original_date] } })
+    await expect(assignShipmentsToTransport(db, [shipment.id], transport.id)).rejects.toThrow(/in Nederland/)
+    await markReceivedInNl(db, [shipment.id], TODAY)
+    expect(await flowOf(id)).toMatchObject({ follow: 'actie', next: { key: 'goederen', label: 'Op transport zetten', href: `#inkomend-klaar-${shipment.id}` } })
     await assignShipmentsToTransport(db, [shipment.id], transport.id)
     expect(await flowOf(id)).toMatchObject({ follow: 'wacht', next: { key: 'goederen', state: 'wacht', args: [transport.arrival_date] } })
     expect(await flowOf(id, addDays(transport.arrival_date, 1))).toMatchObject({ follow: 'te_laat', next: { key: 'goederen', state: 'laat' } })

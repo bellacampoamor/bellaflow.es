@@ -4,7 +4,7 @@ import { newId, type Driver } from '../data/driver'
 import type { Customer, Product, Salesperson, Settings, Supplier, Warehouse } from '../data/types'
 import { addDays, openLinesOnTransport, todayISO } from './calc'
 import {
-  closeShipment, createDelivery, createInvoice, createTransport, createOrder, createPurchaseOrder, lineFromProduct, markDelivered, markNotePrinted, markReady, payInvoice,
+  closeShipment, createDelivery, createInvoice, createTransport, createOrder, createPurchaseOrder, lineFromProduct, markDelivered, markNotePrinted, markReady, markReceivedInNl, payInvoice,
   receiveGoods, rescheduleOrder, setTransportStatus, transferStock, type OrderHeader, type OrderLineInput,
 } from './services'
 import { loadSnapshot } from '../data/driver'
@@ -259,5 +259,12 @@ export async function seedDemo(db: Driver, today = todayISO()) {
     supplier_id: oak.id, order_date: today, supplier_reference: 'EH-2340', notes: '',
     lines: [{ product_id: dining.id, qty: 8, unit_cost: dining.purchase_price, sales_order_line_id: null }],
   })
+  // Besteld voor het magazijn, staat al klaar in Nederland maar nog niet op een transport.
+  const poReady = await createPurchaseOrder(db, {
+    supplier_id: lounge.id, order_date: d(-9), supplier_reference: 'NZ-88377', notes: '',
+    lines: [{ product_id: chair.id, qty: 8, unit_cost: chair.purchase_price, sales_order_line_id: null }],
+  })
+  s = await loadSnapshot(db)
+  await markReceivedInNl(db, s.inbound_shipments.filter((x) => x.purchase_order_id === poReady).map((x) => x.id), d(-2))
   await setTransportStatus(db, trLate, 'departed')
 }

@@ -4,6 +4,8 @@
 import type { SalesOrder, Snapshot } from '../data/types'
 import { invoiceBalance, linePurchaseStatus, orderLines, plannedQty, shippedQty, todayISO, uninvoicedDeliveries } from './calc'
 
+const purchaseListHref = '#inkoop-lijst-opvolgen-proforma'
+
 export const PHASES = ['proforma', 'verkooporder', 'goederen', 'planning', 'afleveren', 'factureren'] as const
 export type PhaseKey = typeof PHASES[number]
 
@@ -74,9 +76,19 @@ export function orderFlow(s: Snapshot, o: SalesOrder, today = todayISO()): Order
   else {
     const perLine = waiting.map((l): Phase => {
       const st = linePurchaseStatus(s, l.id)
-      if (st.purchased < l.qty) return { key: 'goederen', state: 'actie', label: 'Inkooporder maken', href: '#inkoop-proforma' }
+      if (st.purchased < l.qty) {
+        // Direct naar de proforma-inkooporder van deze verkooporder, met het omzetten al open.
+        const pf = s.purchase_orders.find((p) => p.status === 'proforma' && s.purchase_order_lines.some((x) => x.purchase_order_id === p.id && x.sales_order_line_id === l.id))
+        return { key: 'goederen', state: 'actie', label: 'Inkooporder maken', href: pf ? `#inkoop-omzetten-${pf.id}` : purchaseListHref }
+      }
       const open = st.shipments.filter((x) => x.status === 'expected' || x.status === 'partial')
-      if (!open.length || open.some((x) => !x.transport_id)) return { key: 'goederen', state: 'actie', label: 'Op transport zetten', href: '#inkomend' }
+      const notInNl = open.find((x) => !x.transport_id && !x.nl_received_at)
+      if (notInNl) {
+        const late = notInNl.original_date < today
+        return { key: 'goederen', state: late ? 'laat' : 'wacht', label: late ? 'Nog niet in NL, verwacht {0}' : 'Bij leverancier, verwacht in NL {0}', args: [notInNl.original_date], href: `#inkomend-nl-${notInNl.id}` }
+      }
+      const ready = open.find((x) => !x.transport_id)
+      if (!open.length || ready) return { key: 'goederen', state: 'actie', label: 'Op transport zetten', href: ready ? `#inkomend-klaar-${ready.id}` : '#inkomend' }
       const first = [...open].sort((a, b) => a.expected_date.localeCompare(b.expected_date))[0]
       if (first.expected_date < today) return { key: 'goederen', state: 'laat', label: 'Ontvangst te laat, verwacht {0}', args: [first.expected_date], href: `#ontvangst-${first.transport_id}` }
       return { key: 'goederen', state: 'wacht', label: 'Onderweg uit Nederland, verwacht {0}', args: [first.expected_date], href: '#inkomend' }
