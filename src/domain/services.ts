@@ -66,6 +66,18 @@ export async function createPurchaseOrder(db: Driver, input: PurchaseInput) {
   // Regels voor een klant maken het altijd een verkoop-inkoop; anders volgt het label de keuze of de bestemming.
   const destination = warehouses.find((w) => w.id === warehouseId)
   const label: PurchaseLabel = input.lines.some((l) => l.sales_order_line_id) ? 'verkoop' : input.label ?? (destination?.kind === 'winkel' ? 'showroom' : 'magazijn')
+  // Regels voor een verkooporder: nooit meer inkopen dan nog nodig is, en alleen bij de leverancier van het artikel.
+  const snap = await loadSnapshot(db)
+  const open = linesToPurchase(snap)
+  const asked = new Map<string, number>()
+  for (const l of input.lines.filter((x) => x.sales_order_line_id)) asked.set(l.sales_order_line_id!, (asked.get(l.sales_order_line_id!) ?? 0) + l.qty)
+  for (const [lineId, qty] of asked) {
+    const need = open.find((x) => x.id === lineId)
+    if (!need) fail(tx("Een regel van een verkooporder is al ingekocht. Ververs het overzicht."))
+    if (qty > need!.qty) fail(tx("{0}: {1} gevraagd, maar nog {2} in te kopen voor deze verkooporder.", need!.description, qty, need!.qty))
+    const own = snap.products.find((p) => p.id === need!.product_id)?.supplier_id
+    if (own && own !== input.supplier_id) fail(tx("{0} hoort bij een andere leverancier.", need!.description))
+  }
   const id = newId()
   const number = await nextDocumentNumber(db, 'IO', 'prefix_purchase', yearOf(input.order_date))
   await db.insert('purchase_orders', [{ id, number, supplier_id: input.supplier_id, order_date: input.order_date, supplier_reference: input.supplier_reference, notes: input.notes, status: 'open', label }])
@@ -80,6 +92,8 @@ export async function createPurchaseOrder(db: Driver, input: PurchaseInput) {
     await db.insert('inbound_shipments', [{ id: sid, purchase_order_id: id, sequence, expected_date: expected, original_date: expected, warehouse_id: (warehouse_id ?? warehouseId)!, carrier: transport?.carrier ?? '', status: 'expected', notes: '', transport_id: transport?.id ?? null }])
     await db.insert('inbound_shipment_lines', [{ id: newId(), shipment_id: sid, purchase_order_line_id: polId, qty: line.qty }])
   }
+  // Wat nu definitief is ingekocht, verdwijnt van de proforma.
+  if (asked.size) await syncPurchaseProformas(db)
   return id
 }
 
@@ -92,31 +106,64 @@ export async function setPurchaseLabel(db: Driver, id: string, label: PurchaseLa
   await db.update('purchase_orders', id, { label })
 }
 
-export interface ConvertInput {
-  lines: { sales_order_line_id: string }[]
-  order_date: string
+// Proforma-inkooporders -----------------------------------------------------------
+// Wat een verkooporder op bestelling zet, komt vanzelf op een proforma-inkooporder: één per verkooporder en leverancier,
+// met een tijdelijk nummer (PIO-). Pas bij omzetten ontstaat de definitieve inkooporder met een IO-nummer.
+// Een proforma volgt de verkooporder: wijzigt of vervalt de behoefte, dan wijzigt of vervalt de proforma mee.
+
+/** Brengt de proforma-inkooporders in lijn met wat de verkooporders nog nodig hebben. */
+export async function syncPurchaseProformas(db: Driver) {
+  const s = await loadSnapshot(db)
+  const need = new Map<string, { line: SalesOrderLine; qty: number; supplier_id: string }>()
+  for (const l of linesToPurchase(s)) {
+    // Zonder leverancier op het artikel kan er geen proforma komen; de regel blijft zichtbaar als Inkoop zonder leverancier.
+    const supplier_id = s.products.find((p) => p.id === l.product_id)?.supplier_id
+    if (supplier_id) need.set(l.id, { line: l, qty: l.qty, supplier_id })
+  }
+  const proformas = s.purchase_orders.filter((p) => p.status === 'proforma')
+  const handled = new Set<string>()
+  for (const pol of s.purchase_order_lines.filter((l) => proformas.some((p) => p.id === l.purchase_order_id))) {
+    const n = pol.sales_order_line_id ? need.get(pol.sales_order_line_id) : undefined
+    const po = proformas.find((p) => p.id === pol.purchase_order_id)!
+    if (!n || n.supplier_id !== po.supplier_id || handled.has(pol.sales_order_line_id!)) { await db.remove('purchase_order_lines', pol.id); continue }
+    handled.add(pol.sales_order_line_id!)
+    if (pol.qty !== n.qty || pol.product_id !== n.line.product_id) await db.update('purchase_order_lines', pol.id, { qty: n.qty, product_id: n.line.product_id })
+  }
+  const kept = (await db.list('purchase_order_lines'))
+  for (const n of need.values()) {
+    if (handled.has(n.line.id)) continue
+    const order = s.sales_orders.find((o) => o.id === n.line.sales_order_id)!
+    let po = proformas.find((p) => p.supplier_id === n.supplier_id && kept.some((l) => l.purchase_order_id === p.id && s.sales_order_lines.find((x) => x.id === l.sales_order_line_id)?.sales_order_id === order.id))
+    if (!po) {
+      po = { id: newId(), number: await db.nextNumber('PIO', yearOf(order.order_date)), supplier_id: n.supplier_id, order_date: order.order_date, supplier_reference: '', notes: '', status: 'proforma', label: 'verkoop' }
+      await db.insert('purchase_orders', [po])
+      proformas.push(po)
+    }
+    const row = { id: newId(), purchase_order_id: po.id, product_id: n.line.product_id, qty: n.qty, unit_cost: s.products.find((p) => p.id === n.line.product_id)?.purchase_price ?? 0, sales_order_line_id: n.line.id }
+    await db.insert('purchase_order_lines', [row])
+    kept.push(row)
+  }
+  // Een lege proforma heeft geen betekenis meer.
+  const left = await db.list('purchase_order_lines')
+  for (const p of proformas) if (!left.some((l) => l.purchase_order_id === p.id)) await db.remove('purchase_orders', p.id)
 }
 
-/** Zet aangevinkte regels van verkooporders door: per leverancier één inkooporder. */
-export async function convertLinesToPurchaseOrders(db: Driver, input: ConvertInput) {
-  if (!input.lines.length) fail(tx("Vink minimaal één regel aan."))
+/** Zet aangevinkte proforma-inkooporders om: per leverancier één definitieve inkooporder met IO-nummer. */
+export async function convertPurchaseProformas(db: Driver, input: { ids: string[]; order_date: string; supplier_reference?: string }) {
+  if (!input.ids.length) fail(tx("Selecteer minimaal één proforma-inkooporder."))
+  if (!input.order_date) fail(tx("Vul de besteldatum in."))
+  await syncPurchaseProformas(db)
   const s = await loadSnapshot(db)
-  const open = linesToPurchase(s)
-  const rows = input.lines.map((l) => {
-    const line = open.find((x) => x.id === l.sales_order_line_id)
-    if (!line) fail(tx("Een van de regels is al ingekocht. Ververs het overzicht."))
-    // Een artikel hoort bij één leverancier; die staat op het product.
-    const supplier_id = s.products.find((p) => p.id === line!.product_id)?.supplier_id
-    if (!supplier_id) fail(tx("{0} heeft geen leverancier.", line!.description))
-    return { line: line!, supplier_id: supplier_id! }
-  })
+  const chosen = input.ids.map((id) => s.purchase_orders.find((p) => p.id === id && p.status === 'proforma') ?? fail(tx("Een van de proforma's bestaat niet meer of is al omgezet. Ververs het overzicht.")))
   const ids: string[] = []
-  for (const supplier_id of new Set(rows.map((r) => r.supplier_id))) {
+  for (const supplier_id of new Set(chosen.map((p) => p.supplier_id))) {
+    const group = chosen.filter((p) => p.supplier_id === supplier_id)
+    const lines = s.purchase_order_lines.filter((l) => group.some((p) => p.id === l.purchase_order_id))
+    for (const p of group) await db.remove('purchase_orders', p.id)
+    for (const l of lines) await db.remove('purchase_order_lines', l.id)
     ids.push(await createPurchaseOrder(db, {
-      supplier_id, order_date: input.order_date, supplier_reference: '', notes: '',
-      lines: rows.filter((r) => r.supplier_id === supplier_id).map(({ line }) => ({
-        product_id: line.product_id, qty: line.qty, unit_cost: s.products.find((p) => p.id === line.product_id)?.purchase_price ?? 0, sales_order_line_id: line.id,
-      })),
+      supplier_id, order_date: input.order_date, supplier_reference: input.supplier_reference ?? '', notes: '', label: 'verkoop',
+      lines: lines.map((l) => ({ product_id: l.product_id, qty: l.qty, unit_cost: l.unit_cost, sales_order_line_id: l.sales_order_line_id })),
     }))
   }
   return ids
@@ -129,10 +176,13 @@ export async function closeShipment(db: Driver, shipmentId: string, reason: stri
 
 export async function cancelPurchaseOrder(db: Driver, id: string) {
   const s = await loadSnapshot(db)
+  if (s.purchase_orders.find((p) => p.id === id)?.status === 'proforma') fail(tx("Een proforma-inkooporder volgt de verkooporder. Pas de verkooporder aan om hem te laten vervallen."))
   const shipments = s.inbound_shipments.filter((x) => x.purchase_order_id === id)
   if (s.goods_receipt_lines.some((r) => s.inbound_shipment_lines.some((l) => l.id === r.shipment_line_id && shipments.some((x) => x.id === l.shipment_id)))) fail(tx("Deze inkooporder heeft al ontvangsten en kan niet worden geannuleerd."))
   await db.update('purchase_orders', id, { status: 'cancelled' })
   for (const x of shipments) await db.update('inbound_shipments', x.id, { status: 'closed' })
+  // Wat de verkooporders nog nodig hebben, komt terug op een proforma-inkooporder.
+  await syncPurchaseProformas(db)
 }
 
 // Transport ----------------------------------------------------------------------
@@ -325,6 +375,7 @@ export async function createOrder(db: Driver, raw: OrderInput, opts: { autoDeliv
   await db.insert('sales_order_lines', lines)
   await db.insert('order_events', [event(id, 'aangemaakt', `Verkooporder ${number} aangemaakt.`)])
   await finishNewOrder(db, id, input, lines, opts)
+  await syncPurchaseProformas(db)
   return id
 }
 
@@ -429,6 +480,7 @@ export async function confirmProforma(db: Driver, id: string, raw: OrderInput, o
   })
   await db.insert('order_events', [event(id, 'bevestigd', `Proforma ${order.number} bevestigd als verkooporder ${number}.`)])
   await finishNewOrder(db, id, input, rows, opts)
+  await syncPurchaseProformas(db)
   return number
 }
 
@@ -448,7 +500,11 @@ export async function updateOrder(db: Driver, id: string, raw: OrderInput) {
   const changes: string[] = []
   for (const old of existing) {
     if (!kept.has(old.id)) {
-      if (s.purchase_order_lines.some((l) => l.sales_order_line_id === old.id)) fail(tx("{0} is al ingekocht voor deze verkooporder en kan niet worden verwijderd.", old.description))
+      const pols = s.purchase_order_lines.filter((l) => l.sales_order_line_id === old.id)
+      const statusOf = (poId: string) => s.purchase_orders.find((p) => p.id === poId)?.status
+      if (pols.some((l) => statusOf(l.purchase_order_id) === 'open')) fail(tx("{0} is al ingekocht voor deze verkooporder en kan niet worden verwijderd.", old.description))
+      // Staat de regel alleen op een proforma-inkooporder, dan vervalt hij daar mee.
+      for (const l of pols.filter((x) => statusOf(x.purchase_order_id) === 'proforma')) await db.remove('purchase_order_lines', l.id)
       await db.remove('sales_order_lines', old.id); changes.push(`${old.description} verwijderd`)
     }
   }
@@ -468,6 +524,7 @@ export async function updateOrder(db: Driver, id: string, raw: OrderInput) {
   const moved = prev.delivery_address !== input.header.delivery_address || prev.delivery_postal_code !== input.header.delivery_postal_code || prev.delivery_city !== input.header.delivery_city
   await db.update('sales_orders', id, moved ? { ...input.header, delivery_latitude: null, delivery_longitude: null } : input.header)
   await db.insert('order_events', [event((order as SalesOrder).id, 'gewijzigd', changes.length ? `Verkooporder gewijzigd: ${changes.join(', ')}.` : 'Gegevens van de verkooporder gewijzigd.')])
+  await syncPurchaseProformas(db)
 }
 
 export async function rescheduleOrder(db: Driver, orderId: string, input: { new_date: string; reason: string; customer_notified: boolean }) {
@@ -491,6 +548,7 @@ export async function cancelOrder(db: Driver, id: string, reason: string) {
   for (const d of s.deliveries.filter((x) => x.sales_order_id === id && x.status !== 'cancelled')) await db.update('deliveries', d.id, { status: 'cancelled' })
   await db.update('sales_orders', id, { status: 'cancelled' })
   await db.insert('order_events', [event(id, 'geannuleerd', reason ? `Verkooporder geannuleerd: ${reason}` : 'Verkooporder geannuleerd.')])
+  await syncPurchaseProformas(db)
 }
 
 export async function setLineWarehouse(db: Driver, lineId: string, warehouseId: string) {

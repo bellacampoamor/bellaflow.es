@@ -5,9 +5,9 @@ import { eur, fmtDate, Head, DocPaper } from '../ui/kit'
 import { tx } from '../i18n'
 
 const T: Record<Language, Record<string, string>> = {
-  es: { title: 'Pedido de compra', date: 'Fecha', ref: 'Su referencia', supplier: 'Proveedor', tax: 'NIF', code: 'Referencia', prod: 'Producto', opts: 'Acabado', qty: 'Cant.', price: 'Precio', total: 'Total', grand: 'Total sin IVA', notes: 'Observaciones' },
-  nl: { title: 'Inkooporder', date: 'Datum', ref: 'Uw referentie', supplier: 'Leverancier', tax: 'Btw-nummer', code: 'Artikelnummer', prod: 'Product', opts: 'Uitvoering', qty: 'Aantal', price: 'Prijs', total: 'Totaal', grand: 'Totaal excl. btw', notes: 'Opmerkingen' },
-  en: { title: 'Purchase order', date: 'Date', ref: 'Your reference', supplier: 'Supplier', tax: 'VAT no.', code: 'Item no.', prod: 'Product', opts: 'Finish', qty: 'Qty', price: 'Price', total: 'Total', grand: 'Total excl. VAT', notes: 'Notes' },
+  es: { title: 'Pedido de compra', proforma: 'Proforma pedido de compra', date: 'Fecha', ref: 'Su referencia', supplier: 'Proveedor', tax: 'NIF', code: 'Referencia', prod: 'Producto', opts: 'Acabado', qty: 'Cant.', price: 'Precio', total: 'Total', grand: 'Total sin IVA', notes: 'Observaciones' },
+  nl: { title: 'Inkooporder', proforma: 'Proforma-inkooporder', date: 'Datum', ref: 'Uw referentie', supplier: 'Leverancier', tax: 'Btw-nummer', code: 'Artikelnummer', prod: 'Product', opts: 'Uitvoering', qty: 'Aantal', price: 'Prijs', total: 'Totaal', grand: 'Totaal excl. btw', notes: 'Opmerkingen' },
+  en: { title: 'Purchase order', proforma: 'Proforma purchase order', date: 'Date', ref: 'Your reference', supplier: 'Supplier', tax: 'VAT no.', code: 'Item no.', prod: 'Product', opts: 'Finish', qty: 'Qty', price: 'Price', total: 'Total', grand: 'Total excl. VAT', notes: 'Notes' },
 }
 
 /** Afdrukbare inkooporder voor de leverancier. Bevat bewust geen klantgegevens. */
@@ -32,7 +32,7 @@ export function PurchaseOrderDocument({ id }: { id: string }) {
             <div className="small muted">{[co.address, `${co.postal_code} ${co.city}`.trim(), co.province, co.phone, co.email].filter(Boolean).join(', ')}<br />{t.tax}: {co.tax_id}</div>
           </div>
           <div style={{ textAlign: 'right' }}>
-            <h1 style={{ fontSize: '1.45rem' }}>{t.title}</h1>
+            <h1 style={{ fontSize: '1.45rem' }}>{po.status === 'proforma' ? t.proforma : t.title}</h1>
             <div className="strong">{po.number}</div>
             <div className="small muted">{t.date}: {fmtDate(po.order_date)}{po.supplier_reference && <><br />{t.ref}: {po.supplier_reference}</>}</div>
           </div>

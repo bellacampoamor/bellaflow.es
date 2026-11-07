@@ -98,7 +98,7 @@ export interface OrderEvent {
 export type PurchaseLabel = 'showroom' | 'magazijn' | 'verkoop'
 export interface PurchaseOrder {
   id: string; number: string; supplier_id: string; order_date: string; supplier_reference: string
-  notes: string; status: 'open' | 'cancelled'; label: PurchaseLabel
+  notes: string; status: 'proforma' | 'open' | 'cancelled'; label: PurchaseLabel
 }
 export interface PurchaseOrderLine {
   id: string; purchase_order_id: string; product_id: string; qty: number; unit_cost: number

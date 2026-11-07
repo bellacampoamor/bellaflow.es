@@ -12,7 +12,7 @@ import { TABLES } from '../src/data/types'
 import { archiveRows, openLinesOnTransport, linePurchaseStatus, linesToPurchase, documentLanguage, flowCounts, freeAt, transportLoad, invoiceBalance, onHandMap, orderStage, orderTab, reservedMap, stockKey, vatBreakdown , invoiceReport, periodRange, invoiceQrUrl, hasTaxId, driverStops } from '../src/domain/calc'
 import { renameOldSuppliers, restoreSettings, restoreSuppliers, seedDemo } from '../src/domain/demo'
 import {
-  importShowroom, importShowroomDetails, importSupplierFile, createDelivery, createInvoice, markDeliveriesReady, createOrder, createPurchaseOrder, invoiceProformas, lineFromProduct, markDelivered, assignShipmentsToTransport, cancelTransport, convertLinesToPurchaseOrders, createTransport, markReady, receiveGoods, rescheduleDelivery, rescheduleOrder, saveRouteOrder, saveSettings, mailSignedNote, setPurchaseLabel, signDelivery, splitLinesForStock, setDeliveryInTransit, setTransportStatus, updateTransport, transferStock,
+  importShowroom, importShowroomDetails, importSupplierFile, createDelivery, createInvoice, markDeliveriesReady, createOrder, createPurchaseOrder, invoiceProformas, lineFromProduct, markDelivered, assignShipmentsToTransport, cancelTransport, convertPurchaseProformas, syncPurchaseProformas, cancelOrder, cancelPurchaseOrder, createTransport, markReady, receiveGoods, rescheduleDelivery, rescheduleOrder, saveRouteOrder, saveSettings, mailSignedNote, setPurchaseLabel, signDelivery, splitLinesForStock, setDeliveryInTransit, setTransportStatus, updateTransport, transferStock,
 } from '../src/domain/services'
 import { estimateMatrix, parseRouterTable } from '../src/data/geo'
 import { dropIndex, googleMapsRouteUrl, moveItem, optimizeRoute, tourCost } from '../src/domain/route'
@@ -66,7 +66,7 @@ describe('van inkoop tot factuur', () => {
 
     // Inkoop 50/50.
     const poId = await createPurchaseOrder(db, {
-      supplier_id: s.suppliers[0].id, order_date: TODAY, supplier_reference: '', notes: '', warehouse_id: north.id,
+      supplier_id: product.supplier_id!, order_date: TODAY, supplier_reference: '', notes: '', warehouse_id: north.id,
       lines: [{ product_id: product.id, qty: 10, unit_cost: 100, sales_order_line_id: line.id }],
     })
     s = await loadSnapshot(db)
@@ -304,12 +304,15 @@ describe('meerdere tabbladen', () => {
   })
 })
 
-describe('doorzetten zonder leverancier op het artikel', () => {
-  it('weigert en verwijst naar Beheer', async () => {
+describe('artikel zonder leverancier', () => {
+  it('komt niet op een proforma-inkooporder en blijft in te kopen', async () => {
     const s = await loadSnapshot(db)
     const [line] = linesToPurchase(s)
     await db.update('products', line.product_id, { supplier_id: null })
-    await expect(convertLinesToPurchaseOrders(db, { lines: [{ sales_order_line_id: line.id }], order_date: TODAY })).rejects.toThrow(/geen leverancier/)
+    await syncPurchaseProformas(db)
+    const after = await loadSnapshot(db)
+    expect(after.purchase_order_lines.some((l) => l.sales_order_line_id === line.id)).toBe(false)
+    expect(linesToPurchase(after).some((l) => l.id === line.id)).toBe(true)
   })
 })
 
@@ -459,7 +462,9 @@ describe('verkoop stuurt inkoop', () => {
     expect(freeAt(s, product.id, campoamor.id)).toBe(0)
     const line = s.sales_order_lines.find((l) => l.sales_order_id === orderId && l.source === 'bestelling')!
     // Deels ingekocht: de rest blijft op de lijst.
-    await createPurchaseOrder(db, { supplier_id: s.suppliers[0].id, order_date: TODAY, supplier_reference: '', notes: '', lines: [{ product_id: product.id, qty: 3, unit_cost: 1, sales_order_line_id: line.id }], warehouse_id: campoamor.id })
+    await createPurchaseOrder(db, { supplier_id: product.supplier_id!, order_date: TODAY, supplier_reference: '', notes: '', lines: [{ product_id: product.id, qty: 3, unit_cost: 1, sales_order_line_id: line.id }], warehouse_id: campoamor.id })
+    // De rest blijft op de proforma-inkooporder.
+    expect((await loadSnapshot(db)).purchase_order_lines.find((l) => l.sales_order_line_id === line.id && l.qty === 1)).toBeTruthy()
     s = await loadSnapshot(db)
     expect(linesToPurchase(s).find((l) => l.id === line.id)!.qty).toBe(1)
     expect(linePurchaseStatus(s, line.id)).toMatchObject({ purchased: 3, received: 0 })
@@ -496,19 +501,48 @@ describe('meenemen per regel', () => {
   })
 })
 
-describe('doorzetten naar inkoop', () => {
-  it('maakt per leverancier één inkooporder, gekoppeld aan de regels en het transport', async () => {
+describe('proforma-inkooporders', () => {
+  it('ontstaan vanzelf per verkooporder en leverancier, zonder zending', async () => {
     const s = await loadSnapshot(db)
     const queue = linesToPurchase(s)
-    const suppliersIn = new Set(queue.map((l) => s.products.find((p) => p.id === l.product_id)!.supplier_id))
+    expect(queue.length).toBeGreaterThan(0)
+    const proformas = s.purchase_orders.filter((p) => p.status === 'proforma')
+    const keys = new Set(queue.map((l) => `${l.sales_order_id}|${s.products.find((p) => p.id === l.product_id)!.supplier_id}`))
+    expect(proformas).toHaveLength(keys.size)
+    expect(proformas.every((p) => p.number.startsWith('PIO-') && p.label === 'verkoop')).toBe(true)
+    for (const l of queue) expect(s.purchase_order_lines.find((x) => x.sales_order_line_id === l.id)!.qty).toBe(l.qty)
+    expect(s.inbound_shipments.some((x) => proformas.some((p) => p.id === x.purchase_order_id))).toBe(false)
+    // Proforma telt niet als ingekocht.
+    for (const l of queue) expect(linePurchaseStatus(s, l.id).purchased).toBe(0)
+  })
+
+  it('volgen een nieuwe verkooporder, een wijziging en een annulering', async () => {
+    const s = await loadSnapshot(db)
+    const product = s.products.find((p) => p.supplier_id)!
+    const id = await createOrder(db, { header: header(s.customers[0].id), lines: [lineFromProduct(product, { qty: 3, source: 'bestelling', warehouse_id: null })] })
+    let after = await loadSnapshot(db)
+    const line = after.sales_order_lines.find((l) => l.sales_order_id === id)!
+    const pol = after.purchase_order_lines.find((l) => l.sales_order_line_id === line.id)!
+    expect(pol.qty).toBe(3)
+    expect(after.purchase_orders.find((p) => p.id === pol.purchase_order_id)).toMatchObject({ status: 'proforma', supplier_id: product.supplier_id })
+    await cancelOrder(db, id, 'test')
+    after = await loadSnapshot(db)
+    expect(after.purchase_order_lines.some((l) => l.sales_order_line_id === line.id)).toBe(false)
+    expect(after.purchase_orders.some((p) => p.id === pol.purchase_order_id)).toBe(false)
+  })
+
+  it('omzetten maakt per leverancier één inkooporder, gekoppeld aan de regels en het transport', async () => {
+    const s = await loadSnapshot(db)
+    const queue = linesToPurchase(s)
+    const proformas = s.purchase_orders.filter((p) => p.status === 'proforma')
+    const suppliersIn = new Set(proformas.map((p) => p.supplier_id))
     expect(suppliersIn.size).toBeGreaterThan(1)
     const transport = s.transports.find((t) => t.status === 'planned')!
-    const ids = await convertLinesToPurchaseOrders(db, {
-      lines: queue.map((l) => ({ sales_order_line_id: l.id })),
-      order_date: TODAY,
-    })
+    const ids = await convertPurchaseProformas(db, { ids: proformas.map((p) => p.id), order_date: TODAY })
     expect(ids).toHaveLength(suppliersIn.size)
     const after = await loadSnapshot(db)
+    expect(after.purchase_orders.filter((p) => p.status === 'proforma')).toHaveLength(0)
+    expect(ids.every((id) => after.purchase_orders.find((p) => p.id === id)!.status === 'open')).toBe(true)
     expect(linesToPurchase(after)).toHaveLength(0)
     for (const l of queue) expect(linePurchaseStatus(after, l.id).purchased).toBe(l.qty)
     // Elke regel eigen rij, nog zonder transport. Na koppelen volgt de verwachte datum uit het transport.
@@ -518,8 +552,27 @@ describe('doorzetten naar inkoop', () => {
     await assignShipmentsToTransport(db, [rows[0].id], transport.id)
     const linked = await loadSnapshot(db)
     expect(linked.inbound_shipments.find((x) => x.id === rows[0].id)).toMatchObject({ transport_id: transport.id, expected_date: transport.arrival_date })
-    expect(linked.inbound_shipments.find((x) => x.id === rows[1].id)!.transport_id).toBeNull()
-    await expect(convertLinesToPurchaseOrders(db, { lines: [{ sales_order_line_id: queue[0].id }], order_date: TODAY })).rejects.toThrow(/al ingekocht/)
+    await expect(convertPurchaseProformas(db, { ids: [proformas[0].id], order_date: TODAY })).rejects.toThrow(/al omgezet/)
+  })
+
+  it('rechtstreeks inkopen uit een verkooporder haalt de regel van de proforma; annuleren zet hem terug', async () => {
+    const s = await loadSnapshot(db)
+    const line = linesToPurchase(s)[0]
+    const product = s.products.find((p) => p.id === line.product_id)!
+    const other = s.suppliers.find((x) => x.id !== product.supplier_id)!
+    const base = { order_date: TODAY, supplier_reference: '', notes: '' }
+    await expect(createPurchaseOrder(db, { ...base, supplier_id: other.id, lines: [{ product_id: product.id, qty: line.qty, unit_cost: 1, sales_order_line_id: line.id }] })).rejects.toThrow(/andere leverancier/)
+    await expect(createPurchaseOrder(db, { ...base, supplier_id: product.supplier_id!, lines: [{ product_id: product.id, qty: line.qty + 1, unit_cost: 1, sales_order_line_id: line.id }] })).rejects.toThrow(/nog \d+ in te kopen/)
+    const id = await createPurchaseOrder(db, { ...base, supplier_id: product.supplier_id!, lines: [{ product_id: product.id, qty: line.qty, unit_cost: 1, sales_order_line_id: line.id }] })
+    let after = await loadSnapshot(db)
+    const onProforma = (x: typeof after) => x.purchase_order_lines.filter((l) => l.sales_order_line_id === line.id && x.purchase_orders.find((p) => p.id === l.purchase_order_id)?.status === 'proforma')
+    expect(onProforma(after)).toHaveLength(0)
+    expect(after.purchase_orders.find((p) => p.id === id)!.label).toBe('verkoop')
+    await cancelPurchaseOrder(db, id)
+    after = await loadSnapshot(db)
+    expect(onProforma(after).map((l) => l.qty)).toEqual([line.qty])
+    const pf = after.purchase_orders.find((p) => p.id === onProforma(after)[0].purchase_order_id)!
+    await expect(cancelPurchaseOrder(db, pf.id)).rejects.toThrow(/volgt de verkooporder/)
   })
 })
 
@@ -530,7 +583,9 @@ describe('label van een inkooporder', () => {
     const line = { product_id: s.products[0].id, qty: 1, unit_cost: 1, sales_order_line_id: null }
     const a = await createPurchaseOrder(db, { ...base, label: 'showroom', lines: [line] })
     const b = await createPurchaseOrder(db, { ...base, lines: [line] })
-    const c = await createPurchaseOrder(db, { ...base, label: 'magazijn', lines: [{ ...line, sales_order_line_id: s.sales_order_lines[0].id }] })
+    const need = linesToPurchase(s)[0]
+    const needProduct = s.products.find((p) => p.id === need.product_id)!
+    const c = await createPurchaseOrder(db, { ...base, supplier_id: needProduct.supplier_id!, label: 'magazijn', lines: [{ product_id: needProduct.id, qty: 1, unit_cost: 1, sales_order_line_id: need.id }] })
     const after = await loadSnapshot(db)
     const label = (id: string) => after.purchase_orders.find((p) => p.id === id)!.label
     expect([label(a), label(b), label(c)]).toEqual(['showroom', 'magazijn', 'verkoop'])

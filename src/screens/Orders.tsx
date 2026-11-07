@@ -176,7 +176,12 @@ export function OrderDetail({ id }: { id: string }) {
                       <td className="num">{l.qty}</td>
                       <td className="num" style={st.purchased < l.qty ? { color: 'var(--bad)', fontWeight: 600 } : undefined}>{st.purchased}</td>
                       <td className="num">{st.received}</td>
-                      <td>{st.orders.length ? st.orders.map((p, i) => <span key={p.id}>{i > 0 && ', '}<a className="rowlink" href={`#inkoop-${p.id}`}>{p.number}</a></span>) : <Pill tone="warn">{tx("Nog in te kopen")}</Pill>}</td>
+                      <td>{st.orders.map((p, i) => <span key={p.id}>{i > 0 && ', '}<a className="rowlink" href={`#inkoop-${p.id}`}>{p.number}</a></span>)}
+                        {st.purchased < l.qty && (() => {
+                          // Wat nog niet is ingekocht, staat op een proforma-inkooporder die omgezet kan worden.
+                          const pf = s.purchase_orders.find((p) => p.status === 'proforma' && s.purchase_order_lines.some((x) => x.purchase_order_id === p.id && x.sales_order_line_id === l.id))
+                          return <>{st.orders.length > 0 && ' '}{pf ? <a href={`#inkoop-${pf.id}`}><Pill tone="warn">{tx("Proforma {0}", pf.number)}</Pill></a> : <Pill tone="warn">{tx("Nog in te kopen")}</Pill>}</>
+                        })()}</td>
                       <td>{next ? <>{fmtDate(next.expected_date)}{next.transport_id && <div className="muted small">{s.transports.find((t) => t.id === next.transport_id)?.number}</div>}</> : '–'}</td>
                     </tr>
                   )

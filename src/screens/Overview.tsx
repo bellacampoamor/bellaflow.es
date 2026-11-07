@@ -101,7 +101,7 @@ export function Overview() {
           <div className="panel-head"><h2>{tx("Inkopen")}</h2><a className="small" href="#inkoop">{tx("Inkoop")}</a></div>
           {toBuy.length === 0 && lowStock.length === 0 && <Empty>{tx("Niets om in te kopen.")}</Empty>}
           {toBuy.map((l) => (
-            <a className="task" key={l.id} href="#inkoop-nieuw">
+            <a className="task" key={l.id} href="#inkoop-proforma">
               <div><div className="task-t">{l.qty} {tx("×")} {l.description}<Sku code={articleNo(s, l.product_id)} /></div><div className="muted small">{tx("Voor")} {s.sales_orders.find((o) => o.id === l.sales_order_id)?.number}{l.options ? `, ${l.options}` : ''}</div></div>
               <Pill tone="warn">{tx("Op bestelling")}</Pill>
             </a>

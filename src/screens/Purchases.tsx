@@ -1,12 +1,12 @@
 import { useMemo, useState } from 'react'
-import { FileText, Plus, Trash2 } from 'lucide-react'
+import { ArrowRight, FileText, Plus, Trash2 } from 'lucide-react'
 import { inboundWarehouse, linesToPurchase, round2, shipmentDestination, shipmentIsOpen, todayISO } from '../domain/calc'
 import { assignShipmentsToTransport, cancelPurchaseOrder, createPurchaseOrder, setPurchaseLabel } from '../domain/services'
 import type { PurchaseLabel } from '../data/types'
 import { tx } from '../i18n'
 import { go, useApp } from '../ui/app-context'
 import { AreaField, Combo, Empty, eur, fmtDate, Head, Modal, Pill, SelectField, Sku, Tabs, TextField, type Tone } from '../ui/kit'
-import { PurchaseQueue } from './PurchaseQueue'
+import { ConvertProformaModal, PurchaseProformas, salesOrdersOf } from './PurchaseQueue'
 
 type Snap = ReturnType<typeof useApp>['s']
 
@@ -16,13 +16,13 @@ export function poProgress(s: Snap, poId: string) {
   return { total: lines.length, planned: lines.filter((x) => x.transport_id).length, received: lines.filter((x) => !shipmentIsOpen(x)).length }
 }
 
-export function Purchases() {
+export function Purchases({ tab: initialTab = 'orders' }: { tab?: 'proforma' | 'orders' } = {}) {
   const { s } = useApp()
-  const waiting = linesToPurchase(s)
-  const [tab, setTab] = useState<'queue' | 'orders'>('orders')
+  const proformaCount = s.purchase_orders.filter((p) => p.status === 'proforma').length
+  const [tab, setTab] = useState<'proforma' | 'orders'>(initialTab)
   const [labelFilter, setLabelFilter] = useState<PurchaseLabel | ''>('')
   const [supplierFilter, setSupplierFilter] = useState('')
-  const all = [...s.purchase_orders].sort((a, b) => b.order_date.localeCompare(a.order_date) || b.number.localeCompare(a.number))
+  const all = s.purchase_orders.filter((po) => po.status !== 'proforma').sort((a, b) => b.order_date.localeCompare(a.order_date) || b.number.localeCompare(a.number))
   // De aantallen op de labels volgen de gekozen leverancier, zodat ze kloppen met wat je te zien krijgt.
   const forSupplier = all.filter((po) => !supplierFilter || po.supplier_id === supplierFilter)
   const rows = forSupplier.filter((po) => !labelFilter || (po.label ?? 'magazijn') === labelFilter)
@@ -30,11 +30,11 @@ export function Purchases() {
   const usedSuppliers = s.suppliers.filter((x) => all.some((po) => po.supplier_id === x.id)).sort((a, b) => a.name.localeCompare(b.name))
   return (
     <>
-      <Head title={tx("Inkooporders")} sub={tx("Gedurende de dag ontstaan verkooporders. Zet de regels die ingekocht moeten worden door naar een inkooporder bij de leverancier.")}>
+      <Head title={tx("Inkooporders")} sub={tx("Koop rechtstreeks in bij een leverancier met Nieuwe inkooporder, of zet een proforma om die vanzelf ontstaat uit een verkooporder met artikelen die niet op voorraad zijn.")}>
         <a className="btn primary" href="#inkoop-nieuw"><Plus size={16} />{tx("Nieuwe inkooporder")}</a>
       </Head>
-      <Tabs<'queue' | 'orders'> value={tab} onChange={setTab} tabs={[{ value: 'orders', label: tx("Inkooporders"), n: all.length }, { value: 'queue', label: tx("Inkoop vereist"), n: waiting.length }]} />
-      {tab === 'queue' && <PurchaseQueue onDone={() => setTab('orders')} />}
+      <Tabs<'proforma' | 'orders'> value={tab} onChange={(v) => { setTab(v); go(v === 'proforma' ? 'inkoop-proforma' : 'inkoop') }} tabs={[{ value: 'orders', label: tx("Inkooporders"), n: all.length }, { value: 'proforma', label: tx("Proforma"), n: proformaCount }]} />
+      {tab === 'proforma' && <PurchaseProformas onDone={() => { setTab('orders'); go('inkoop') }} />}
       {tab === 'orders' && <section className="panel">
         <div className="panel-head">
           <div className="chips" role="group" aria-label={tx("Filter op label")}>
@@ -55,8 +55,7 @@ export function Purchases() {
             const { total, planned, received } = poProgress(s, po.id)
             const value = round2(s.purchase_order_lines.filter((l) => l.purchase_order_id === po.id).reduce((n, l) => n + l.qty * l.unit_cost, 0))
             // Een inkooporder kan regels voor meerdere verkooporders hebben.
-            const orderIds = new Set(s.purchase_order_lines.filter((l) => l.purchase_order_id === po.id && l.sales_order_line_id).map((l) => s.sales_order_lines.find((x) => x.id === l.sales_order_line_id)?.sales_order_id))
-            const salesOrders = s.sales_orders.filter((o) => orderIds.has(o.id)).sort((a, b) => a.number.localeCompare(b.number))
+            const salesOrders = salesOrdersOf(s, po.id)
             const [label, tone]: [string, Tone] = po.status === 'cancelled' ? [tx("Geannuleerd"), ''] : received === total ? [tx("Ontvangen"), 'good'] : planned === total ? [tx("Ingepland"), 'info'] : [tx("Besteld"), 'warn']
             return (
               <tr key={po.id} className="click" onClick={() => go(`inkoop-${po.id}`)}>
@@ -84,17 +83,20 @@ export const LabelPill = ({ label = 'magazijn' }: { label?: PurchaseLabel }) => 
 export function PurchaseDetail({ id }: { id: string }) {
   const { s, run } = useApp()
   const [confirm, setConfirm] = useState(false)
+  const [convert, setConvert] = useState(false)
   const po = s.purchase_orders.find((p) => p.id === id)
   if (!po) return <div className="panel">{tx("Inkooporder niet gevonden.")} <a href="#inkoop">{tx("Terug naar inkoop")}</a>.</div>
   const lines = s.purchase_order_lines.filter((l) => l.purchase_order_id === id)
   const planned = s.transports.filter((t) => t.status === 'planned').sort((a, b) => a.departure_date.localeCompare(b.departure_date))
-  const shipmentOf = (lineId: string) => s.inbound_shipments.find((x) => s.inbound_shipment_lines.some((l) => l.shipment_id === x.id && l.purchase_order_line_id === lineId))!
+  const shipmentOf = (lineId: string) => s.inbound_shipments.find((x) => s.inbound_shipment_lines.some((l) => l.shipment_id === x.id && l.purchase_order_line_id === lineId))
   const supplier = s.suppliers.find((x) => x.id === po.supplier_id)
   const forSale = lines.some((l) => l.sales_order_line_id)
+  const isProforma = po.status === 'proforma'
   const hasReceipts = lines.some((l) => s.goods_receipt_lines.some((r) => r.shipment_line_id === s.inbound_shipment_lines.find((x) => x.purchase_order_line_id === l.id)?.id))
   return (
     <>
-      <Head title={<>{po.number} {forSale && <LabelPill label="verkoop" />}</>} sub={tx("{0}, besteld op {1}{2}", supplier?.name, fmtDate(po.order_date), po.supplier_reference ? tx(", referentie {0}", po.supplier_reference) : '')} back={{ href: '#inkoop', label: tx("Inkooporders") }}>
+      <Head title={<>{po.number} {isProforma && <Pill tone="warn">{tx("Proforma")}</Pill>} {forSale && <LabelPill label="verkoop" />}</>} sub={isProforma ? tx("{0}, ontstaan op {1}", supplier?.name, fmtDate(po.order_date)) : tx("{0}, besteld op {1}{2}", supplier?.name, fmtDate(po.order_date), po.supplier_reference ? tx(", referentie {0}", po.supplier_reference) : '')} back={isProforma ? { href: '#inkoop-proforma', label: tx("Proforma-inkooporders") } : { href: '#inkoop', label: tx("Inkooporders") }}>
+        {isProforma && <button className="btn primary" onClick={() => setConvert(true)}>{tx("Omzetten naar inkooporder")}<ArrowRight size={16} /></button>}
         {!forSale && <select style={{ width: 'auto' }} aria-label={tx("Label")} value={po.label ?? 'magazijn'} onChange={(e) => run((db) => setPurchaseLabel(db, id, e.target.value as PurchaseLabel), tx("Label aangepast"))}>
           <option value="showroom">{tx("Showroom")}</option>
           <option value="magazijn">{tx("Magazijn")}</option>
@@ -102,29 +104,37 @@ export function PurchaseDetail({ id }: { id: string }) {
         {po.status === 'open' && !hasReceipts && <button className="btn danger" onClick={() => setConfirm(true)}>{tx("Inkooporder annuleren")}</button>}
       </Head>
       <div className="stack">
+        {isProforma && (
+          <div className="note proforma">
+            <div>
+              <strong>{tx("Proforma, nog geen inkooporder")}</strong>
+              <div>{tx("{0} is vanzelf ontstaan uit de verkooporder, voor wat niet op voorraad is. Het nummer is tijdelijk. Wijzigt de verkooporder, dan wijzigt deze proforma mee. Zet hem om naar een inkooporder om te bestellen; dan krijgt hij een definitief nummer en kan hij op een transport.", po.number)}</div>
+            </div>
+          </div>
+        )}
         <section className="panel">
-          <h2>{tx("Bestelde producten")}</h2>
+          <h2>{isProforma ? tx("Producten") : tx("Bestelde producten")}</h2>
           <div className="table-wrap"><table>
             <thead><tr><th>{tx("Product")}</th><th>{tx("Voor")}</th><th className="num">{tx("Aantal")}</th><th className="num">{tx("Inkoopprijs")}</th><th className="num">{tx("Totaal")}</th><th style={{ minWidth: 190 }}>{tx("Transport")}</th><th>{tx("Verwacht")}</th><th style={{ minWidth: 170 }}>{tx("Bestemming")}</th></tr></thead>
             <tbody>{lines.map((l) => {
               const sol = s.sales_order_lines.find((x) => x.id === l.sales_order_line_id)
               const so = sol && s.sales_orders.find((o) => o.id === sol.sales_order_id)
               const x = shipmentOf(l.id)
-              const t = s.transports.find((r) => r.id === x.transport_id)
-              const open = shipmentIsOpen(x) && po.status === 'open'
+              const t = x && s.transports.find((r) => r.id === x.transport_id)
+              const open = !!x && shipmentIsOpen(x) && po.status === 'open'
               return (
                 <tr key={l.id}>
                   <td className="strong">{s.products.find((p) => p.id === l.product_id)?.name}<Sku code={s.products.find((p) => p.id === l.product_id)?.sku} /></td>
                   <td>{so ? <a className="rowlink" href={`#orders-${so.id}`}>{so.number}</a> : <span className="muted">{tx("Voorraad")}</span>}</td>
                   <td className="num">{l.qty}</td><td className="num">{eur(l.unit_cost)}</td><td className="num">{eur(l.qty * l.unit_cost)}</td>
-                  <td>{open && (!t || t.status === 'planned')
+                  <td>{x && open && (!t || t.status === 'planned')
                     ? <select aria-label={tx("Transport voor {0}", s.products.find((p) => p.id === l.product_id)?.name)} value={x.transport_id ?? ''} onChange={(e) => run((db) => assignShipmentsToTransport(db, [x.id], e.target.value || null), tx("Transport aangepast"))}>
                         <option value="">{tx("Nog niet ingepland")}</option>
                         {planned.map((r) => <option key={r.id} value={r.id}>{tx("{0}, vertrek {1}", r.number, fmtDate(r.departure_date))}</option>)}
                       </select>
                     : t?.number ?? '–'}</td>
-                  <td>{t ? fmtDate(x.expected_date) : <span className="muted">–</span>}</td>
-                  <td>{shipmentDestination(s, x)}{x.status === 'received' && <> <Pill tone="good">{tx("Ontvangen")}</Pill></>}</td>
+                  <td>{x && t ? fmtDate(x.expected_date) : <span className="muted">–</span>}</td>
+                  <td>{x ? <>{shipmentDestination(s, x)}{x.status === 'received' && <> <Pill tone="good">{tx("Ontvangen")}</Pill></>}</> : inboundWarehouse(s.warehouses)?.name}</td>
                 </tr>
               )
             })}</tbody>
@@ -132,11 +142,12 @@ export function PurchaseDetail({ id }: { id: string }) {
         </section>
         {po.notes && <section className="panel"><h2>{tx("Notitie")}</h2><p style={{ margin: 0 }}>{po.notes}</p></section>}
       </div>
+      {convert && <ConvertProformaModal ids={[id]} onClose={() => setConvert(false)} onDone={(ids) => { setConvert(false); if (ids[0]) go(`inkoop-${ids[0]}`) }} />}
       {confirm && (
         <Modal title={tx("{0} annuleren?", po.number)} onClose={() => setConfirm(false)} footer={<>
           <button className="btn" onClick={() => setConfirm(false)}>{tx("Terug")}</button>
           <button className="btn danger" onClick={async () => { await run((db) => cancelPurchaseOrder(db, id), tx("Inkooporder geannuleerd")); setConfirm(false) }}>{tx("Inkooporder annuleren")}</button>
-        </>}><p style={{ margin: 0 }}>{tx("De regels vervallen. Verkooporders die hierop wachten, verschijnen weer bij Inkoop vereist.")}</p></Modal>
+        </>}><p style={{ margin: 0 }}>{tx("De regels vervallen. Wat verkooporders hiervan nodig hebben, komt terug op een proforma-inkooporder.")}</p></Modal>
       )}
     </>
   )
@@ -164,6 +175,22 @@ export function PurchaseForm({ orderId }: { orderId?: string } = {}) {
   const patchLine = (key: number, patch: Partial<PoLine>) => setLines((v) => v.map((l) => l.key === key ? { ...l, ...patch } : l))
   const total = round2(lines.reduce((n, l) => n + l.qty * l.unit_cost, 0))
   const isSale = lines.some((l) => l.sales_order_line_id)
+  // Rechtstreeks bij de leverancier, of uit hoofde van een verkooporder: wat daarvan nog niet is ingekocht.
+  const need = linesToPurchase(s)
+  const supplierOf = (productId: string) => productOf(productId)?.supplier_id ?? ''
+  const fits = (productId: string, sup: string) => !sup || !supplierOf(productId) || supplierOf(productId) === sup
+  const openFor = (oid: string, sup: string) => need.filter((l) => l.sales_order_id === oid && fits(l.product_id, sup) && !lines.some((x) => x.sales_order_line_id === l.id))
+  const orderChoices = s.sales_orders.filter((o) => o.status === 'open' && openFor(o.id, supplier).length > 0).sort((a, b) => b.number.localeCompare(a.number))
+  const addFromOrder = (oid: string) => {
+    const sup = supplier || need.filter((l) => l.sales_order_id === oid).map((l) => supplierOf(l.product_id)).find(Boolean) || ''
+    if (!supplier && sup) setSupplier(sup)
+    setLines((v) => [...v, ...openFor(oid, sup).map((l) => ({ key: k++, product_id: l.product_id, qty: l.qty, unit_cost: productOf(l.product_id)?.purchase_price ?? 0, sales_order_line_id: l.id }))])
+  }
+  const changeSupplier = (sup: string) => {
+    setSupplier(sup)
+    // Regels van een verkooporder horen bij de leverancier van het artikel.
+    setLines((v) => v.filter((l) => !l.sales_order_line_id || fits(l.product_id, sup)))
+  }
   const save = async () => {
     let id = ''
     const ok = await run(async (db) => {
@@ -178,7 +205,7 @@ export function PurchaseForm({ orderId }: { orderId?: string } = {}) {
         <section className="panel">
           <h2>{tx("Inkooporder")}</h2>
           <div className="form-grid">
-            <SelectField className="span-2" label={tx("Leverancier")} value={supplier} onChange={setSupplier} placeholder={tx("Kies een leverancier")} options={suppliers.map((x) => ({ value: x.id, label: `${x.name} (${x.country})` }))} />
+            <SelectField className="span-2" label={tx("Leverancier")} value={supplier} onChange={changeSupplier} placeholder={tx("Kies een leverancier")} options={suppliers.map((x) => ({ value: x.id, label: `${x.name} (${x.country})` }))} />
             <TextField label={tx("Besteldatum")} type="date" value={orderDate} onChange={setOrderDate} />
             <TextField label={tx("Referentie leverancier")} value={reference} onChange={setReference} placeholder={tx("Ordernummer bij leverancier")} />
             {isSale
@@ -188,8 +215,19 @@ export function PurchaseForm({ orderId }: { orderId?: string } = {}) {
           </div>
         </section>
         <section className="panel">
-          <div className="panel-head"><h2>{tx("Producten")}</h2><button className="btn sm" onClick={() => setLines((v) => [...v, { key: k++, product_id: '', qty: 1, unit_cost: 0, sales_order_line_id: null }])}><Plus size={14} />{tx("Regel toevoegen")}</button></div>
-          {lines.length === 0 && <Empty>{tx("Voeg het eerste product toe.")}</Empty>}
+          <div className="panel-head"><h2>{tx("Producten")}</h2><div className="btn-row" style={{ alignItems: 'center' }}>
+            <select style={{ width: 'auto', minHeight: 32, maxWidth: 360 }} aria-label={tx("Regels uit verkooporder")} value="" disabled={!orderChoices.length} onChange={(e) => { if (e.target.value) addFromOrder(e.target.value) }}>
+              <option value="">{orderChoices.length ? tx("Regels uit verkooporder…") : tx("Geen verkooporder met artikelen op bestelling")}</option>
+              {orderChoices.map((o) => {
+                const c = s.customers.find((x) => x.id === o.customer_id)
+                const n = openFor(o.id, supplier).length
+                return <option key={o.id} value={o.id}>{tx("{0}, {1} ({2})", o.number, c?.company || c?.name || '–', n === 1 ? tx("1 regel") : tx("{0} regels", n))}</option>
+              })}
+            </select>
+            <button className="btn sm" onClick={() => setLines((v) => [...v, { key: k++, product_id: '', qty: 1, unit_cost: 0, sales_order_line_id: null }])}><Plus size={14} />{tx("Regel toevoegen")}</button>
+          </div></div>
+          {lines.length === 0 && <Empty>{tx("Voeg het eerste product toe, of neem de regels over uit een verkooporder.")}</Empty>}
+          {isSale && <p className="small muted" style={{ marginTop: 0 }}>{tx("Regels uit een verkooporder gaan bij het aanmaken van de proforma-inkooporder af.")}</p>}
           {lines.length > 0 && (
             <div className="table-wrap"><table>
               <thead><tr><th style={{ minWidth: 260 }}>{tx("Product")}</th><th>{tx("Voor verkooporder")}</th><th className="num">{tx("Aantal")}</th><th className="num">{tx("Inkoopprijs")}</th><th className="num">{tx("Totaal")}</th><th></th></tr></thead>
