@@ -9,7 +9,7 @@ import type { CatalogArticle, Supplier } from '../src/data/types'
 import { ARTICLE_CATEGORIES, ARTICLE_NUMBER, ArticleStore, categoryFor, priceWithSurcharge, formatArticleNumber, suggestSupplierCode } from '../src/domain/articles'
 import { seedDemo } from '../src/domain/demo'
 import {
-  createOrder, saveSupplierSurcharge, importCatalog, importShowroom, importShowroomDetails, importSupplierFile, productForArticle, saveSupplier, syncCatalogArticles,
+  createOrder, saveSupplierSurcharge, importShowroom, importShowroomDetails, importSupplierFile, productForArticle, saveSupplier, syncCatalogArticles,
 } from '../src/domain/services'
 import { toSeedSql } from '../scripts/seed-sql'
 
@@ -207,15 +207,14 @@ describe('toeslag per leverancier', () => {
 })
 
 describe('echte catalogi van Life Outdoor Living', () => {
-  it('alle 10.000 artikelen en elementen krijgen een uniek nummer', async () => {
-    await importCatalog(db, readFileSync('public/assets/catalogus/supplier_catalog_items.csv', 'utf8'))
+  it('alle 9.391 artikelen en elementen van de showroom krijgen een uniek nummer', async () => {
     await importShowroom(db, readFileSync('public/assets/catalogus/supplier_showroom_items.csv', 'utf8'))
     await importShowroomDetails(db, readFileSync('public/assets/catalogus/supplier_showroom_details.csv', 'utf8'))
     const t0 = performance.now()
     const r = await syncCatalogArticles(db)
     const ms = performance.now() - t0
     const arts = db.articles.articles
-    const skus = new Set([...db.data.supplier_showroom_items, ...db.data.supplier_catalog_items].map((x) => x.supplier_sku.toLowerCase()))
+    const skus = new Set(db.data.supplier_showroom_items.map((x) => x.supplier_sku.toLowerCase()))
     expect(arts.length).toBe(skus.size)
     expect(r.added).toBe(skus.size)
     expect(new Set(arts.map((a) => a.article_number)).size).toBe(arts.length)
@@ -339,13 +338,10 @@ describe('database', () => {
     expect(t.filter((r) => r.reason === 'gewijzigd').map((r) => r.supplier_sku)).toEqual(['S0', 'S1'])
     expect(t.filter((r) => r.reason === 'ronde')).toHaveLength(1)
     expect(await todo(10, 3)).toHaveLength(3)
-    // Eigen artikelnummers aan het eind van de sync, ook voor wat alleen in de webshop staat.
-    await pg.query(`insert into supplier_catalog_items (supplier_name, supplier_sku, name, price_regular, categories) values ($1, 'W-1', 'Webshop tuintafel', 300, '[{"name":"Tuintafels","url_path":"x"}]')`, [LOL])
-    const r = await call('select sync_catalog_articles($1) as r', LOL)
-    expect(r).toMatchObject({ showroom: { new: 6 }, webshop: { new: 1, changed: 0 }, total: 7 })
-    const w = (await pg.query<{ article_number: string; price: number }>(`select article_number, price::float as price from catalog_articles where supplier_sku = 'W-1'`)).rows[0]
-    expect(w.article_number).toMatch(/^LOL-TAF-\d{10}$/)
-    expect(await call('select sync_catalog_articles($1) as r', LOL)).toMatchObject({ showroom: { new: 0 }, webshop: { new: 0 }, total: 7 })
+    // Eigen artikelnummers aan het eind van de sync, alleen uit de showroom (de webshoptabel bestaat niet meer).
+    expect(await call('select sync_catalog_articles($1) as r', LOL)).toMatchObject({ new: 6, total: 6 })
+    expect((await pg.query(`select to_regclass('supplier_catalog_items') as t`)).rows[0]).toEqual({ t: null })
+    expect(await call('select sync_catalog_articles($1) as r', LOL)).toMatchObject({ new: 0, total: 6 })
     await pg.query(`update suppliers set code = null where name = $1`, [LOL])
     await expect(call('select sync_catalog_articles($1) as r', LOL)).rejects.toThrow(/afkorting/)
   }, 60000)

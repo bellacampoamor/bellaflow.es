@@ -12,7 +12,7 @@ import { TABLES } from '../src/data/types'
 import { archiveRows, openLinesOnTransport, linePurchaseStatus, linesToPurchase, documentLanguage, flowCounts, freeAt, transportLoad, invoiceBalance, onHandMap, orderStage, orderTab, reservedMap, stockKey, vatBreakdown , invoiceReport, periodRange, invoiceQrUrl, hasTaxId, driverStops } from '../src/domain/calc'
 import { renameOldSuppliers, restoreSettings, restoreSuppliers, seedDemo } from '../src/domain/demo'
 import {
-  importCatalog, importShowroom, importShowroomDetails, importSupplierFile, createDelivery, createInvoice, markDeliveriesReady, createOrder, createPurchaseOrder, invoiceProformas, lineFromProduct, markDelivered, assignShipmentsToTransport, cancelTransport, convertLinesToPurchaseOrders, createTransport, markReady, receiveGoods, rescheduleDelivery, rescheduleOrder, saveRouteOrder, saveSettings, mailSignedNote, setPurchaseLabel, signDelivery, splitLinesForStock, setDeliveryInTransit, setTransportStatus, updateTransport, transferStock,
+  importShowroom, importShowroomDetails, importSupplierFile, createDelivery, createInvoice, markDeliveriesReady, createOrder, createPurchaseOrder, invoiceProformas, lineFromProduct, markDelivered, assignShipmentsToTransport, cancelTransport, convertLinesToPurchaseOrders, createTransport, markReady, receiveGoods, rescheduleDelivery, rescheduleOrder, saveRouteOrder, saveSettings, mailSignedNote, setPurchaseLabel, signDelivery, splitLinesForStock, setDeliveryInTransit, setTransportStatus, updateTransport, transferStock,
 } from '../src/domain/services'
 import { estimateMatrix, parseRouterTable } from '../src/data/geo'
 import { dropIndex, googleMapsRouteUrl, moveItem, optimizeRoute, tourCost } from '../src/domain/route'
@@ -21,7 +21,7 @@ import { en } from '../src/i18n.en'
 import { toSeedSql } from '../scripts/seed-sql'
 import { pageNumbers } from '../src/ui/kit'
 import { partOf, showroomOf, showroomParts } from '../src/domain/showroom'
-import { catalogOf, elementsOf, imageSrc, parseCsv, safeHtml, seriesCode } from '../src/domain/catalog'
+import { imageSrc, parseCsv, safeHtml } from '../src/domain/catalog'
 
 const TODAY = '2026-11-04'
 let db: LocalDriver
@@ -751,53 +751,6 @@ describe('database', () => {
 })
 
 describe('catalogi', () => {
-  const CSV = readFileSync('public/assets/catalogus/supplier_catalog_items.csv', 'utf8')
-  const lol = () => db.data.suppliers.find((x) => x.name === 'Life Outdoor Living International B.V.')!
-
-  it('leest de export van de leverancier volledig in, per leverancier en zonder dubbelingen', async () => {
-    expect(await importCatalog(db, CSV)).toEqual({ added: 642, updated: 0 })
-    const s = await loadSnapshot(db)
-    const list = catalogOf(s, lol().id, { withElements: true })
-    expect(list).toHaveLength(642)
-    expect(catalogOf(s, s.suppliers.find((x) => x.id !== lol().id)!.id)).toHaveLength(0)
-    const cover = list.find((x) => x.supplier_sku === '24-1641-889')!
-    expect(cover).toMatchObject({ name: 'Ligbedhoes Fits Roy 2-personen - 218x173x39cm', price_regular: 98.75, price_final: 79, stock_status: 'IN_STOCK', supplier_id: lol().id })
-    expect(cover.image_urls[0].url).toMatch(/^https:\/\/www\.lifeoutdoorliving\.com\/.*24-1641-889-V1\.png$/)
-    expect(cover.categories[0].name).toBe('Beschermhoezen en onderhoudsmiddelen')
-    // Opnieuw inlezen werkt bij, het ID blijft gelijk.
-    expect(await importCatalog(db, CSV)).toEqual({ added: 0, updated: 642 })
-    expect((await loadSnapshot(db)).supplier_catalog_items.find((x) => x.supplier_sku === '24-1641-889')!.id).toBe(cover.id)
-  })
-  it('zoekt op naam, artikelnummer en categorie', async () => {
-    await importCatalog(db, CSV)
-    const s = await loadSnapshot(db)
-    expect(catalogOf(s, lol().id, { q: '24-1641-889' }).map((x) => x.supplier_sku)).toEqual(['24-1641-889'])
-    const dining = catalogOf(s, lol().id, { category: 'Dining tuinsets' })
-    expect(dining.length).toBeGreaterThan(0)
-    expect(dining.every((x) => x.categories.some((c) => c.name === 'Dining tuinsets'))).toBe(true)
-  })
-  it('toont bij een artikel de elementen uit dezelfde serie', async () => {
-    await importCatalog(db, CSV)
-    const s = await loadSnapshot(db)
-    expect([seriesCode('CONFIG-TIM-OPST1'), seriesCode('PRX-BBR-LMP-FLO'), seriesCode('24-1641-889'), seriesCode('CONFIG-24-1718')]).toEqual(['TIM', 'PRX', null, null])
-    const timber = s.supplier_catalog_items.find((x) => x.supplier_sku === 'CONFIG-TIM-OPST1')!
-    const els = elementsOf(s, timber)
-    expect(els.map((x) => x.supplier_sku)).toEqual(expect.arrayContaining(['CONFIG-TIM-TUS', 'CONFIG-TIM-POE', 'CONFIG-TIM-STO']))
-    // Andere opstellingen zijn geen element; elementen zelf hebben geen elementen.
-    expect(els.some((x) => x.supplier_sku.startsWith('CONFIG-TIM-OPST'))).toBe(false)
-    expect(els.every((x) => seriesCode(x.supplier_sku) === 'TIM')).toBe(true)
-    expect(elementsOf(s, els[0])).toEqual([])
-    expect(elementsOf(s, s.supplier_catalog_items.find((x) => x.supplier_sku === '24-1641-889')!)).toEqual([])
-    // De lijst toont alleen hoofdartikelen: elementen staan alleen op de artikelkaart van de set.
-    const list = catalogOf(s, lol().id).map((x) => x.supplier_sku)
-    expect(list).toContain('CONFIG-TIM-OPST1')
-    expect(list).not.toContain('CONFIG-TIM-TUS')
-    expect(list).toContain('24-1641-889')
-    expect(catalogOf(s, lol().id, { withElements: true })).toHaveLength(642)
-  })
-  it('weigert een leverancier die niet onder Beheer staat', async () => {
-    await expect(importCatalog(db, 'supplier_name,supplier_sku,name\nOnbekend B.V.,A1,Stoel\n')).rejects.toThrow(/Onbekend B\.V\..*Beheer/)
-  })
   it('pagineert met weglatingstekens', () => {
     expect(pageNumbers(1, 1)).toEqual([1])
     expect(pageNumbers(1, 10)).toEqual([1, 2, '…', 10])
@@ -813,16 +766,6 @@ describe('catalogi', () => {
     expect(imageSrc('javascript:alert(1)')).toBe('')
     expect(imageSrc('https://a.test/x.png')).toBe('https://a.test/x.png')
   })
-  it('de catalogus past in de database', async () => {
-    await importCatalog(db, CSV)
-    const pg = new PGlite()
-    await pg.exec('create role authenticated;')
-    await pg.exec(readdirSync('supabase/migrations').sort().map((f) => readFileSync(`supabase/migrations/${f}`, 'utf8')).join('\n'))
-    await pg.exec(toSeedSql(await loadSnapshot(db)))
-    const r = await pg.query<{ n: number; imgs: number }>(`select count(*)::int as n, sum(jsonb_array_length(image_urls))::int as imgs from supplier_catalog_items`)
-    expect(r.rows[0].n).toBe(642)
-    expect(r.rows[0].imgs).toBe(db.data.supplier_catalog_items.reduce((n, x) => n + x.image_urls.length, 0))
-  }, 60000)
 })
 
 describe('showroom', () => {
@@ -892,9 +835,9 @@ describe('showroom', () => {
     expect(showroomOf(s, sup, { q: 'T-LAMP-2' }).map((x) => x.supplier_sku)).toEqual(['T-LAMP-2'])
     expect(await importShowroomDetails(db, DETAILS)).toEqual({ added: 0, updated: 1 })
   })
-  it('herkent aan de kopregel of het showroom of webshop is', async () => {
+  it('herkent aan de kopregel een export van de showroom en weigert andere bestanden', async () => {
     expect((await importSupplierFile(db, CSV)).kind).toBe('showroom')
-    expect((await importSupplierFile(db, readFileSync('public/assets/catalogus/supplier_catalog_items.csv', 'utf8'))).kind).toBe('catalogus')
+    await expect(importSupplierFile(db, 'supplier_name,supplier_sku,name\nX,A1,Stoel\n')).rejects.toThrow(/geen export van de showroom/)
   })
   it('de showroom past in de database', async () => {
     await importShowroom(db, CSV)

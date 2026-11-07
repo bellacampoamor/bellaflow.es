@@ -2,7 +2,7 @@
 // Opbouw LLL-CCC-0000000000: afkorting leverancier, afkorting categorie, tiencijferig volgnummer dat uniek is over alle leveranciers.
 // Een toegekend nummer wijzigt nooit. Dit bestand bevat alleen rekenwerk; opslaan loopt via de Driver.
 import type { ArticleHit, ArticleQuery, CatalogArticle, CatalogArticleElement, Snapshot, Supplier } from '../data/types'
-import { elementsOf, isSetArticle, sameName } from './catalog'
+import { sameName } from './catalog'
 import { showroomCategories, showroomParts } from './showroom'
 
 /**
@@ -79,11 +79,10 @@ export interface SourceLink { supplier_id: string; parent_sku: string; element_s
 const skuKey = (supplierId: string, sku: string) => `${supplierId}|${sku.trim().toLowerCase()}`
 
 /**
- * Alle artikelen en koppelingen uit de ingelezen catalogi. De showroom gaat voor de webshop bij hetzelfde artikelnummer.
- * Koppelingen: de elementen van de productpagina in de showroom (of de delen uit de naam), en in de webshop de losse
- * artikelen uit dezelfde serie als een set.
+ * Alle artikelen en koppelingen uit de showroom van de leveranciers. Koppelingen: de elementen van de productpagina
+ * (of, zonder productpagina, de delen uit de naam).
  */
-export function articleSources(s: Pick<Snapshot, 'suppliers' | 'supplier_showroom_items' | 'supplier_showroom_details' | 'supplier_catalog_items'>) {
+export function articleSources(s: Pick<Snapshot, 'suppliers' | 'supplier_showroom_items' | 'supplier_showroom_details'>) {
   const supplierOf = (name: string, id?: string | null) => s.suppliers.find((x) => x.id === id) ?? s.suppliers.find((x) => sameName(x.name, name))
   const unknown = new Set<string>()
   const out = new Map<string, ArticleSource>()
@@ -98,16 +97,6 @@ export function articleSources(s: Pick<Snapshot, 'suppliers' | 'supplier_showroo
       price: x.price, currency: x.currency, image_url: x.image_url, source: 'showroom', active: x.active !== false,
     })
     ;(parts.get(x.id) ?? []).forEach((c, i) => links.push({ supplier_id: sup.id, parent_sku: x.supplier_sku, element_sku: c.supplier_sku, position: i + 1 }))
-  }
-  for (const x of s.supplier_catalog_items) {
-    const sup = supplierOf(x.supplier_name, x.supplier_id)
-    if (!sup) { unknown.add(x.supplier_name); continue }
-    const key = skuKey(sup.id, x.supplier_sku)
-    if (!out.has(key)) out.set(key, {
-      supplier_id: sup.id, supplier_sku: x.supplier_sku.trim(), ean: '', name: x.name, series: '', categories: x.categories.map((c) => c.name),
-      price: x.price_regular || x.price_final || null, currency: x.currency, image_url: x.image_urls[0]?.url ?? '', source: 'webshop', active: x.active,
-    })
-    if (isSetArticle(x)) elementsOf(s as Snapshot, x).forEach((c, i) => links.push({ supplier_id: sup.id, parent_sku: x.supplier_sku, element_sku: c.supplier_sku, position: i + 1 }))
   }
   return { sources: [...out.values()], links, unknownSuppliers: [...unknown] }
 }
@@ -162,8 +151,8 @@ export function planArticleSync(
   const loaded = new Set(sources.map((x) => x.supplier_id))
   for (const a of existing.articles) if (a.active && loaded.has(a.supplier_id) && !srcByKey.has(skuKey(a.supplier_id, a.supplier_sku))) updates.push({ ...a, active: false })
 
-  // Vaste volgorde: per leverancier, showroom voor webshop, op artikelnummer van de leverancier.
-  fresh.sort((a, b) => a.supplier_code.localeCompare(b.supplier_code) || Number(a.source !== 'showroom') - Number(b.source !== 'showroom') || a.supplier_sku.localeCompare(b.supplier_sku))
+  // Vaste volgorde: per leverancier, op artikelnummer van de leverancier.
+  fresh.sort((a, b) => a.supplier_code.localeCompare(b.supplier_code) || a.supplier_sku.localeCompare(b.supplier_sku))
   return { updates, fresh, links }
 }
 

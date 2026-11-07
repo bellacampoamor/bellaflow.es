@@ -5,9 +5,9 @@ import { loadSnapshot, newId, type Driver } from '../data/driver'
 import type {
   EmailStatus, Language,
   Delivery, Fulfilment, InboundShipment, InvoiceLine, OrderType, Payment, Product, PurchaseLabel, SalesOrder, Settings,
-  SalesOrderLine, Snapshot, StockMovement, SupplierCatalogItem, CatalogArticle, Supplier, ArticleQuery, SupplierShowroomDetail, SupplierShowroomItem, TableName,
+  SalesOrderLine, Snapshot, StockMovement, CatalogArticle, Supplier, ArticleQuery, SupplierShowroomDetail, SupplierShowroomItem, TableName,
 } from '../data/types'
-import { CATALOG_COLUMNS, catalogItemFromCsv, parseCsv, sameName } from './catalog'
+import { parseCsv, sameName } from './catalog'
 import { articleSources, categoryName, priceWithSurcharge, finishArticleSync, missingSupplierCodes, planArticleSync } from './articles'
 import { DETAIL_COLUMNS, SHOWROOM_COLUMNS, showroomDetailFromCsv, showroomItemFromCsv } from './showroom'
 import {
@@ -654,38 +654,6 @@ export async function payInvoice(db: Driver, input: { invoice_id: string; amount
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
-/** Leest een catalogus in uit een csv-export. Bestaande artikelen worden bijgewerkt op leverancier en artikelnummer. */
-export async function importCatalog(db: Driver, csv: string) {
-  const rows = parseCsv(csv)
-  if (!rows.length) fail(tx("Het bestand bevat geen artikelen."))
-  const missing = CATALOG_COLUMNS.filter((c) => !(c in rows[0]))
-  if (missing.length) fail(tx("Het bestand mist de kolom {0}. Gebruik een export van supplier_catalog_items.", missing.join(', ')))
-  const suppliers = await db.list('suppliers')
-  const unknown = [...new Set(rows.map((r) => r.supplier_name.trim()))].filter((n) => !suppliers.some((x) => sameName(x.name, n)))
-  if (unknown.length) fail(tx("Leverancier {0} staat niet onder Beheer. Voeg die eerst toe met precies deze naam.", unknown.join(', ')))
-  const current = await db.list('supplier_catalog_items')
-  const byKey = new Map(current.map((x) => [`${x.supplier_name.toLowerCase()}|${x.supplier_sku.toLowerCase()}`, x.id]))
-  const usedIds = new Set(current.map((x) => x.id))
-  let added = 0, updated = 0
-  const out = new Map<string, SupplierCatalogItem>()
-  for (const r of rows) {
-    if (!r.supplier_sku?.trim() || !r.name?.trim()) continue
-    const item = catalogItemFromCsv(r, suppliers.find((x) => sameName(x.name, r.supplier_name)))
-    const key = `${item.supplier_name.toLowerCase()}|${item.supplier_sku.toLowerCase()}`
-    let id = byKey.get(key)
-    if (id) updated++
-    else {
-      id = UUID.test(r.id ?? '') && !usedIds.has(r.id) ? r.id : newId()
-      added++
-    }
-    byKey.set(key, id); usedIds.add(id)
-    out.set(id, { ...item, id })
-  }
-  if (!out.size) fail(tx("Het bestand bevat geen artikelen."))
-  await db.upsert('supplier_catalog_items', [...out.values()])
-  return { added, updated }
-}
-
 /** Leest de showroom-export (supplier_showroom_items.csv) in. Bestaande artikelen worden bijgewerkt op leverancier en artikelnummer. */
 export async function importShowroom(db: Driver, csv: string) {
   const rows = parseCsv(csv)
@@ -740,11 +708,12 @@ export async function importShowroomDetails(db: Driver, csv: string) {
   return { added, updated }
 }
 
-/** Kiest aan de kopregel welke export het is: showroom, details van de showroom of webshopcatalogus. */
+/** Kiest aan de kopregel welke export het is: de showroom of de details van de showroom. */
 export async function importSupplierFile(db: Driver, csv: string) {
   const head = csv.replace(/^\uFEFF/, '').split(/\r?\n/, 1)[0]
   const result = /(^|,)specifications(,|$)/.test(head) ? { kind: 'details' as const, ...(await importShowroomDetails(db, csv)) }
-    : /(^|,)available_text(,|$)|(^|,)ean(,|$)/.test(head) ? { kind: 'showroom' as const, ...(await importShowroom(db, csv)) } : { kind: 'catalogus' as const, ...(await importCatalog(db, csv)) }
+    : /(^|,)available_text(,|$)|(^|,)ean(,|$)/.test(head) ? { kind: 'showroom' as const, ...(await importShowroom(db, csv)) }
+    : fail(tx("Dit bestand is geen export van de showroom (supplier_showroom_items of supplier_showroom_details)."))
   return { ...result, articles: await syncCatalogArticles(db) }
 }
 

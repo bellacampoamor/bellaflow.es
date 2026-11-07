@@ -5,7 +5,7 @@ import { App } from './App'
 import { LocalDriver } from './data/localDriver'
 import { createSupabase, SupabaseDriver } from './data/supabaseDriver'
 import { renameOldSuppliers, restoreSettings, restoreSuppliers, seedDemo } from './domain/demo'
-import { importCatalog, importShowroom, importShowroomDetails, syncCatalogArticles } from './domain/services'
+import { importShowroom, importShowroomDetails, syncCatalogArticles } from './domain/services'
 import { AppProvider } from './ui/app-context'
 import { LogoFull } from './ui/kit'
 import './styles.css'
@@ -13,7 +13,7 @@ import { tx } from './i18n'
 
 const Loading = () => <div className="wrap" style={{ paddingBlock: 40 }}>{tx("Gegevens laden…")}</div>
 
-// Catalogi van Life Outdoor Living uit de aangeleverde exports: de webshop en de dealershowroom.
+// De showroom van Life Outdoor Living uit de aangeleverde exports. Bella werkt alleen met de showroom.
 // Ze staan niet in de browseropslag en worden bij elke start opnieuw ingelezen.
 async function loadCatalogFiles(d: LocalDriver) {
   const load = async (file: string, read: (db: LocalDriver, csv: string) => Promise<unknown>) => {
@@ -22,7 +22,6 @@ async function loadCatalogFiles(d: LocalDriver) {
       if (res.ok) await read(d, await res.text())
     } catch { /* blijft leeg; inlezen kan ook met de knop */ }
   }
-  if (!(await d.list('supplier_catalog_items')).length) await load('supplier_catalog_items.csv', importCatalog)
   if (!(await d.list('supplier_showroom_items')).length) await load('supplier_showroom_items.csv', importShowroom)
   if (!(await d.list('supplier_showroom_details')).length) await load('supplier_showroom_details.csv', importShowroomDetails)
   // Eigen artikelnummers voor alle artikelen en elementen. In de browser in het geheugen; met de database blijven ze bewaard.

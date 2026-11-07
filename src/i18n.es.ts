@@ -1001,4 +1001,6 @@ export const es: Record<string, string> = {
   "{0} heeft geen leverancier.": "{0} no tiene proveedor.",
   "Geen leverancier bij dit artikel": "Este artículo no tiene proveedor",
   "Toeslag op de prijs van de leverancier voor transport en distributie naar Spanje. In de verkooporder zit de toeslag onzichtbaar in de prijs van een catalogusartikel. Een artikel dat al eens verkocht is, houdt zijn verkoopprijs.": "Recargo sobre el precio del proveedor por transporte y distribución a España. En el pedido de venta va incluido, sin mostrarse, en el precio de un artículo del catálogo. Un artículo ya vendido antes mantiene su precio de venta.",
+  "Dit bestand is geen export van de showroom (supplier_showroom_items of supplier_showroom_details).": "Este archivo no es una exportación del showroom (supplier_showroom_items o supplier_showroom_details).",
+  "De showroom van elke leverancier, zoals de leverancier die aanbiedt. Klik op een artikel voor de artikelkaart.": "El showroom de cada proveedor, tal como lo ofrece. Haga clic en un artículo para ver su ficha.",
 }
