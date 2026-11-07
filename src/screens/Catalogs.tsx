@@ -178,7 +178,7 @@ function ArticleCard({ supplierId, item, onOpen, onClose }: { supplierId?: strin
             <div className="note">
               <span className="strong">{tx("In assortiment")}</span>: {own.name}, {tx("verkoopprijs")} {eur(own.sale_price)}, {tx("{0} vrij op voorraad", free)}.
             </div>
-          ) : <p className="muted small" style={{ margin: 0 }}>{tx("Niet in het eigen assortiment onder Beheer.")}</p>}
+          ) : <p className="muted small" style={{ margin: 0 }}>{tx("Nog niet verkocht: wordt een product zodra het op een verkooporder komt.")}</p>}
           {item.short_description_html && <p className="cat-lead" dangerouslySetInnerHTML={{ __html: safeHtml(item.short_description_html) }} />}
         </div>
       </div>

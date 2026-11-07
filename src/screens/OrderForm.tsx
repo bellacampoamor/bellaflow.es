@@ -3,6 +3,7 @@ import { CreditCard, Layers, Plus, Trash2 } from 'lucide-react'
 import type { CatalogArticle, Customer, Fulfilment, Payment } from '../data/types'
 import { inboundByProduct, lineTotal, onHandMap, plannedQty, reservedMap, round2, stockKey, todayISO, vatBreakdown } from '../domain/calc'
 import { catalogArticlesByNumber, createOrder, lineFromProduct, saveRecord, splitLinesForStock, updateOrder, type OrderHeader, type OrderLineInput } from '../domain/services'
+import { priceWithSurcharge } from '../domain/articles'
 import { ArticleSearch, ElementsModal, SearchSourceChips, useSearchSources, type ArticlePick } from '../ui/ArticleSearch'
 import { loadSnapshot } from '../data/driver'
 import { go, useApp } from '../ui/app-context'
@@ -94,14 +95,15 @@ export function OrderForm({ id }: { id?: string }) {
   const pickArticle = (key: number, pick: ArticlePick) => {
     if (pick.kind === 'product') return pickProduct(key, pick.product.id)
     const a = pick.article
-    patch(key, { product_id: '', article: a, description: a.name, unit_price: a.price ?? 0, vat_rate: 21, source: 'bestelling', take_now: false, warehouse_id: null })
+    // De toeslag van de leverancier zit onzichtbaar in de prijs.
+    patch(key, { product_id: '', article: a, description: a.name, unit_price: priceWithSurcharge(a.price, s.suppliers.find((x) => x.id === a.supplier_id)) ?? 0, vat_rate: 21, source: 'bestelling', take_now: false, warehouse_id: null })
   }
   const addArticleLine = (a: CatalogArticle) => {
     const p = s.products.find((x) => x.catalog_article_number === a.article_number)
     const wid = p ? bestWarehouse(p.id, 1) : null
     const line: Line = p
       ? { ...lineFromProduct(p, { source: wid ? 'voorraad' : 'bestelling', warehouse_id: wid }), key: k++ }
-      : { ...lineFromProduct({ id: '', name: a.name, sale_price: a.price ?? 0, vat_rate: 21 } as never, { source: 'bestelling' }), article: a, key: k++ }
+      : { ...lineFromProduct({ id: '', name: a.name, sale_price: priceWithSurcharge(a.price, s.suppliers.find((x) => x.id === a.supplier_id)) ?? 0, vat_rate: 21 } as never, { source: 'bestelling' }), article: a, key: k++ }
     setLines((v) => [...v, line])
   }
 
@@ -186,7 +188,7 @@ export function OrderForm({ id }: { id?: string }) {
                           <span style={{ minWidth: 0 }}>
                             <span className="muted">{tx("Artikelnummer")}: </span><span className="strong">{art?.article_number ?? productOf(l.product_id)?.sku}</span>
                             {art && <><span className="muted"> · {tx("Artikelnummer leverancier")}: </span>{art.supplier_sku}<span className="muted"> · {s.suppliers.find((x) => x.id === art.supplier_id)?.name}</span></>}
-                            {l.article && !l.product_id && <span className="muted"> · {tx("Komt bij opslaan onder Beheer")}</span>}
+                            {l.article && !l.product_id && <span className="muted"> · {tx("Nieuw product, wordt bij opslaan vastgelegd")}</span>}
                           </span>
                           {art && <button type="button" className="btn sm" onClick={() => setElementsFor(art)}><Layers size={14} />{tx("Elementen")}{l.article && 'element_count' in l.article ? ` (${(l.article as { element_count: number }).element_count})` : ''}</button>}
                         </div>

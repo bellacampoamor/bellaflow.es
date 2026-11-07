@@ -1,8 +1,8 @@
-// Artikel zoeken in de verkooporder: eigen assortiment en alle catalogi tegelijk, of alleen de gekozen catalogi.
+// Artikel zoeken in de verkooporder: alle catalogi tegelijk, of alleen de gekozen catalogi.
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Plus } from 'lucide-react'
 import type { ArticleHit, CatalogArticle, Product } from '../data/types'
-import { categoryName } from '../domain/articles'
+import { categoryName, priceWithSurcharge } from '../domain/articles'
 import { onHandMap, reservedMap, stockKey } from '../domain/calc'
 import { catalogArticleCounts, catalogArticleElements, catalogArticlesBySku, searchCatalogArticles } from '../domain/services'
 import { useApp } from './app-context'
@@ -11,13 +11,13 @@ import { locale, tx } from '../i18n'
 
 export type ArticlePick = { kind: 'product'; product: Product } | { kind: 'article'; article: CatalogArticle }
 
-/** Waar gezocht wordt: het eigen assortiment en per leverancier de catalogus. Standaard alles aan; de keuze blijft bewaard in deze browser. */
-export interface SearchSources { own: boolean; off: string[] }
+/** In welke catalogi gezocht wordt: standaard alle; de keuze blijft bewaard in deze browser. */
+export interface SearchSources { off: string[] }
 const KEY = 'bella-flow-zoeken-in'
 export function useSearchSources() {
   const [v, setV] = useState<SearchSources>(() => {
-    try { const x = JSON.parse(localStorage.getItem(KEY) ?? ''); if (x && Array.isArray(x.off)) return { own: x.own !== false, off: x.off } } catch { /* standaard */ }
-    return { own: true, off: [] }
+    try { const x = JSON.parse(localStorage.getItem(KEY) ?? ''); if (x && Array.isArray(x.off)) return { off: x.off } } catch { /* standaard */ }
+    return { off: [] }
   })
   const set = (next: SearchSources) => { setV(next); try { localStorage.setItem(KEY, JSON.stringify(next)) } catch { /* alleen deze sessie */ } }
   return [v, set] as const
@@ -30,12 +30,11 @@ export function SearchSourceChips({ value, onChange }: { value: SearchSources; o
   useEffect(() => { catalogArticleCounts(db).then(setCounts).catch(() => setCounts([])) }, [db])
   const withCatalog = counts.map((c) => ({ ...c, supplier: s.suppliers.find((x) => x.id === c.supplier_id) })).filter((c) => c.supplier)
   const toggle = (id: string) => onChange({ ...value, off: value.off.includes(id) ? value.off.filter((x) => x !== id) : [...value.off, id] })
-  const all = value.own && value.off.length === 0
+  const all = value.off.length === 0
   return (
     <div className="chips" role="group" aria-label={tx("Zoeken in")}>
       <span className="muted small" style={{ alignSelf: 'center' }}>{tx("Zoeken in")}:</span>
-      <button type="button" className={`chip ${all ? 'on' : ''}`} aria-pressed={all} onClick={() => onChange({ own: true, off: [] })}>{tx("Alles")}</button>
-      <button type="button" className={`chip ${value.own ? 'on' : ''}`} aria-pressed={value.own} onClick={() => onChange({ ...value, own: !value.own })}>{tx("Eigen assortiment")}</button>
+      <button type="button" className={`chip ${all ? 'on' : ''}`} aria-pressed={all} onClick={() => onChange({ off: [] })}>{tx("Alles")}</button>
       {withCatalog.map((c) => (
         <button key={c.supplier_id} type="button" className={`chip ${value.off.includes(c.supplier_id) ? '' : 'on'}`} aria-pressed={!value.off.includes(c.supplier_id)} onClick={() => toggle(c.supplier_id)}>
           {c.supplier!.name}<span>{c.n.toLocaleString(locale())}</span>
@@ -58,7 +57,7 @@ function useFree() {
 
 type Row = { key: string; pick: ArticlePick; hit?: ArticleHit; product?: Product }
 
-/** Zoekveld voor één productregel. Toont eigen producten en catalogusartikelen, met eigen en leveranciersartikelnummer. */
+/** Zoekveld voor één productregel: artikelen uit de catalogi, met eigen en leveranciersartikelnummer. */
 export function ArticleSearch({ id, label, sources, onPick }: { id?: string; label: string; sources: SearchSources; onPick: (p: ArticlePick) => void }) {
   const { s, db } = useApp()
   const free = useFree()
@@ -89,17 +88,8 @@ export function ArticleSearch({ id, label, sources, onPick }: { id?: string; lab
     return () => clearTimeout(timer)
   }, [q, db, supplierIds, sources.off.length])
 
-  // Eigen assortiment: producten onder Beheer die niet uit een catalogus komen.
-  const own = useMemo(() => {
-    const words = q.trim().toLowerCase().split(/\s+/).filter(Boolean)
-    if (!sources.own || !words.length) return []
-    return s.products.filter((p) => p.is_active && !p.catalog_article_number)
-      .filter((p) => { const h = `${p.sku} ${p.name} ${p.collection} ${p.category}`.toLowerCase(); return words.every((w) => h.includes(w)) })
-      .slice(0, 10)
-  }, [q, s.products, sources.own])
-
+  // Alleen artikelen uit de catalogi: dat zijn de producten. Staat het artikel al als product vast, dan met verkoopprijs en voorraad.
   const rows: Row[] = [
-    ...own.map((p) => ({ key: `p${p.id}`, pick: { kind: 'product', product: p } as ArticlePick, product: p })),
     ...hits.map((a) => {
       const p = byNumber.get(a.article_number)
       return { key: `a${a.id}`, pick: (p ? { kind: 'product', product: p } : { kind: 'article', article: a }) as ArticlePick, hit: a, product: p }
@@ -146,10 +136,10 @@ export function ArticleSearch({ id, label, sources, onPick }: { id?: string; lab
                   <span className="article-main">
                     <span className="article-nrs"><span className="strong">{a?.article_number ?? p?.sku}</span>{a && <span className="muted"> · {a.supplier_sku}</span>}</span>
                     <span>{a?.name ?? p?.name}</span>
-                    <small>{a ? `${supplierName(a.supplier_id)} · ${categoryName(a.category_code)}${a.series ? ` · ${a.series}` : ''}` : tx("Eigen assortiment")}</small>
+                    <small>{a ? `${supplierName(a.supplier_id)} · ${categoryName(a.category_code)}${a.series ? ` · ${a.series}` : ''}` : ''}</small>
                   </span>
                   <span className="article-side">
-                    <span className="strong">{p ? eur(p.sale_price) : money(a?.price ?? null, a?.currency ?? 'EUR')}</span>
+                    <span className="strong">{p ? eur(p.sale_price) : money(priceWithSurcharge(a?.price ?? null, s.suppliers.find((x) => x.id === a?.supplier_id)), a?.currency ?? 'EUR')}</span>
                     {p && <small>{tx("{0} vrij", free(p.id))}</small>}
                     {a && a.element_count > 0 && <small>{tx("+{0} elementen", a.element_count)}</small>}
                     {p && a && <Pill tone="info">{tx("In assortiment")}</Pill>}
@@ -182,7 +172,7 @@ export function ElementsModal({ article, onAdd, onClose }: { article: CatalogArt
               <td style={{ width: 64 }}><CatalogPhoto url={x.image_url} alt={x.name} className="thumb" /></td>
               <td style={{ whiteSpace: 'nowrap' }}><span className="strong">{x.article_number}</span><div className="muted small">{x.supplier_sku}</div></td>
               <td>{x.name}<div className="muted small">{categoryName(x.category_code)}</div></td>
-              <td className="num" style={{ whiteSpace: 'nowrap' }}>{money(x.price, x.currency)}</td>
+              <td className="num" style={{ whiteSpace: 'nowrap' }}>{money(s.products.find((p) => p.catalog_article_number === x.article_number)?.sale_price ?? priceWithSurcharge(x.price, s.suppliers.find((y) => y.id === x.supplier_id)), x.currency)}</td>
               <td style={{ textAlign: 'right' }}><button type="button" className="btn sm" onClick={() => { onAdd(x); setAdded((v) => [...v, x.id]) }}><Plus size={14} />{added.includes(x.id) ? tx("Nog een") : tx("Toevoegen")}</button></td>
             </tr>
           ))}</tbody>

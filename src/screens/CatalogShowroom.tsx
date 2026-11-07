@@ -126,7 +126,7 @@ function ShowroomCard({ supplierId, item, parts, parent, specs, fromShowroom, on
           </dl>
           {own ? (
             <div className="note"><span className="strong">{tx("In assortiment")}</span>: {own.name}, {tx("verkoopprijs")} {eur(own.sale_price)}, {tx("{0} vrij op voorraad", free)}.</div>
-          ) : <p className="muted small" style={{ margin: 0 }}>{tx("Niet in het eigen assortiment onder Beheer.")}</p>}
+          ) : <p className="muted small" style={{ margin: 0 }}>{tx("Nog niet verkocht: wordt een product zodra het op een verkooporder komt.")}</p>}
         </div>
       </div>
       {specs.length > 0 && (

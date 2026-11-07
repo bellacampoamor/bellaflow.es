@@ -19,6 +19,8 @@ export interface Supplier {
   notes: string; is_active: boolean
   /** Afkorting van drie hoofdletters, het begin van het eigen artikelnummer (LOL-...). */
   code?: string | null
+  /** Toeslag in procenten op de prijs van de leverancier, voor transport en distributie naar Spanje. Onzichtbaar in de verkooporder. */
+  price_surcharge_pct?: number
 }
 export type Language = 'es' | 'nl' | 'en'
 export type DocumentLanguage = Language | 'klant'

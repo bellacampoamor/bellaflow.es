@@ -81,7 +81,7 @@ export function PurchaseQueue({ onDone }: { onDone: () => void }) {
                     <td className="strong">{l.description}<Sku code={articleNo(s, l.product_id)} /></td>
                     <td className="muted">{l.options || '–'}</td>
                     <td className="num">{l.qty}{bought > 0 && <div className="muted small">{tx("{0} al ingekocht", bought)}</div>}</td>
-                    <td>{s.suppliers.find((x) => x.id === supplierFor(l))?.name ?? <a href="#beheer" onClick={(e) => e.stopPropagation()} style={{ color: 'var(--bad)' }}>{tx("Geen leverancier. Stel in onder Beheer")}</a>}</td>
+                    <td>{s.suppliers.find((x) => x.id === supplierFor(l))?.name ?? <a href="#beheer" onClick={(e) => e.stopPropagation()} style={{ color: 'var(--bad)' }}>{tx("Geen leverancier bij dit artikel")}</a>}</td>
                     <td className="num">{eur(productOf(l.product_id)?.purchase_price ?? 0)}</td>
                     <td>{on && <CheckIcon size={16} />}</td>
                   </tr>

@@ -34,6 +34,13 @@ export function categoryFor(supplierCategories: string[], name: string, parentCo
   return ruleFor(name) ?? parentCode ?? OTHER_CATEGORY.code
 }
 
+/** Verkoopprijs uit de prijs van de leverancier met de toeslag van die leverancier, afgerond op centen. */
+export function priceWithSurcharge(price: number | null, supplier: Pick<Supplier, 'price_surcharge_pct'> | undefined) {
+  if (price === null) return null
+  const pct = Number(supplier?.price_surcharge_pct ?? 0)
+  return Math.round(price * (1 + (Number.isFinite(pct) ? pct : 0) / 100) * 100) / 100
+}
+
 export const ARTICLE_NUMBER = /^[A-Z]{3}-[A-Z]{3}-\d{10}$/
 export function formatArticleNumber(supplierCode: string, categoryCode: string, n: number) {
   if (!/^[A-Z]{3}$/.test(supplierCode)) throw new Error(`Ongeldige afkorting leverancier: ${supplierCode}`)

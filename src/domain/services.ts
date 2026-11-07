@@ -8,7 +8,7 @@ import type {
   SalesOrderLine, Snapshot, StockMovement, SupplierCatalogItem, CatalogArticle, Supplier, ArticleQuery, SupplierShowroomDetail, SupplierShowroomItem, TableName,
 } from '../data/types'
 import { CATALOG_COLUMNS, catalogItemFromCsv, parseCsv, sameName } from './catalog'
-import { articleSources, categoryName, finishArticleSync, missingSupplierCodes, planArticleSync } from './articles'
+import { articleSources, categoryName, priceWithSurcharge, finishArticleSync, missingSupplierCodes, planArticleSync } from './articles'
 import { DETAIL_COLUMNS, SHOWROOM_COLUMNS, showroomDetailFromCsv, showroomItemFromCsv } from './showroom'
 import {
   addDays, depositAvailable, freeAt, linesToPurchase, invoicedDeliveryLineIds, lineTotal, onHandMap, orderLines, plannedQty, round2,
@@ -106,7 +106,7 @@ export async function convertLinesToPurchaseOrders(db: Driver, input: ConvertInp
     if (!line) fail(tx("Een van de regels is al ingekocht. Ververs het overzicht."))
     // Een artikel hoort bij één leverancier; die staat op het product.
     const supplier_id = s.products.find((p) => p.id === line!.product_id)?.supplier_id
-    if (!supplier_id) fail(tx("{0} heeft geen leverancier. Stel die in onder Beheer.", line!.description))
+    if (!supplier_id) fail(tx("{0} heeft geen leverancier.", line!.description))
     return { line: line!, supplier_id: supplier_id! }
   })
   const ids: string[] = []
@@ -777,6 +777,12 @@ export async function saveSupplier(db: Driver, row: Supplier | Omit<Supplier, 'i
   return saveRecord(db, 'suppliers', { ...row, code } as Supplier)
 }
 
+/** Toeslag per leverancier op de prijs van de leverancier (transport en distributie naar Spanje). */
+export async function saveSupplierSurcharge(db: Driver, supplierId: string, pct: number) {
+  if (!Number.isFinite(pct) || pct < 0 || pct > 500) fail(tx("De toeslag ligt tussen 0 en 500%."))
+  await db.update('suppliers', supplierId, { price_surcharge_pct: Math.round(pct * 100) / 100 })
+}
+
 // Schermen lezen catalogusartikelen via deze functies; de opslag zoekt zelf.
 export const searchCatalogArticles = (db: Driver, q: ArticleQuery) => db.searchArticles(q)
 export const catalogArticlesBySku = (db: Driver, supplierId: string, skus: string[]) => (skus.length ? db.findArticles({ supplierId, skus }) : Promise.resolve([]))
@@ -792,10 +798,11 @@ export const catalogArticleCounts = (db: Driver) => db.articleCounts()
 export async function productForArticle(db: Driver, a: CatalogArticle) {
   const found = (await db.list('products')).find((p) => p.catalog_article_number === a.article_number)
   if (found) return found.id
+  const supplier = (await db.list('suppliers')).find((x) => x.id === a.supplier_id)
   const id = newId()
   await db.insert('products', [{
     id, sku: a.article_number, name: a.name, collection: a.series, category: categoryName(a.category_code), material: '', color: '', dimensions: '',
-    weight_kg: 0, colli: 1, purchase_price: 0, sale_price: a.price ?? 0, vat_rate: 21, supplier_id: a.supplier_id, min_stock: 0, is_active: true,
+    weight_kg: 0, colli: 1, purchase_price: 0, sale_price: priceWithSurcharge(a.price, supplier) ?? 0, vat_rate: 21, supplier_id: a.supplier_id, min_stock: 0, is_active: true,
     volume_m3: 0, catalog_article_number: a.article_number,
   }])
   return id

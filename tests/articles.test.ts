@@ -6,10 +6,10 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { loadSnapshot, newId } from '../src/data/driver'
 import { LocalDriver } from '../src/data/localDriver'
 import type { CatalogArticle, Supplier } from '../src/data/types'
-import { ARTICLE_CATEGORIES, ARTICLE_NUMBER, ArticleStore, categoryFor, formatArticleNumber, suggestSupplierCode } from '../src/domain/articles'
+import { ARTICLE_CATEGORIES, ARTICLE_NUMBER, ArticleStore, categoryFor, priceWithSurcharge, formatArticleNumber, suggestSupplierCode } from '../src/domain/articles'
 import { seedDemo } from '../src/domain/demo'
 import {
-  createOrder, importCatalog, importShowroom, importShowroomDetails, importSupplierFile, productForArticle, saveSupplier, syncCatalogArticles,
+  createOrder, saveSupplierSurcharge, importCatalog, importShowroom, importShowroomDetails, importSupplierFile, productForArticle, saveSupplier, syncCatalogArticles,
 } from '../src/domain/services'
 import { toSeedSql } from '../scripts/seed-sql'
 
@@ -183,6 +183,29 @@ describe('catalogusartikelen', () => {
   })
 })
 
+describe('toeslag per leverancier', () => {
+  it('verhoogt de prijs van de leverancier, afgerond op centen', () => {
+    expect(priceWithSurcharge(100, { price_surcharge_pct: 12.5 })).toBe(112.5)
+    expect(priceWithSurcharge(49.99, { price_surcharge_pct: 15 })).toBe(57.49)
+    expect(priceWithSurcharge(100, {})).toBe(100)
+    expect(priceWithSurcharge(null, { price_surcharge_pct: 10 })).toBeNull()
+  })
+  it('zit in de verkoopprijs van een nieuw product uit de catalogus', async () => {
+    await importShowroom(db, [SHOWROOM_HEAD, row(LOL, 'T-STOEL', 'Teststoel', 'Tuinstoelen', 200)].join('\n'))
+    await syncCatalogArticles(db)
+    const lol = db.data.suppliers.find((x) => x.name === LOL)!
+    await saveSupplierSurcharge(db, lol.id, 18)
+    const [a] = await db.searchArticles({ q: 'T-STOEL' })
+    const pid = await productForArticle(db, a)
+    expect(db.data.products.find((x) => x.id === pid)!.sale_price).toBe(236)
+    // Een bestaand product houdt zijn verkoopprijs als de toeslag later wijzigt.
+    await saveSupplierSurcharge(db, lol.id, 25)
+    await productForArticle(db, a)
+    expect(db.data.products.find((x) => x.id === pid)!.sale_price).toBe(236)
+    await expect(saveSupplierSurcharge(db, lol.id, -1)).rejects.toThrow(/tussen 0 en 500/)
+  })
+})
+
 describe('echte catalogi van Life Outdoor Living', () => {
   it('alle 10.000 artikelen en elementen krijgen een uniek nummer', async () => {
     await importCatalog(db, readFileSync('public/assets/catalogus/supplier_catalog_items.csv', 'utf8'))
@@ -292,6 +315,39 @@ describe('database', () => {
     await expect(ins('T-X', 'Fout', 1)).rejects.toThrow()
     await expect(pg.query(`insert into catalog_articles (article_number, supplier_id, supplier_sku, name, category_code, source) values ('LOL-LOU-12', $1, 'Y', 'Y', 'LOU', 'showroom')`, [sup.id])).rejects.toThrow()
     await expect(pg.query(`update suppliers set code = 'lo1' where id = $1`, [sup.id])).rejects.toThrow()
+  }, 60000)
+
+  it('de nachtelijke sync leest elke gewijzigde productpagina, en een andere beschikbaarheid telt niet als wijziging', async () => {
+    const pg = new PGlite({ extensions: { pg_trgm } })
+    await pg.exec('create role authenticated; create role anon; create role service_role;')
+    await pg.exec(readdirSync('supabase/migrations').sort().map((f) => readFileSync(`supabase/migrations/${f}`, 'utf8')).join('\n'))
+    await pg.exec(toSeedSql(await loadSnapshot(db)))
+    const call = async (sql: string, ...args: unknown[]) => (await pg.query<{ r: Record<string, unknown> }>(sql, args)).rows[0].r
+    const row = (sku: string, name: string, date: string) => ({ supplier_sku: sku, name, ean: '', series: '', categories: 'Tuinstoelen', price: 100, available_date: date, available_text: date, image_url: '', product_url: `https://voorbeeld.test/${sku}`, source_hash: `${name}|${date}`, content_hash: name })
+    const items = (rows: unknown[]) => call('select sync_supplier_showroom_items($1, $2::jsonb) as r', LOL, JSON.stringify(rows))
+    const skus = Array.from({ length: 6 }, (_, i) => `S${i}`)
+    await items(skus.map((k) => row(k, `Stoel ${k}`, '2026-11-07')))
+    const todo = async (limit: number, max = 3000) => (await pg.query<{ supplier_sku: string; reason: string }>('select * from showroom_details_todo($1, $2, $3)', [LOL, limit, max])).rows
+    // Alles nieuw: alles komt mee, ongeacht de rondgang.
+    expect((await todo(1)).map((r) => r.reason)).toEqual(Array(6).fill('nieuw'))
+    await call('select sync_supplier_showroom_details($1, $2::jsonb) as r', LOL, JSON.stringify(skus.map((k) => ({ supplier_sku: k, specifications: [], elements: [], source_hash: k }))))
+    expect(await todo(0)).toEqual([])
+    // Volgende nacht: alle beschikbaarheidsdata anders, bij twee artikelen ook de naam.
+    await new Promise((r) => setTimeout(r, 5))
+    await items(skus.map((k, i) => row(k, i < 2 ? `Stoel ${k} nieuw` : `Stoel ${k}`, '2026-11-20')))
+    const t = await todo(1)
+    expect(t.filter((r) => r.reason === 'gewijzigd').map((r) => r.supplier_sku)).toEqual(['S0', 'S1'])
+    expect(t.filter((r) => r.reason === 'ronde')).toHaveLength(1)
+    expect(await todo(10, 3)).toHaveLength(3)
+    // Eigen artikelnummers aan het eind van de sync, ook voor wat alleen in de webshop staat.
+    await pg.query(`insert into supplier_catalog_items (supplier_name, supplier_sku, name, price_regular, categories) values ($1, 'W-1', 'Webshop tuintafel', 300, '[{"name":"Tuintafels","url_path":"x"}]')`, [LOL])
+    const r = await call('select sync_catalog_articles($1) as r', LOL)
+    expect(r).toMatchObject({ showroom: { new: 6 }, webshop: { new: 1, changed: 0 }, total: 7 })
+    const w = (await pg.query<{ article_number: string; price: number }>(`select article_number, price::float as price from catalog_articles where supplier_sku = 'W-1'`)).rows[0]
+    expect(w.article_number).toMatch(/^LOL-TAF-\d{10}$/)
+    expect(await call('select sync_catalog_articles($1) as r', LOL)).toMatchObject({ showroom: { new: 0 }, webshop: { new: 0 }, total: 7 })
+    await pg.query(`update suppliers set code = null where name = $1`, [LOL])
+    await expect(call('select sync_catalog_articles($1) as r', LOL)).rejects.toThrow(/afkorting/)
   }, 60000)
 
   it('de index maakt zoeken in 250.000 artikelen snel', async () => {

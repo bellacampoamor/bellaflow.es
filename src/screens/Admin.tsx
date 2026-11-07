@@ -1,17 +1,18 @@
 import { useState } from 'react'
 import { Plus } from 'lucide-react'
-import type { Customer, DocumentLanguage, Language, Product, Salesperson, Settings, Supplier, Warehouse } from '../data/types'
-import { saveRecord, saveSettings, saveSupplier, type PrefixField } from '../domain/services'
+import type { Customer, DocumentLanguage, Language, Salesperson, Settings, Supplier, Warehouse } from '../data/types'
+import { saveRecord, saveSettings, saveSupplier, saveSupplierSurcharge, type PrefixField } from '../domain/services'
+import { priceWithSurcharge } from '../domain/articles'
 import { useApp } from '../ui/app-context'
 import { AreaField, Check, eur, Head, Modal, NumberField, Pill, SelectField, Tabs, TextField } from '../ui/kit'
 import { CustomerFields } from './OrderForm'
 import { tx } from '../i18n'
 
-type Tab = 'magazijnen' | 'producten' | 'leveranciers' | 'klanten' | 'verkopers' | 'bedrijf'
+// Geen tabblad Producten: de producten zijn de artikelen uit de catalogi van de leveranciers, met een eigen artikelnummer.
+type Tab = 'magazijnen' | 'leveranciers' | 'toeslagen' | 'klanten' | 'verkopers' | 'bedrijf'
 
 const NEW = {
   warehouse: { code: '', name: '', kind: 'magazijn', address: '', postal_code: '', city: '', phone: '', contact_name: '', receives_goods: true, ships_goods: true, is_active: true, latitude: null, longitude: null, is_route_origin: false } as Omit<Warehouse, 'id'>,
-  product: { sku: '', name: '', collection: '', category: '', material: '', color: '', dimensions: '', weight_kg: 0, colli: 1, purchase_price: 0, sale_price: 0, vat_rate: 21, supplier_id: null, min_stock: 0, is_active: true, volume_m3: 0 } as Omit<Product, 'id'>,
   supplier: { name: '', vat_number: '', contact_name: '', email: '', phone: '', address: '', postal_code: '', city: '', country: 'Nederland', lead_time_days: 21, payment_terms: '', notes: '', is_active: true } as Omit<Supplier, 'id'>,
   customer: { kind: 'particulier', name: '', company: '', tax_id: '', email: '', phone: '', language: 'es', address: '', postal_code: '', city: '', province: 'Alicante', country: 'España', notes: '' } as Omit<Customer, 'id'>,
 }
@@ -20,23 +21,22 @@ export function Admin() {
   const { s, run, toast } = useApp()
   const [tab, setTab] = useState<Tab>('magazijnen')
   const [wh, setWh] = useState<(Omit<Warehouse, 'id'> & { id?: string }) | null>(null)
-  const [pr, setPr] = useState<(Omit<Product, 'id'> & { id?: string }) | null>(null)
   const [su, setSu] = useState<(Omit<Supplier, 'id'> & { id?: string }) | null>(null)
   const [cu, setCu] = useState<(Omit<Customer, 'id'> & { id?: string }) | null>(null)
   const [se, setSe] = useState<(Omit<Salesperson, 'id'> & { id?: string }) | null>(null)
   const [co, setCo] = useState<Settings>(s.settings[0])
 
-  const addButton = { magazijnen: [tx("Magazijn toevoegen"), () => setWh({ ...NEW.warehouse })], producten: [tx("Product toevoegen"), () => setPr({ ...NEW.product })], leveranciers: [tx("Leverancier toevoegen"), () => setSu({ ...NEW.supplier })], klanten: [tx("Klant toevoegen"), () => setCu({ ...NEW.customer })], verkopers: [tx("Verkoper toevoegen"), () => setSe({ name: '', email: '', phone: '', is_active: true })] } as Record<string, [string, () => void]>
+  const addButton = { magazijnen: [tx("Magazijn toevoegen"), () => setWh({ ...NEW.warehouse })], leveranciers: [tx("Leverancier toevoegen"), () => setSu({ ...NEW.supplier })], klanten: [tx("Klant toevoegen"), () => setCu({ ...NEW.customer })], verkopers: [tx("Verkoper toevoegen"), () => setSe({ name: '', email: '', phone: '', is_active: true })] } as Record<string, [string, () => void]>
   const need = (ok: unknown, msg: string) => { if (!ok) toast(msg, true); return !!ok }
 
   return (
     <>
       <Head title={tx("Beheer")} sub={tx("De vaste gegevens waar het hele proces op draait.")}>
-        {tab !== 'bedrijf' && <button className="btn primary" onClick={addButton[tab][1]}><Plus size={16} />{addButton[tab][0]}</button>}
+        {tab !== 'bedrijf' && tab !== 'toeslagen' && <button className="btn primary" onClick={addButton[tab][1]}><Plus size={16} />{addButton[tab][0]}</button>}
       </Head>
       <Tabs<Tab> value={tab} onChange={setTab} tabs={[
-        { value: 'magazijnen', label: tx("Magazijnen"), n: s.warehouses.length }, { value: 'producten', label: tx("Producten"), n: s.products.length },
-        { value: 'leveranciers', label: tx("Leveranciers"), n: s.suppliers.length }, { value: 'klanten', label: tx("Klanten"), n: s.customers.length }, { value: 'verkopers', label: tx("Verkopers"), n: s.salespeople.length }, { value: 'bedrijf', label: tx("Bedrijf en factuur") },
+        { value: 'magazijnen', label: tx("Magazijnen"), n: s.warehouses.length },
+        { value: 'leveranciers', label: tx("Leveranciers"), n: s.suppliers.length }, { value: 'toeslagen', label: tx("Toeslagen") }, { value: 'klanten', label: tx("Klanten"), n: s.customers.length }, { value: 'verkopers', label: tx("Verkopers"), n: s.salespeople.length }, { value: 'bedrijf', label: tx("Bedrijf en factuur") },
       ]} />
 
       {tab === 'magazijnen' && <section className="panel"><div className="table-wrap"><table>
@@ -46,12 +46,6 @@ export function Admin() {
         ))}</tbody>
       </table></div></section>}
 
-      {tab === 'producten' && <section className="panel"><div className="table-wrap"><table>
-        <thead><tr><th>{tx("Artikelnummer")}</th><th>{tx("Naam")}</th><th>{tx("Collectie")}</th><th>{tx("Categorie")}</th><th>{tx("Maten")}</th><th>{tx("Leverancier")}</th><th className="num">{tx("Inkoop")}</th><th className="num">{tx("Verkoop incl.")}</th></tr></thead>
-        <tbody>{s.products.map((p) => (
-          <tr key={p.id} className="click" onClick={() => setPr(p)}><td className="strong">{p.sku}</td><td>{p.name}</td><td>{p.collection}</td><td>{p.category}</td><td className="muted small">{p.dimensions}</td><td>{s.suppliers.find((x) => x.id === p.supplier_id)?.name ?? '–'}</td><td className="num">{eur(p.purchase_price)}</td><td className="num">{eur(p.sale_price)}</td></tr>
-        ))}</tbody>
-      </table></div></section>}
 
       {tab === 'leveranciers' && <section className="panel"><div className="table-wrap"><table>
         <thead><tr><th>{tx("Naam")}</th><th>{tx("Afkorting")}</th><th>{tx("Postcode")}</th><th>{tx("Plaats")}</th><th>{tx("Land")}</th><th>{tx("Contact")}</th><th className="num">{tx("Levertijd")}</th></tr></thead>
@@ -67,6 +61,8 @@ export function Admin() {
         <thead><tr><th>{tx("Naam")}</th><th>{tx("E-mail")}</th><th>{tx("Telefoon")}</th><th>{tx("Status")}</th></tr></thead>
         <tbody>{s.salespeople.map((x) => <tr key={x.id} className="click" onClick={() => setSe(x)}><td className="strong">{x.name}</td><td className="muted">{x.email || '–'}</td><td className="muted">{x.phone || '–'}</td><td>{x.is_active ? <Pill tone="good">{tx("Actief")}</Pill> : <Pill>{tx("Inactief")}</Pill>}</td></tr>)}</tbody>
       </table></div></section>}
+
+      {tab === 'toeslagen' && <Surcharges />}
 
       {tab === 'bedrijf' && <div className="stack">
         <div className="cols-even same-height">
@@ -162,29 +158,6 @@ export function Admin() {
         </div>
       </Modal>}
 
-      {pr && <Modal wide title={pr.id ? pr.name : tx("Product toevoegen")} onClose={() => setPr(null)} footer={<>
-        <button className="btn" onClick={() => setPr(null)}>{tx("Annuleren")}</button>
-        <button className="btn primary" onClick={async () => { if (need(pr.sku && pr.name, tx("Vul een artikelnummer en een naam in.")) && await run((db) => saveRecord(db, 'products', pr as Product), tx("Product opgeslagen"))) setPr(null) }}>{tx("Opslaan")}</button>
-      </>}>
-        <div className="form-grid">
-          <TextField label={tx("Artikelnummer")} value={pr.sku} onChange={(v) => setPr({ ...pr, sku: v })} />
-          <TextField className="span-2" label={tx("Naam")} value={pr.name} onChange={(v) => setPr({ ...pr, name: v })} />
-          <TextField label={tx("Collectie")} value={pr.collection} onChange={(v) => setPr({ ...pr, collection: v })} />
-          <TextField label={tx("Categorie")} value={pr.category} onChange={(v) => setPr({ ...pr, category: v })} />
-          <TextField label={tx("Materiaal")} value={pr.material} onChange={(v) => setPr({ ...pr, material: v })} />
-          <TextField label={tx("Kleur")} value={pr.color} onChange={(v) => setPr({ ...pr, color: v })} />
-          <TextField label={tx("Maten")} value={pr.dimensions} onChange={(v) => setPr({ ...pr, dimensions: v })} placeholder={tx("220 × 92 × 74 cm")} />
-          <NumberField label={tx("Gewicht (kg)")} value={pr.weight_kg} min={0} onChange={(v) => setPr({ ...pr, weight_kg: v })} />
-          <NumberField label={tx("Volume (m³)")} value={pr.volume_m3} min={0} onChange={(v) => setPr({ ...pr, volume_m3: v })} />
-          <NumberField label={tx("Aantal colli")} value={pr.colli} min={1} step="1" onChange={(v) => setPr({ ...pr, colli: v })} />
-          <SelectField label={tx("Leverancier")} value={pr.supplier_id} placeholder={tx("Geen vaste leverancier")} onChange={(v) => setPr({ ...pr, supplier_id: v || null })} options={s.suppliers.map((x) => ({ value: x.id, label: x.name }))} />
-          <NumberField label={tx("Inkoopprijs excl. IVA")} value={pr.purchase_price} step="0.01" min={0} onChange={(v) => setPr({ ...pr, purchase_price: v })} />
-          <NumberField label={tx("Verkoopprijs incl. IVA")} value={pr.sale_price} step="0.01" min={0} onChange={(v) => setPr({ ...pr, sale_price: v })} />
-          <NumberField label={tx("IVA %")} value={pr.vat_rate} min={0} onChange={(v) => setPr({ ...pr, vat_rate: v })} />
-          <NumberField label={tx("Minimumvoorraad")} value={pr.min_stock} step="1" min={0} onChange={(v) => setPr({ ...pr, min_stock: v })} />
-        </div>
-        <Check label={tx("Actief in verkoop")} checked={pr.is_active} onChange={(v) => setPr({ ...pr, is_active: v })} />
-      </Modal>}
 
       {su && <Modal wide title={su.id ? su.name : tx("Leverancier toevoegen")} onClose={() => setSu(null)} footer={<>
         <button className="btn" onClick={() => setSu(null)}>{tx("Annuleren")}</button>
@@ -214,5 +187,39 @@ export function Admin() {
         <CustomerFields c={cu} set={(p) => setCu({ ...cu, ...p })} />
       </Modal>}
     </>
+  )
+}
+
+/** Toeslag per leverancier op de prijs van de leverancier, voor transport en distributie van Nederland naar Spanje. */
+function Surcharges() {
+  const { s, run } = useApp()
+  const [draft, setDraft] = useState<Record<string, string>>({})
+  const save = async (id: string) => {
+    const v = draft[id]
+    if (v === undefined) return
+    const pct = Number(v.replace(',', '.'))
+    if (await run((db) => saveSupplierSurcharge(db, id, pct), tx("Toeslag opgeslagen"))) setDraft(({ [id]: _x, ...rest }) => rest)
+  }
+  return (
+    <section className="panel">
+      <p className="muted small" style={{ marginTop: 0 }}>{tx("Toeslag op de prijs van de leverancier voor transport en distributie naar Spanje. In de verkooporder zit de toeslag onzichtbaar in de prijs van een catalogusartikel. Een artikel dat al eens verkocht is, houdt zijn verkoopprijs.")}</p>
+      <div className="table-wrap"><table>
+        <thead><tr><th>{tx("Leverancier")}</th><th>{tx("Afkorting")}</th><th style={{ width: 160 }}>{tx("Toeslag %")}</th><th className="num">{tx("Prijs leverancier")}</th><th className="num">{tx("Prijs in verkooporder")}</th></tr></thead>
+        <tbody>{s.suppliers.map((x) => {
+          const value = draft[x.id] ?? String(x.price_surcharge_pct ?? 0)
+          const pct = Number(value.replace(',', '.'))
+          return (
+            <tr key={x.id}>
+              <td className="strong">{x.name}</td>
+              <td>{x.code || '–'}</td>
+              <td><input type="number" inputMode="decimal" min={0} max={500} step="0.5" aria-label={tx("Toeslag % voor {0}", x.name)} value={value}
+                onChange={(e) => setDraft((d) => ({ ...d, [x.id]: e.target.value }))} onBlur={() => void save(x.id)} onKeyDown={(e) => { if (e.key === 'Enter') void save(x.id) }} /></td>
+              <td className="num muted">{eur(100)}</td>
+              <td className="num">{Number.isFinite(pct) ? eur(priceWithSurcharge(100, { price_surcharge_pct: pct })!) : '–'}</td>
+            </tr>
+          )
+        })}</tbody>
+      </table></div>
+    </section>
   )
 }
