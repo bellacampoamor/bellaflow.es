@@ -23,6 +23,9 @@ export function useSearchSources() {
   return [v, set] as const
 }
 
+/** Korte naam op de knop: de afkorting van drie letters uit Beheer; zonder afkorting de naam. */
+const short = (x: { name: string; code?: string | null }) => x.code?.trim() || x.name
+
 /** Knoppen boven de productregels: in welke catalogi gezocht wordt. */
 export function SearchSourceChips({ value, onChange }: { value: SearchSources; onChange: (v: SearchSources) => void }) {
   const { s, db } = useApp()
@@ -37,12 +40,12 @@ export function SearchSourceChips({ value, onChange }: { value: SearchSources; o
       <span className="muted small" style={{ alignSelf: 'center' }}>{tx("Zoeken in")}:</span>
       <button type="button" className={`chip ${all ? 'on' : ''}`} aria-pressed={all} onClick={() => onChange({ off: [] })}>{tx("Alles")}</button>
       {withCatalog.map((c) => c.n === 0 ? (
-        <button key={c.supplier_id} type="button" className="chip" disabled title={tx("Nog geen catalogus ingelezen voor deze leverancier (Catalogi, Catalogus inlezen).")}>
-          {c.supplier.name}<span>{tx("geen catalogus")}</span>
+        <button key={c.supplier_id} type="button" className="chip" disabled title={`${c.supplier.name}: ${tx("Nog geen catalogus ingelezen voor deze leverancier (Catalogi, Catalogus inlezen).")}`}>
+          {short(c.supplier)}<span>{tx("geen catalogus")}</span>
         </button>
       ) : (
-        <button key={c.supplier_id} type="button" className={`chip ${value.off.includes(c.supplier_id) ? '' : 'on'}`} aria-pressed={!value.off.includes(c.supplier_id)} onClick={() => toggle(c.supplier_id)}>
-          {c.supplier.name}<span>{c.n.toLocaleString(locale())}</span>
+        <button key={c.supplier_id} type="button" className={`chip ${value.off.includes(c.supplier_id) ? '' : 'on'}`} aria-pressed={!value.off.includes(c.supplier_id)} onClick={() => toggle(c.supplier_id)} title={c.supplier.name}>
+          {short(c.supplier)}<span>{c.n.toLocaleString(locale())}</span>
         </button>
       ))}
     </div>
