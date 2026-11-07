@@ -144,3 +144,29 @@ export const needsFollowUp = (f: OrderFlow) => f.follow === 'te_laat' || f.follo
 /** Aantal verkooporders (ook proforma's) waar iemand iets moet doen; voor de stappenbalk. */
 export const followUpCount = (s: Snapshot, today = todayISO()) =>
   s.sales_orders.filter((o) => o.status !== 'cancelled' && needsFollowUp(orderFlow(s, o, today))).length
+
+// Lijst Verkooporders --------------------------------------------------------------
+
+export type OrdersTab = 'opvolgen' | 'loopt' | 'afgerond' | 'alle'
+export const ORDERS_TABS: OrdersTab[] = ['opvolgen', 'loopt', 'afgerond', 'alle']
+
+export const inOrdersTab = (tab: OrdersTab, follow: FollowUp) =>
+  tab === 'alle' || (tab === 'opvolgen' ? follow === 'te_laat' || follow === 'actie' : tab === 'loopt' ? follow === 'wacht' : follow === 'afgerond')
+
+/** Een verkooporder hoort bij een fase als daar iets gebeurt: actie, te laat of wachten. */
+export const activeIn = (f: OrderFlow, k: PhaseKey) => {
+  const st = f.phases.find((p) => p.key === k)?.state
+  return st === 'actie' || st === 'laat' || st === 'wacht'
+}
+
+/** Vaste link naar de lijst Verkooporders op een tabblad en eventueel een fase, bijvoorbeeld #orders-lijst-opvolgen-planning. */
+export const ordersHref = (tab: OrdersTab, phase?: PhaseKey) => `#orders-lijst-${tab}${phase ? `-${phase}` : ''}`
+
+/** Leest het deel na "orders-" terug; onbekend geeft het standaardtabblad. */
+export function parseOrdersParam(param: string): { tab: OrdersTab; phase: PhaseKey | null } {
+  const [, tab, phase] = param.match(/^lijst-([a-z]+)(?:-([a-z]+))?$/) ?? []
+  return {
+    tab: ORDERS_TABS.includes(tab as OrdersTab) ? tab as OrdersTab : 'opvolgen',
+    phase: PHASES.includes(phase as PhaseKey) ? phase as PhaseKey : null,
+  }
+}

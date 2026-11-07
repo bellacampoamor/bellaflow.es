@@ -1251,4 +1251,5 @@ export const es: Record<string, string> = {
   "{0} van {1} geleverd": "{0} de {1} entregados",
   "{0} deelfactuur": "{0} factura parcial",
   "Bevestigd": "Confirmado",
+  "Goederen nog niet binnen": "Mercancía aún no recibida",
 }

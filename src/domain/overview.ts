@@ -3,6 +3,7 @@ import {
   addDays, deliveryIsOpen, deliveryValue, depositAvailable, freeTotal, invoiceBalance, openLinesOnTransport, orderStage,
   round2, todayISO, transportLoad, uninvoicedDeliveries,
 } from './calc'
+import { activeIn, orderFlow, ordersHref } from './orderFlow'
 
 /** Eén actie op het Overzicht: een aantal, met waar je het afhandelt. */
 export interface OverviewAction {
@@ -24,10 +25,11 @@ export function overview(s: Snapshot, today = todayISO()) {
 
   // Verkoop
   const salesProformas = s.sales_orders.filter((o) => o.status === 'proforma')
-  const toPlan = openOrders.filter((o) => stage.get(o.id) === 'te_plannen')
-    .sort((a, b) => (a.requested_date ?? '9999').localeCompare(b.requested_date ?? '9999'))
-  const waiting = openOrders.filter((o) => stage.get(o.id) === 'wacht_op_goederen')
-    .sort((a, b) => (a.requested_date ?? '9999').localeCompare(b.requested_date ?? '9999'))
+  // Zelfde indeling als de lijst Verkooporders: een verkooporder hoort bij een fase als daar actie, te laat of wachten is.
+  const flows = new Map(openOrders.map((o) => [o.id, orderFlow(s, o, today)]))
+  const byRequested = (a: { requested_date: string | null }, b: { requested_date: string | null }) => (a.requested_date ?? '9999').localeCompare(b.requested_date ?? '9999')
+  const toPlan = openOrders.filter((o) => ['actie', 'laat'].includes(flows.get(o.id)!.phases.find((p) => p.key === 'planning')!.state)).sort(byRequested)
+  const waiting = openOrders.filter((o) => activeIn(flows.get(o.id)!, 'goederen')).sort(byRequested)
 
   // Levering: open leveringen per dag, alles van vóór vandaag samen als "te laat".
   const open = s.deliveries.filter(deliveryIsOpen)
@@ -89,14 +91,15 @@ export function overview(s: Snapshot, today = todayISO()) {
     { key: 'tr-laat', flow: 'buy', n: transports.filter((x) => x.t.arrival_date < today).length, label: 'Transporten te laat', href: '#ontvangst', urgent: true },
     { key: 'lev-vandaag', flow: 'ship', n: todayDeliveries.filter((d) => d.status === 'planned').length, label: 'Vandaag nog klaar te zetten', href: '#levering', urgent: false },
     { key: 'tr-vandaag', flow: 'buy', n: transports.filter((x) => x.t.arrival_date === today).length, label: 'Transporten vandaag', href: '#ontvangst', urgent: false },
-    { key: 'pro', flow: 'sell', n: salesProformas.length, label: 'Proforma-verkooporders', href: '#orders', urgent: false },
-    { key: 'plannen', flow: 'sell', n: toPlan.length, label: 'Verkooporders te plannen', href: '#orders', urgent: false },
+    { key: 'pro', flow: 'sell', n: salesProformas.length, label: 'Proforma-verkooporders', href: ordersHref('opvolgen', 'proforma'), urgent: false },
+    { key: 'plannen', flow: 'sell', n: toPlan.length, label: 'Verkooporders te plannen', href: ordersHref('opvolgen', 'planning'), urgent: false },
     { key: 'pf', flow: 'bill', n: toBill.length, label: 'Proforma\'s te factureren', href: '#facturatie', urgent: false },
     { key: 'pio', flow: 'buy', n: purchaseProformas.length, label: 'Proforma-inkooporders om te zetten', href: '#inkoop-proforma', urgent: false },
   ].filter((a) => a.n > 0) as OverviewAction[]
 
+  const links = { proformas: ordersHref('opvolgen', 'proforma'), toPlan: ordersHref('opvolgen', 'planning'), waiting: ordersHref('alle', 'goederen'), all: ordersHref('alle') }
   return {
-    today, actions, money, order,
+    today, actions, money, order, links,
     sales: { proformas: salesProformas, toPlan, waiting, running: openOrders.filter((o) => stage.get(o.id) !== 'gefactureerd').length },
     delivery: { days, late: late.length, today: todayDeliveries.length, later: laterCount },
     billing: { toBill, openInvoices, overdue: overdue.length },

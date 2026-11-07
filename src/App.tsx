@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { BookOpen, FileBarChart, Headset, Languages, Moon, Store, Sun, Boxes, ClipboardList, FileText, LayoutDashboard, PackageCheck, Settings2, ShoppingCart, Truck, Warehouse as WarehouseIcon } from 'lucide-react'
 import { flowCounts } from './domain/calc'
-import { followUpCount } from './domain/orderFlow'
+import { followUpCount, parseOrdersParam } from './domain/orderFlow'
 import { useApp, useHash } from './ui/app-context'
 import { Logo, Modal } from './ui/kit'
 import { Overview } from './screens/Overview'
@@ -174,7 +174,8 @@ function Route({ screen, param }: { screen: string; param: string }) {
       if (param === 'nieuw') return <OrderForm />
       if (param.startsWith('print-')) return <SalesOrderDocument key={param} id={param.slice(6)} />
       if (param.startsWith('wijzig-')) return <OrderForm id={param.slice(7)} />
-      return param ? <OrderDetail id={param} /> : <Orders />
+      if (!param || param.startsWith('lijst-')) { const l = parseOrdersParam(param); return <Orders key={param} tab={l.tab} phase={l.phase} /> }
+      return <OrderDetail id={param} />
     case 'levering': return param.startsWith('print-') ? <DeliveryNote key={param} id={param.slice(6)} autoPrint /> : param.startsWith('archief-') ? <DeliveryNote key={param} id={param.slice(8)} fromArchive /> : param ? <DeliveryNote key={param} id={param} /> : <Deliveries />
     case 'facturatie': return param.startsWith('print-') ? <InvoiceDetail key={param} id={param.slice(6)} autoPrint /> : param ? <InvoiceDetail key={param} id={param} /> : <Invoices />
     case 'rapportage': return <Reports tab="facturen" />

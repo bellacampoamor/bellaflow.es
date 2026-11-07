@@ -3,7 +3,8 @@ import { loadSnapshot } from '../src/data/driver'
 import { LocalDriver } from '../src/data/localDriver'
 import { addDays } from '../src/domain/calc'
 import { seedDemo } from '../src/domain/demo'
-import { followUpCount, orderFlow, PHASES } from '../src/domain/orderFlow'
+import { activeIn, followUpCount, inOrdersTab, orderFlow, ordersHref, parseOrdersParam, PHASES } from '../src/domain/orderFlow'
+import { overview } from '../src/domain/overview'
 import { assignShipmentsToTransport, convertPurchaseProformas, createDelivery, createOrder, invoiceProformas, lineFromProduct, markDelivered, markReady } from '../src/domain/services'
 
 const TODAY = '2026-11-04'
@@ -90,5 +91,28 @@ describe('verkoop-flow per verkooporder', () => {
     const n = s.sales_orders.filter((o) => o.status !== 'cancelled' && ['te_laat', 'actie'].includes(orderFlow(s, o, TODAY).follow)).length
     expect(followUpCount(s, TODAY)).toBe(n)
     expect(n).toBeGreaterThan(0)
+  })
+
+  it('links naar de lijst bewaren tabblad en fase, en onbekend valt terug op Opvolgen', () => {
+    expect(ordersHref('opvolgen', 'planning')).toBe('#orders-lijst-opvolgen-planning')
+    expect(parseOrdersParam('lijst-opvolgen-planning')).toEqual({ tab: 'opvolgen', phase: 'planning' })
+    expect(parseOrdersParam('lijst-alle')).toEqual({ tab: 'alle', phase: null })
+    expect(parseOrdersParam('')).toEqual({ tab: 'opvolgen', phase: null })
+    expect(parseOrdersParam('lijst-onzin-xyz')).toEqual({ tab: 'opvolgen', phase: null })
+  })
+
+  it('de tegels en groepen op Overzicht openen precies de verkooporders die ze tellen', async () => {
+    const s = await loadSnapshot(db)
+    const o = overview(s, TODAY)
+    const listed = (href: string) => {
+      const { tab, phase } = parseOrdersParam(href.replace('#orders-', ''))
+      return s.sales_orders.filter((x) => { const f = orderFlow(s, x, TODAY); return inOrdersTab(tab, f.follow) && (!phase || activeIn(f, phase)) }).map((x) => x.id).sort()
+    }
+    const plan = o.actions.find((a) => a.key === 'plannen')
+    expect(plan?.href).toBe(o.links.toPlan)
+    expect(listed(o.links.toPlan)).toEqual(o.sales.toPlan.map((x) => x.id).sort())
+    expect(listed(o.links.waiting)).toEqual(o.sales.waiting.map((x) => x.id).sort())
+    expect(listed(o.links.proformas)).toEqual(o.sales.proformas.map((x) => x.id).sort())
+    expect(o.sales.toPlan.length + o.sales.waiting.length).toBeGreaterThan(0)
   })
 })

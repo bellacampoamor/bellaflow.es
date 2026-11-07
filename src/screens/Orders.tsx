@@ -6,30 +6,29 @@ import { addOrderPayment, cancelOrder, createDelivery, defaultMethod, reschedule
 import { go, useApp } from '../ui/app-context'
 import { Check, Empty, eur, fmtDate, Head, Modal, NumberField, Pill, SelectField, Sku, Tabs, TextField, type Tone } from '../ui/kit'
 import { tx } from '../i18n'
-import { currentPhase, followRank, orderFlow, PHASES, PHASE_LABEL, type FollowUp, type OrderFlow, type PhaseKey } from '../domain/orderFlow'
+import { activeIn, currentPhase, followRank, inOrdersTab, orderFlow, ordersHref, PHASES, PHASE_LABEL, type FollowUp, type OrdersTab, type PhaseKey } from '../domain/orderFlow'
 import { FlowTrack, FOLLOW_LABEL, MiniTrack, NextStep, PhaseCell, PHASE_ICON, phaseText } from '../ui/OrderFlowTrack'
 
 const FOLLOW_TONE: Record<FollowUp, Tone> = { te_laat: 'bad', actie: 'sell', wacht: 'info', afgerond: 'good', geannuleerd: '' }
 
-type Filter = 'opvolgen' | 'loopt' | 'afgerond' | 'alle'
-const inFilter = (f: Filter, follow: FollowUp) =>
-  f === 'alle' || (f === 'opvolgen' ? follow === 'te_laat' || follow === 'actie' : f === 'loopt' ? follow === 'wacht' : follow === 'afgerond')
+type Filter = OrdersTab
 
-/** Waar een verkooporder in de flow staat: de fase die aandacht vraagt of waarop gewacht wordt. */
-const phaseOf = (f: OrderFlow): PhaseKey => f.next?.key ?? currentPhase(f)
-
-export function Orders() {
+export function Orders({ tab = 'opvolgen', phase: initialPhase = null }: { tab?: OrdersTab; phase?: PhaseKey | null }) {
   const { s } = useApp()
-  const [filter, setFilter] = useState<Filter>('opvolgen')
-  const [phase, setPhase] = useState<PhaseKey | null>(null)
+  const [filter, setFilterState] = useState<Filter>(tab)
+  const [phase, setPhaseState] = useState<PhaseKey | null>(initialPhase)
+  // Tabblad en fase staan in de adresbalk, zodat een link (bijv. vanaf Overzicht) en Terug op dezelfde plek uitkomen.
+  const remember = (f: Filter, p: PhaseKey | null) => history.replaceState(null, '', ordersHref(f, p ?? undefined))
+  const setFilter = (f: Filter) => { setFilterState(f); setPhaseState(null); remember(f, null) }
+  const setPhase = (p: PhaseKey | null) => { setPhaseState(p); remember(filter, p) }
   const [q, setQ] = useState('')
   const today = todayISO()
   const rows = useMemo(() => s.sales_orders.map((o) => ({ o, flow: orderFlow(s, o, today), cust: s.customers.find((c) => c.id === o.customer_id) }))
     .sort((a, b) => followRank(a.flow.follow) - followRank(b.flow.follow) || b.o.order_date.localeCompare(a.o.order_date) || b.o.number.localeCompare(a.o.number)), [s, today])
   const t = q.trim().toLowerCase()
   const matches = (r: typeof rows[number]) => !t || `${r.o.number} ${r.cust?.name ?? ''} ${r.cust?.company ?? ''} ${r.o.customer_reference}`.toLowerCase().includes(t)
-  const inTab = rows.filter((r) => inFilter(filter, r.flow.follow) && matches(r))
-  const shown = inTab.filter((r) => !phase || phaseOf(r.flow) === phase)
+  const inTab = rows.filter((r) => inOrdersTab(filter, r.flow.follow) && matches(r))
+  const shown = inTab.filter((r) => !phase || activeIn(r.flow, phase))
   const late = rows.filter((r) => r.flow.follow === 'te_laat').length
   return (
     <>
@@ -38,7 +37,7 @@ export function Orders() {
       </Head>
       <section className="panel">
         <div className="panel-head" style={{ alignItems: 'flex-end' }}>
-          <Tabs<Filter> value={filter} onChange={(f) => { setFilter(f); setPhase(null) }} tabs={(['opvolgen', 'loopt', 'afgerond', 'alle'] as Filter[]).map((f) => ({ value: f, label: { opvolgen: tx("Opvolgen"), loopt: tx("Loopt"), afgerond: tx("Afgerond"), alle: tx("Alles") }[f], n: rows.filter((r) => inFilter(f, r.flow.follow)).length }))} />
+          <Tabs<Filter> value={filter} onChange={setFilter} tabs={(['opvolgen', 'loopt', 'afgerond', 'alle'] as Filter[]).map((f) => ({ value: f, label: { opvolgen: tx("Opvolgen"), loopt: tx("Loopt"), afgerond: tx("Afgerond"), alle: tx("Alles") }[f], n: rows.filter((r) => inOrdersTab(f, r.flow.follow)).length }))} />
           <input style={{ maxWidth: 280, marginBottom: 14 }} aria-label={tx("Verkooporders zoeken")} placeholder={tx("Zoek op nummer of klant")} value={q} onChange={(e) => setQ(e.target.value)} />
         </div>
         <p className="small muted" style={{ marginTop: 0 }}>
@@ -51,7 +50,7 @@ export function Orders() {
             <th aria-label="PDF" /><th>{tx("Verkooporder")}</th>
             {PHASES.map((k, i) => {
               const Icon = PHASE_ICON[k]
-              const n = inTab.filter((r) => phaseOf(r.flow) === k && r.flow.follow !== 'afgerond').length
+              const n = inTab.filter((r) => activeIn(r.flow, k)).length
               return (
                 <th key={k} className={`ph-head${phase === k ? ' on' : ''}`}>
                   <button type="button" onClick={() => setPhase(phase === k ? null : k)} aria-pressed={phase === k} title={phase === k ? tx("Filter op deze fase opheffen") : tx("Alleen verkooporders in deze fase")}>

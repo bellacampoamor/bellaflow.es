@@ -79,7 +79,7 @@ export function Overview() {
           </section>
 
           <section className="panel">
-            <div className="panel-head"><h2>{tx("Verkooporders die aandacht vragen")}</h2><a className="small" href="#orders">{tx("Alle verkooporders")}</a></div>
+            <div className="panel-head"><h2>{tx("Verkooporders die aandacht vragen")}</h2><a className="small" href={o.links.all}>{tx("Alle verkooporders")}</a></div>
             {o.sales.proformas.length + o.sales.toPlan.length + o.sales.waiting.length === 0 && <Empty>{tx("Alle verkooporders zijn ingepland.")}</Empty>}
             {o.sales.proformas.length > 0 && (
               <Group title={tx("Proforma, nog te bevestigen")} n={o.sales.proformas.length}>
@@ -89,7 +89,7 @@ export function Overview() {
                     <span className="num strong">{eur(orderTotal(s, x.id))}</span>
                   </a>
                 ))}
-                <More n={o.sales.proformas.length - MAX} href="#orders" />
+                <More n={o.sales.proformas.length - MAX} href={o.links.proformas} />
               </Group>
             )}
             {o.sales.toPlan.length > 0 && (
@@ -100,18 +100,18 @@ export function Overview() {
                     {x.requested_date ? <Pill tone={x.requested_date < today ? 'bad' : x.requested_date <= addDays(today, 3) ? 'warn' : 'sell'}>{tx("Gewenst {0}", fmtShort(x.requested_date))}</Pill> : <Pill tone="sell">{tx("Te plannen")}</Pill>}
                   </a>
                 ))}
-                <More n={o.sales.toPlan.length - MAX} href="#orders" />
+                <More n={o.sales.toPlan.length - MAX} href={o.links.toPlan} />
               </Group>
             )}
             {o.sales.waiting.length > 0 && (
-              <Group title={tx("Wacht op goederen")} n={o.sales.waiting.length}>
+              <Group title={tx("Goederen nog niet binnen")} n={o.sales.waiting.length}>
                 {o.sales.waiting.slice(0, MAX).map((x) => (
                   <a className="task" key={x.id} href={`#orders-${x.id}`}>
                     <div><div className="task-t">{name(s.customers, x.customer_id)}</div><div className="muted small">{x.number}</div></div>
-                    {x.requested_date ? <Pill tone={x.requested_date < today ? 'bad' : 'warn'}>{tx("Gewenst {0}", fmtShort(x.requested_date))}</Pill> : <Pill tone="warn">{tx("Wacht op goederen")}</Pill>}
+                    {x.requested_date ? <Pill tone={x.requested_date < today ? 'bad' : 'warn'}>{tx("Gewenst {0}", fmtShort(x.requested_date))}</Pill> : <Pill tone="warn">{tx("Nog niet binnen")}</Pill>}
                   </a>
                 ))}
-                <More n={o.sales.waiting.length - MAX} href="#orders" />
+                <More n={o.sales.waiting.length - MAX} href={o.links.waiting} />
               </Group>
             )}
           </section>

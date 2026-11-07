@@ -1251,4 +1251,5 @@ export const en: Record<string, string> = {
   "{0} van {1} geleverd": "{0} of {1} delivered",
   "{0} deelfactuur": "{0} partial invoice",
   "Bevestigd": "Confirmed",
+  "Goederen nog niet binnen": "Goods not in yet",
 }
