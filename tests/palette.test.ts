@@ -31,6 +31,7 @@ const pairs: [string, string][] = [
   ['buy', 'buy-fg'], ['sell', 'sell-fg'], ['ship', 'ship-fg'], ['bill', 'bill-fg'],
   ['good', 'good-bg'], ['warn', 'warn-bg'], ['bad', 'bad-bg'], ['info', 'info-bg'],
   ['bad', 'surface'], ['good', 'surface'],
+  ['acc-klant', 'surface'], ['acc-producten', 'surface'], ['acc-levering', 'surface'], ['acc-notitie', 'surface'],
 ]
 
 describe('kleurenkaart', () => {

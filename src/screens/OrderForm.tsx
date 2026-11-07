@@ -156,7 +156,7 @@ export function OrderForm({ id }: { id?: string }) {
       <Head title={existing ? tx("{0} wijzigen", existing.number) : tx("Nieuwe verkooporder")} back={existing ? { href: `#orders-${id}`, label: existing.number } : { href: '#orders', label: tx("Verkooporders") }} />
       <div className="cols">
         <div className="stack">
-          <section className="panel">
+          <section className="panel acc acc-klant">
             <h2>{tx("Klant")}</h2>
             <div className="form-grid">
               <Field className="span-2" label={tx("Klant")}>{(fid) => <Combo id={fid} value={h.customer_id} options={custOptions} placeholder={tx("Zoek op naam, telefoon of e-mail")} onChange={pickCustomer} />}</Field>
@@ -169,7 +169,7 @@ export function OrderForm({ id }: { id?: string }) {
             </div>
           </section>
 
-          <section className="panel">
+          <section className="panel acc acc-producten">
             <div className="panel-head"><h2>{tx("Producten")}</h2><button className="btn sm" type="button" onClick={addLine}><Plus size={14} />{tx("Product toevoegen")}</button></div>
             <div style={{ marginBottom: 12 }}><SearchSourceChips value={sources} onChange={setSources} /></div>
             {lines.length === 0 && <Empty>{tx("Voeg het eerste product toe.")}</Empty>}
@@ -225,7 +225,7 @@ export function OrderForm({ id }: { id?: string }) {
             </div>
           </section>
 
-          {allTaken ? <section className="panel"><h2>{tx("Levering")}</h2><p className="muted" style={{ margin: 0 }}>{tx("De klant neemt alles direct mee. Er is geen levering nodig.")}</p></section> : <section className="panel">
+          {allTaken ? <section className="panel acc acc-levering"><h2>{tx("Levering")}</h2><p className="muted" style={{ margin: 0 }}>{tx("De klant neemt alles direct mee. Er is geen levering nodig.")}</p></section> : <section className="panel acc acc-levering">
             <h2>{tx("Levering")}</h2>
             <div className="form-grid">
               <SelectField className="span-2" label={tx("Afleverwijze")} value={h.fulfilment} onChange={setFulfilment} options={[
@@ -252,7 +252,7 @@ export function OrderForm({ id }: { id?: string }) {
               </>}
             </div>
           </section>}
-          <section className="panel"><AreaField label={tx("Interne notitie")} value={h.notes} onChange={(v) => set({ notes: v })} /></section>
+          <section className="panel acc acc-notitie"><h2>{tx("Notitie")}</h2><AreaField label={tx("Interne notitie")} value={h.notes} onChange={(v) => set({ notes: v })} /></section>
         </div>
 
         <div className="stack" style={{ position: 'sticky', top: 96 }}>

@@ -24,6 +24,8 @@
   --sell: #F0D9C8;     --sell-fg: #7E4737;
   --ship: #E5DAD5;     --ship-fg: #5A4A4C;
   --bill: #D5DEE4;     --bill-fg: #112F45;
+  /* Accentkleur per paneel van de verkooporder: Klant, Producten, Levering, Notitie. */
+  --acc-klant: #112F45; --acc-producten: #915442; --acc-levering: #5A4A4C; --acc-notitie: #40444E;
   --good: #36603F;     --good-bg: #DDE6D5;
   --warn: #7C5310;     --warn-bg: #F6E4C2;
   --bad: #9E2B2B;      --bad-bg: #F6DAD4;
@@ -42,6 +44,7 @@
   --bg: #252A33; --surface: #30343E; --surface-2: #40444E; --fg: #F2E8DF; --muted: #CDBFB4;
   --line: #4D4C53; --line-strong: #6E6264; --on-primary: #0B182A; --primary: #CE8D61; --primary-hover: #BD7A52; --selected: #CE8D61; --on-selected: #0B182A;
   --buy: #4A505C; --buy-fg: #E0E3E8; --sell: #5F4235; --sell-fg: #F2D6C2; --ship: #54484A; --ship-fg: #EADCD8; --bill: #1F3D54; --bill-fg: #C9DBE7;
+  --acc-klant: #9FC3DC; --acc-producten: #E0AC87; --acc-levering: #D2B3AE; --acc-notitie: #C3C9D4;
   --good: #AFD6B3; --good-bg: #2F463A; --warn: #E9C786; --warn-bg: #4D3D22; --bad: #F4B0A8; --bad-bg: #57302D; --info: #BAD2E1; --info-bg: #2B4354;
   --neutral-bg: #4A4E59; --overlay: rgb(11 24 42 / .62); --shadow: 0 12px 40px rgb(11 24 42 / .5); --logo-plate: #F2E8DF; --logo-pad: 5px 10px; --photo-bg: #FFFFFF; --photo-fg: #6D5D5F; color-scheme: dark;
 } }
@@ -50,6 +53,7 @@
   --bg: #252A33; --surface: #30343E; --surface-2: #40444E; --fg: #F2E8DF; --muted: #CDBFB4;
   --line: #4D4C53; --line-strong: #6E6264; --on-primary: #0B182A; --primary: #CE8D61; --primary-hover: #BD7A52; --selected: #CE8D61; --on-selected: #0B182A;
   --buy: #4A505C; --buy-fg: #E0E3E8; --sell: #5F4235; --sell-fg: #F2D6C2; --ship: #54484A; --ship-fg: #EADCD8; --bill: #1F3D54; --bill-fg: #C9DBE7;
+  --acc-klant: #9FC3DC; --acc-producten: #E0AC87; --acc-levering: #D2B3AE; --acc-notitie: #C3C9D4;
   --good: #AFD6B3; --good-bg: #2F463A; --warn: #E9C786; --warn-bg: #4D3D22; --bad: #F4B0A8; --bad-bg: #57302D; --info: #BAD2E1; --info-bg: #2B4354;
   --neutral-bg: #4A4E59; --overlay: rgb(11 24 42 / .62); --shadow: 0 12px 40px rgb(11 24 42 / .5); --logo-plate: #F2E8DF; --logo-pad: 5px 10px; --photo-bg: #FFFFFF; --photo-fg: #6D5D5F; color-scheme: dark;
 }
@@ -497,3 +501,11 @@ body.route-dragging, body.route-dragging * { cursor: grabbing !important; user-s
 .article-main { display: flex; flex-direction: column; min-width: 0; }
 .article-main > span { overflow: hidden; text-overflow: ellipsis; }
 .article-side { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; text-align: right; white-space: nowrap; }
+
+/* Panelen van de verkooporder: elk een eigen accent, als lijn bovenaan en kleur van de titel. */
+.panel.acc { border-top: 5px solid var(--acc); background: color-mix(in srgb, var(--acc-tint) 45%, var(--surface)); }
+.panel.acc h2 { color: var(--acc); }
+.panel.acc-klant { --acc: var(--acc-klant); --acc-tint: var(--bill); }
+.panel.acc-producten { --acc: var(--acc-producten); --acc-tint: var(--sell); }
+.panel.acc-levering { --acc: var(--acc-levering); --acc-tint: var(--ship); }
+.panel.acc-notitie { --acc: var(--acc-notitie); --acc-tint: var(--buy); }
