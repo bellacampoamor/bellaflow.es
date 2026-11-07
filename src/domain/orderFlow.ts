@@ -2,7 +2,7 @@
 // Proforma (scan in de winkel) → Verkooporder → Voorraad of inkoop → Planning levering → Afleveren → Factureren.
 // Per fase de stand, en voor de hele verkooporder of er iets te doen is (opvolgen), of dat hij wacht of klaar is.
 import type { SalesOrder, Snapshot } from '../data/types'
-import { invoiceBalance, linePurchaseStatus, orderLines, plannedQty, shippedQty, todayISO, uninvoicedDeliveries } from './calc'
+import { invoiceBalance, isDomesticShipment, linePurchaseStatus, orderLines, plannedQty, shippedQty, todayISO, uninvoicedDeliveries } from './calc'
 
 const purchaseListHref = '#inkoop-lijst-opvolgen-proforma'
 
@@ -82,6 +82,14 @@ export function orderFlow(s: Snapshot, o: SalesOrder, today = todayISO()): Order
         return { key: 'goederen', state: 'actie', label: 'Inkooporder maken', href: pf ? `#inkoop-omzetten-${pf.id}` : purchaseListHref }
       }
       const open = st.shipments.filter((x) => x.status === 'expected' || x.status === 'partial')
+      // Leverancier in Spanje: geen NL en geen transport, de leverancier levert bij ons af en we boeken in.
+      const domestic = open.find((x) => isDomesticShipment(s, x))
+      if (domestic) {
+        const href = `#ontvangst-io-${domestic.purchase_order_id}`
+        if (domestic.original_date < today) return { key: 'goederen', state: 'laat', label: 'Nog niet geleverd door leverancier, verwacht {0}', args: [domestic.original_date], href }
+        if (domestic.original_date === today || domestic.status === 'partial') return { key: 'goederen', state: 'actie', label: 'Inboeken', href }
+        return { key: 'goederen', state: 'wacht', label: 'Levering door leverancier in Spanje, verwacht {0}', args: [domestic.original_date], href }
+      }
       const notInNl = open.find((x) => !x.transport_id && !x.nl_received_at)
       if (notInNl) {
         const late = notInNl.original_date < today

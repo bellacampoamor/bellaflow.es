@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Plus, Truck } from 'lucide-react'
 import type { InboundShipment, Snapshot, Transport } from '../data/types'
-import { addDays, ordersAffectedByShipment, shipmentDestination, shipmentIsOpen, shipmentLoad, todayISO, transportLoad } from '../domain/calc'
+import { addDays, isDomesticShipment, ordersAffectedByShipment, shipmentDestination, shipmentIsOpen, shipmentLoad, todayISO, transportLoad } from '../domain/calc'
 import { assignShipmentsToTransport, cancelTransport, closeShipment, createTransport, markReceivedInNl, setTransportStatus, updateTransport, type TransportInput } from '../domain/services'
 import { tx } from '../i18n'
 import { useApp } from '../ui/app-context'
@@ -54,9 +54,9 @@ export function Inbound({ focus }: { focus?: string } = {}) {
   const done = s.transports.filter((t) => t.status === 'arrived').sort((a, b) => b.arrival_date.localeCompare(a.arrival_date))
   const planned = active.filter((t) => t.status === 'planned')
   // Inkoop-flow: eerst ontvangen in NL (bij leverancier of verzamelpunt), pas dan op een transport.
-  const atSupplier = s.inbound_shipments.filter((x) => shipmentIsOpen(x) && !x.transport_id && !x.nl_received_at && s.purchase_orders.find((p) => p.id === x.purchase_order_id)?.status === 'open')
+  const atSupplier = s.inbound_shipments.filter((x) => shipmentIsOpen(x) && !x.transport_id && !x.nl_received_at && !isDomesticShipment(s, x) && s.purchase_orders.find((p) => p.id === x.purchase_order_id)?.status === 'open')
     .sort((a, b) => a.original_date.localeCompare(b.original_date))
-  const unassigned = s.inbound_shipments.filter((x) => shipmentIsOpen(x) && !x.transport_id && !!x.nl_received_at)
+  const unassigned = s.inbound_shipments.filter((x) => shipmentIsOpen(x) && !x.transport_id && !!x.nl_received_at && !isDomesticShipment(s, x))
   const readyM3 = round1(unassigned.reduce((n, x) => n + shipmentLoad(s, x.id).m3, 0))
   const nlIds = atSupplier.filter((x) => nlPicked.has(x.id)).map((x) => x.id)
   const chosenTarget = target || planned[0]?.id || ''

@@ -638,7 +638,7 @@ describe('leveranciers', () => {
     db.clear(); await seedDemo(db, TODAY)
     await restoreSuppliers(db, [...edited, extra])
     const after = await loadSnapshot(db)
-    expect(after.suppliers).toHaveLength(3)
+    expect(after.suppliers).toHaveLength(before.suppliers.length + 1)
     expect(after.suppliers.every((x) => x.email === 'inkoop@voorbeeld.test')).toBe(true)
     await db.update('suppliers', after.suppliers[0].id, { name: 'Noorderzon Outdoor', city: 'Zwolle' })
     await renameOldSuppliers(db)

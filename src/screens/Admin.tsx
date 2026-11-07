@@ -7,6 +7,7 @@ import { useApp } from '../ui/app-context'
 import { AreaField, BackToTop, Check, eur, Head, Modal, NumberField, Pager, Pill, SelectField, Tabs, TextField } from '../ui/kit'
 import { CustomerFields } from './OrderForm'
 import { tx } from '../i18n'
+import { isSpanishSupplier } from '../domain/calc'
 
 // Geen tabblad Producten: de producten zijn de artikelen uit de catalogi van de leveranciers, met een eigen artikelnummer.
 type Tab = 'magazijnen' | 'leveranciers' | 'toeslagen' | 'klanten' | 'verkopers' | 'bedrijf'
@@ -170,7 +171,7 @@ export function Admin() {
           <TextField className="span-2" label={tx("Adres")} value={su.address} onChange={(v) => setSu({ ...su, address: v })} />
           <TextField label={tx("Postcode")} value={su.postal_code} onChange={(v) => setSu({ ...su, postal_code: v })} />
           <TextField label={tx("Plaats")} value={su.city} onChange={(v) => setSu({ ...su, city: v })} />
-          <TextField label={tx("Land")} value={su.country} onChange={(v) => setSu({ ...su, country: v })} />
+          <TextField label={tx("Land")} value={su.country} onChange={(v) => setSu({ ...su, country: v })} hint={isSpanishSupplier(su) ? tx("Spanje: inkoop zonder Ontvangen in NL en transport; de leverancier levert bij ons af.") : tx("Vul España of Spanje in voor een leverancier in Spanje.")} />
           <NumberField label={tx("Levertijd (dagen)")} value={su.lead_time_days} step="1" min={0} onChange={(v) => setSu({ ...su, lead_time_days: v })} />
           <TextField label={tx("Betaalvoorwaarden")} value={su.payment_terms} onChange={(v) => setSu({ ...su, payment_terms: v })} />
           <AreaField className="span-all" label={tx("Notitie")} value={su.notes} onChange={(v) => setSu({ ...su, notes: v })} />

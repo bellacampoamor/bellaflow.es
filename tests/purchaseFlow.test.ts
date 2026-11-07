@@ -91,3 +91,34 @@ describe('inkoop-flow per inkooporder', () => {
     expect(parsePurchasesParam('')).toEqual({ tab: 'opvolgen', phase: null })
   })
 })
+
+describe('inkoop bij een leverancier in Spanje', () => {
+  it('slaat Ontvangen in NL en Transport over; inboeken zonder transport, daarna verder in de verkooporder', async () => {
+    let s = await loadSnapshot(db)
+    const spain = s.suppliers.find((x) => x.country === 'España')!
+    const product = s.products.find((p) => p.supplier_id)!
+    // Artikel van de Spaanse leverancier, op bestelling voor een klant.
+    db.data.products.find((p) => p.id === product.id)!.supplier_id = spain.id
+    const soId = await createOrder(db, { header: header(s.customers[0].id), lines: [lineFromProduct(product, { qty: 1, source: 'bestelling', warehouse_id: null })] })
+    s = await loadSnapshot(db)
+    const sol = s.sales_order_lines.find((l) => l.sales_order_id === soId)!
+    const pf = s.purchase_orders.find((p) => p.status === 'proforma' && p.supplier_id === spain.id && s.purchase_order_lines.some((l) => l.purchase_order_id === p.id && l.sales_order_line_id === sol.id))!
+    const [po] = await convertPurchaseProformas(db, { ids: [pf.id], order_date: TODAY })
+    s = await loadSnapshot(db)
+    const x = s.inbound_shipments.find((r) => r.purchase_order_id === po)!
+    expect(await states(po)).toMatchObject({ nl: 'skip', transport: 'skip', ontvangst: 'wacht' })
+    await expect(markReceivedInNl(db, [x.id], TODAY)).rejects.toThrow(/Spanje/)
+    const t = s.transports.find((r) => r.status === 'planned')!
+    await expect(assignShipmentsToTransport(db, [x.id], t.id)).rejects.toThrow(/Spanje/)
+    expect(await flowOf(po, x.original_date)).toMatchObject({ follow: 'actie', next: { key: 'ontvangst', label: 'Inboeken', href: `#ontvangst-io-${po}` } })
+    expect(await flowOf(po, addDays(x.original_date, 1))).toMatchObject({ follow: 'te_laat', next: { key: 'ontvangst' } })
+    // De verkooporder wacht op de Spaanse leverancier, niet op Nederland.
+    const { orderFlow } = await import('../src/domain/orderFlow')
+    const so = () => loadSnapshot(db).then((snap) => orderFlow(snap, snap.sales_orders.find((o) => o.id === soId)!, TODAY))
+    expect((await so()).phases.find((p) => p.key === 'goederen')).toMatchObject({ state: 'wacht', label: 'Levering door leverancier in Spanje, verwacht {0}' })
+    const sl = s.inbound_shipment_lines.find((l) => l.shipment_id === x.id)!
+    await receiveGoods(db, { transport_id: null, received_date: TODAY, delivery_note: '', received_by: '', notes: '', rows: [{ shipment_line_id: sl.id, qty_received: 1, qty_damaged: 0, location_bin: '' }] })
+    expect(await flowOf(po)).toMatchObject({ follow: 'wacht', next: { key: 'aflevering' } })
+    expect((await so()).next?.key).toBe('planning')
+  })
+})

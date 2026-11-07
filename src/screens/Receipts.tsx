@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { PackageCheck } from 'lucide-react'
-import { articleNo, inboundWarehouse, openLinesOnTransport, shipmentDestination, shipmentLineOpen, todayISO } from '../domain/calc'
+import { articleNo, inboundWarehouse, isDomesticShipment, openLinesOfShipments, openLinesOnTransport, shipmentDestination, shipmentIsOpen, shipmentLineOpen, todayISO } from '../domain/calc'
 import { receiveGoods } from '../domain/services'
 import { tx } from '../i18n'
 import { go, useApp } from '../ui/app-context'
@@ -63,6 +63,10 @@ export function Receipts() {
   const { s } = useApp()
   const today = todayISO()
   const expected = s.transports.filter((t) => t.status !== 'cancelled' && openLinesOnTransport(s, t.id).length > 0).sort((a, b) => a.arrival_date.localeCompare(b.arrival_date))
+  const domestic = s.purchase_orders.filter((p) => p.status === 'open').map((po) => {
+    const rows = s.inbound_shipments.filter((x) => x.purchase_order_id === po.id && shipmentIsOpen(x) && isDomesticShipment(s, x))
+    return { po, lines: openLinesOfShipments(s, rows.map((x) => x.id)), date: rows.map((x) => x.original_date).sort()[0] ?? '' }
+  }).filter((x) => x.lines.length).sort((a, b) => a.date.localeCompare(b.date))
   const history = [...s.goods_receipts].sort((a, b) => b.received_date.localeCompare(a.received_date) || b.number.localeCompare(a.number))
   return (
     <>
@@ -86,6 +90,20 @@ export function Receipts() {
               </a>
             )
           })}
+        </section>
+        <section className="panel">
+          <h2>{tx("Rechtstreeks van leveranciers in Spanje")}</h2>
+          <p className="small muted" style={{ marginTop: -6 }}>{tx("Inkoop bij een leverancier in Spanje komt zonder transport: de leverancier brengt het met eigen vervoer. Boek in wanneer het binnen is.")}</p>
+          {domestic.length === 0 && <Empty>{tx("Er wordt niets verwacht van leveranciers in Spanje.")}</Empty>}
+          {domestic.map(({ po, lines, date }) => (
+            <a key={po.id} className="task" href={`#ontvangst-io-${po.id}`}>
+              <div>
+                <div className="task-t">{po.number}</div>
+                <div className="muted small">{s.suppliers.find((x) => x.id === po.supplier_id)?.name}, {tx("{0} regels, {1} stuks", lines.length, lines.reduce((n, l) => n + shipmentLineOpen(s, l.id), 0))}</div>
+              </div>
+              <Pill tone={date < today ? 'bad' : date === today ? 'warn' : ''}>{fmtDate(date)}</Pill>
+            </a>
+          ))}
         </section>
         <section className="panel">
           <h2>{tx("Eerdere ontvangsten")}</h2>
@@ -115,15 +133,18 @@ export function Receipts() {
 interface Row { key: number; shipment_line_id: string; warehouse_id: string; qty_received: number; qty_damaged: number; location_bin: string }
 let k = 1
 
-export function ReceiptForm({ transportId }: { transportId: string }) {
+/** Inboeken per transport, of per inkooporder bij een leverancier in Spanje (zonder transport). */
+export function ReceiptForm({ transportId, purchaseOrderId }: { transportId?: string; purchaseOrderId?: string }) {
   const { s, run } = useApp()
-  const transport = s.transports.find((t) => t.id === transportId)
+  const transport = transportId ? s.transports.find((t) => t.id === transportId) : undefined
+  const po = purchaseOrderId ? s.purchase_orders.find((p) => p.id === purchaseOrderId) : undefined
+  const openLines = () => transportId ? openLinesOnTransport(s, transportId) : openLinesOfShipments(s, s.inbound_shipments.filter((x) => x.purchase_order_id === purchaseOrderId && shipmentIsOpen(x)).map((x) => x.id))
   const [notes, setNotes] = useState('')
-  const [rows, setRows] = useState<Row[]>(() => openLinesOnTransport(s, transportId).map((l) => ({
+  const [rows, setRows] = useState<Row[]>(() => openLines().map((l) => ({
     // Voorstel: de locatie van de inkoopregel (Showroom voor label Showroom, anders Magazijn Campoamor). Per regel te wijzigen.
     key: k++, shipment_line_id: l.id, warehouse_id: s.inbound_shipments.find((x) => x.id === l.shipment_id)?.warehouse_id ?? inboundWarehouse(s.warehouses)?.id ?? '', qty_received: shipmentLineOpen(s, l.id), qty_damaged: 0, location_bin: '',
   })))
-  if (!transport) return <div className="panel">{tx("Transport niet gevonden.")} <a href="#ontvangst">{tx("Terug naar ontvangst")}</a>.</div>
+  if (!transport && !po) return <div className="panel">{tx("Transport niet gevonden.")} <a href="#ontvangst">{tx("Terug naar ontvangst")}</a>.</div>
   const locations = s.warehouses.filter((w) => w.is_active && w.receives_goods)
   const nameOf = (id: string) => s.warehouses.find((w) => w.id === id)?.name ?? ''
   const lineInfo = (lineId: string) => {
@@ -137,15 +158,15 @@ export function ReceiptForm({ transportId }: { transportId: string }) {
   for (const r of rows) received.set(r.shipment_line_id, (received.get(r.shipment_line_id) ?? 0) + r.qty_received)
   const missing = [...received].reduce((n, [id, got]) => n + Math.max(0, shipmentLineOpen(s, id) - got), 0)
   const save = async () => {
-    const ok = await run((db) => receiveGoods(db, { transport_id: transportId, received_date: todayISO(), delivery_note: '', received_by: '', notes, rows: rows.map(({ key: _k, ...r }) => r) }), tx("Goederen ingeboekt, voorraad bijgewerkt"))
+    const ok = await run((db) => receiveGoods(db, { transport_id: transportId ?? null, received_date: todayISO(), delivery_note: '', received_by: '', notes, rows: rows.map(({ key: _k, ...r }) => r) }), tx("Goederen ingeboekt, voorraad bijgewerkt"))
     // Daarna de match: welke verkooporders kunnen nu worden afgeleverd.
     if (ok) go('rapportage-leverbaar')
   }
   return (
     <>
-      <Head title={tx("Ontvangst {0}", transport.number)} sub={tx("Verwacht op {0}.", fmtDate(transport.arrival_date))} back={{ href: '#ontvangst', label: tx("Goederenontvangst") }} />
-      <TransportPicker value={transportId} />
-      {rows.length === 0 && <><div className="note" style={{ marginBottom: 16 }}>{tx("Alles op dit transport is al ontvangen.")}</div><SignalList transportId={transportId} /></>}
+      <Head title={tx("Ontvangst {0}", transport?.number ?? po!.number)} sub={transport ? tx("Verwacht op {0}.", fmtDate(transport.arrival_date)) : tx("{0}, leverancier in Spanje, zonder transport.", s.suppliers.find((x) => x.id === po!.supplier_id)?.name)} back={{ href: '#ontvangst', label: tx("Goederenontvangst") }} />
+      {transportId && <TransportPicker value={transportId} />}
+      {rows.length === 0 && <><div className="note" style={{ marginBottom: 16 }}>{transportId ? tx("Alles op dit transport is al ontvangen.") : tx("Alles van deze inkooporder is al ontvangen.")}</div>{transportId && <SignalList transportId={transportId} />}</>}
       {rows.length > 0 && <div className="stack">
         <section className="panel">
           <h2>{tx("Goederenontvangst")}</h2>
@@ -174,7 +195,7 @@ export function ReceiptForm({ transportId }: { transportId: string }) {
             {missing > 0 && tx(" {0} stuks niet ontvangen, die blijven open staan.", missing)}
           </div>
         </section>
-        <SignalList transportId={transportId} />
+        {transportId && <SignalList transportId={transportId} />}
         <section className="panel"><AreaField label={tx("Opmerkingen")} value={notes} onChange={setNotes} /></section>
         <div className="sticky-save">
           <a className="btn" href="#ontvangst">{tx("Annuleren")}</a>

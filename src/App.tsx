@@ -170,7 +170,7 @@ function Route({ screen, param }: { screen: string; param: string }) {
     case 'overzicht': return <Overview />
     case 'inkoop': return param.startsWith('print-') ? <PurchaseOrderDocument key={param} id={param.slice(6)} /> : param === 'nieuw' ? <PurchaseForm /> : param.startsWith('nieuw-order-') ? <PurchaseForm orderId={param.slice(12)} /> : param.startsWith('omzetten-') ? <PurchaseDetail key={param} id={param.slice(9)} convert /> : param && param !== 'proforma' && !param.startsWith('lijst-') ? <PurchaseDetail key={param} id={param} /> : (() => { const l = parsePurchasesParam(param); return <Purchases key={param} tab={l.tab} phase={l.phase} /> })()
     case 'inkomend': return <Inbound key={param} focus={param.replace(/^(nl|klaar)-/, '') || undefined} />
-    case 'ontvangst': return param ? <ReceiptForm key={param} transportId={param} /> : <Receipts />
+    case 'ontvangst': return param.startsWith('io-') ? <ReceiptForm key={param} purchaseOrderId={param.slice(3)} /> : param ? <ReceiptForm key={param} transportId={param} /> : <Receipts />
     case 'orders':
       if (param === 'nieuw') return <OrderForm />
       if (param.startsWith('print-')) return <SalesOrderDocument key={param} id={param.slice(6)} />

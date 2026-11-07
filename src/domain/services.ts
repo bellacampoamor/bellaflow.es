@@ -14,7 +14,7 @@ import { DETAIL_COLUMNS, SHOWROOM_COLUMNS, showroomDetailFromCsv, showroomItemFr
 import {
   addDays, depositAvailable, freeAt, linesToPurchase, invoicedDeliveryLineIds, lineTotal, onHandMap, orderLines, plannedQty, round2,
   shipmentLineOpen, shippedQty, stockKey, todayISO, vatBreakdown,
-  inboundWarehouse, scanWarehouse, shipmentIsOpen, defaultReceiptWarehouse,
+  inboundWarehouse, scanWarehouse, shipmentIsOpen, defaultReceiptWarehouse, isDomesticShipment,
 } from './calc'
 
 export class FlowError extends Error {}
@@ -182,6 +182,7 @@ export async function markReceivedInNl(db: Driver, shipmentIds: string[], date: 
     if (!date && x.transport_id) fail(tx("Deze regel staat al op een transport. Koppel hem eerst los."))
     const po = s.purchase_orders.find((p) => p.id === x.purchase_order_id)
     if (date && po && date < po.order_date) fail(tx("De datum in Nederland kan niet voor de besteldatum liggen."))
+    if (isDomesticShipment(s, x)) fail(tx("Deze inkoop is bij een leverancier in Spanje en komt niet via Nederland."))
   }
   for (const id of shipmentIds) await db.update('inbound_shipments', id, { nl_received_at: date })
 }
@@ -235,6 +236,7 @@ export async function assignShipmentsToTransport(db: Driver, shipmentIds: string
   for (const id of shipmentIds) {
     const x = s.inbound_shipments.find((r) => r.id === id) ?? (fail(tx("Inkoopregel niet gevonden.")) as never)
     if (x.status === 'received' || x.status === 'closed') fail(tx("Deze regel is al ontvangen."))
+    if (t && isDomesticShipment(s, x)) fail(tx("Inkoop bij een leverancier in Spanje gaat niet op een transport uit Nederland."))
     if (t && !x.nl_received_at) fail(tx("Een regel kan pas op een transport als hij in Nederland is ontvangen."))
     const current = s.transports.find((r) => r.id === x.transport_id)
     if (current && current.status !== 'planned') fail(tx("Dit transport is al vertrokken. De regel kan er niet meer af."))

@@ -266,6 +266,12 @@ export function scanWarehouse(s: Snapshot, productId: string, qty: number) {
 export const freeAt = (s: Snapshot, productId: string, warehouseId: string) =>
   (onHandMap(s).get(stockKey(productId, warehouseId)) ?? 0) - (reservedMap(s).get(stockKey(productId, warehouseId)) ?? 0)
 
+/** Open regels van de gegeven inkoopregels (zendingen), bijvoorbeeld van één inkooporder zonder transport. */
+export function openLinesOfShipments(s: Snapshot, shipmentIds: string[]) {
+  const ids = new Set(shipmentIds)
+  return s.inbound_shipment_lines.filter((l) => ids.has(l.shipment_id) && shipmentLineOpen(s, l.id) > 0)
+}
+
 /** Inkoopregels op een transport waar nog iets van binnen moet komen. */
 export function openLinesOnTransport(s: Snapshot, transportId: string) {
   const shipments = new Set(s.inbound_shipments.filter((x) => x.transport_id === transportId && shipmentIsOpen(x)).map((x) => x.id))
@@ -298,6 +304,17 @@ export const articleNo = (s: Snapshot, productId: string | null | undefined) => 
 
 /** Voorlopig komt alle inkoop binnen op het magazijn waar de route start (Magazijn Campoamor). Verhuizen kan daarna via Voorraad. */
 export const inboundWarehouse = (warehouses: Warehouse[]) => warehouses.find((w) => w.is_route_origin && w.is_active && w.receives_goods)
+
+/**
+ * Leverancier in Spanje (besluit Rick 7 november 2026): herkend aan het land van de leverancier.
+ * Inkoop daar slaat Ontvangen in NL en Transport over; de leverancier levert met eigen vervoer bij ons af en we boeken in.
+ */
+export const isSpanishSupplier = (supplier: { country?: string } | null | undefined) =>
+  /^\s*(es|esp|espa(ñ|n)a|spanje|spain|spanien)\s*$/i.test(supplier?.country ?? '')
+
+/** Hoort deze inkoopregel bij een Spaanse leverancier? */
+export const isDomesticShipment = (s: Snapshot, x: InboundShipment) =>
+  isSpanishSupplier(s.suppliers.find((y) => y.id === s.purchase_orders.find((p) => p.id === x.purchase_order_id)?.supplier_id))
 
 /** Voorgestelde locatie bij ontvangst: Showroom Campoamor voor label Showroom, anders het magazijn waar de route start. */
 export const defaultReceiptWarehouse = (warehouses: Warehouse[], label: string | undefined) =>

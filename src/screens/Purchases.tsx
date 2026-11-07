@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { ArrowRight, FileText, Plus, Trash2 } from 'lucide-react'
-import { defaultReceiptWarehouse, inboundWarehouse, linesToPurchase, round2, shipmentDestination, shipmentIsOpen, todayISO } from '../domain/calc'
+import { defaultReceiptWarehouse, isSpanishSupplier, inboundWarehouse, linesToPurchase, round2, shipmentDestination, shipmentIsOpen, todayISO } from '../domain/calc'
 import { assignShipmentsToTransport, cancelPurchaseOrder, createPurchaseOrder, markReceivedInNl, setPurchaseLabel, syncPurchaseProformas } from '../domain/services'
 import { followRank, inOrdersTab } from '../domain/orderFlow'
 import { PURCHASE_PHASE_LABEL, PURCHASE_PHASES, PURCHASE_TABS, purchaseActiveIn, purchaseFlow, purchasesHref, type PurchasePhaseKey, type PurchaseTab } from '../domain/purchaseFlow'
@@ -140,6 +140,7 @@ export function PurchaseDetail({ id, convert: convertNow = false }: { id: string
   const isProforma = po.status === 'proforma'
   const flow = purchaseFlow(s, po)
   const today = todayISO()
+  const domestic = isSpanishSupplier(supplier)
   const hasReceipts = lines.some((l) => s.goods_receipt_lines.some((r) => r.shipment_line_id === s.inbound_shipment_lines.find((x) => x.purchase_order_line_id === l.id)?.id))
   return (
     <>
@@ -189,10 +190,11 @@ export function PurchaseDetail({ id, convert: convertNow = false }: { id: string
                   <td>{so ? <a className="rowlink" href={`#orders-${so.id}`}>{so.number}</a> : <span className="muted">{tx("Voorraad")}</span>}</td>
                   <td className="num">{l.qty}</td><td className="num">{eur(l.unit_cost)}</td><td className="num">{eur(l.qty * l.unit_cost)}</td>
                   <td>{!x || po.status !== 'open' ? <span className="muted">–</span>
+                    : domestic ? <span className="muted small">{tx("Leverancier in Spanje")}</span>
                     : x.nl_received_at ? <>{fmtDate(x.nl_received_at)}{open && !x.transport_id && <div><button className="btn sm" style={{ marginTop: 4 }} onClick={() => run((db) => markReceivedInNl(db, [x.id], null), tx("Ontvangst in NL ongedaan gemaakt"))}>{tx("Ongedaan maken")}</button></div>}</>
                     : open ? <><span className={x.original_date < today ? 'small' : 'muted small'} style={x.original_date < today ? { color: 'var(--bad)' } : undefined}>{tx("Verwacht {0}", fmtDate(x.original_date))}</span><div><button className="btn sm primary" style={{ marginTop: 4 }} onClick={() => run((db) => markReceivedInNl(db, [x.id], today), tx("Ontvangen in NL"))}>{tx("Ontvangen in NL")}</button></div></>
                     : <span className="muted">–</span>}</td>
-                  <td>{x && open && x.nl_received_at && (!t || t.status === 'planned')
+                  <td>{domestic ? <span className="muted small">{x && open ? tx("Eigen vervoer leverancier, verwacht {0}", fmtDate(x.original_date)) : tx("Eigen vervoer leverancier")}</span> : x && open && x.nl_received_at && (!t || t.status === 'planned')
                     ? <select aria-label={tx("Transport voor {0}", s.products.find((p) => p.id === l.product_id)?.name)} value={x.transport_id ?? ''} onChange={(e) => run((db) => assignShipmentsToTransport(db, [x.id], e.target.value || null), tx("Transport aangepast"))}>
                         <option value="">{tx("Nog niet ingepland")}</option>
                         {planned.map((r) => <option key={r.id} value={r.id}>{tx("{0}, vertrek {1}", r.number, fmtDate(r.departure_date))}</option>)}

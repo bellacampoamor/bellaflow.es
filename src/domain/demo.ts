@@ -259,6 +259,14 @@ export async function seedDemo(db: Driver, today = todayISO()) {
     supplier_id: oak.id, order_date: today, supplier_reference: 'EH-2340', notes: '',
     lines: [{ product_id: dining.id, qty: 8, unit_cost: dining.purchase_price, sales_order_line_id: null }],
   })
+  // Inkoop bij een leverancier in Spanje (verzonnen): geen NL en geen transport, de leverancier levert zelf af.
+  const spain: Supplier = { ...sup('Voorbeeldleverancier Spanje S.L.', 'Elche', 5), country: 'España' }
+  await db.insert('suppliers', [spain])
+  await createPurchaseOrder(db, {
+    supplier_id: spain.id, order_date: d(-2), supplier_reference: 'ES-1043', notes: 'Levert met eigen vervoer',
+    lines: [{ product_id: coffee.id, qty: 4, unit_cost: coffee.purchase_price, sales_order_line_id: null }],
+  })
+
   // Besteld voor het magazijn, staat al klaar in Nederland maar nog niet op een transport.
   const poReady = await createPurchaseOrder(db, {
     supplier_id: lounge.id, order_date: d(-9), supplier_reference: 'NZ-88377', notes: '',

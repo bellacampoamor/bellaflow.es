@@ -2,7 +2,7 @@
 // Proforma → Inkooporder → Ontvangen in NL → Transport → Ontvangst in Spanje → Aflevering aan de klant.
 // Per fase de stand, en voor de hele inkooporder of er iets te doen is. Zelfde oordelen als de verkoop-flow.
 import type { InboundShipment, PurchaseOrder, Snapshot } from '../data/types'
-import { shipmentDestination, shipmentIsOpen, shippedQty, todayISO } from './calc'
+import { isSpanishSupplier, shipmentDestination, shipmentIsOpen, shippedQty, todayISO } from './calc'
 import type { FollowUp, PhaseState } from './orderFlow'
 
 export const PURCHASE_PHASES = ['proforma', 'inkooporder', 'nl', 'transport', 'ontvangst', 'aflevering'] as const
@@ -40,11 +40,13 @@ export function purchaseFlow(s: Snapshot, po: PurchaseOrder, today = todayISO())
 
   const rows = s.inbound_shipments.filter((x) => x.purchase_order_id === po.id)
   const live = rows.filter((x) => x.status !== 'closed')
-  const nl = combine('nl', live.map((x) => nlPhase(x, today)))
-  const transport = combine('transport', live.map((x) => transportPhase(s, x)))
-  const ontvangst = combine('ontvangst', live.map((x) => receiptPhase(s, x, today)))
+  // Leverancier in Spanje: geen Ontvangen in NL en geen transport; de leverancier brengt het met eigen vervoer en we boeken in.
+  const domestic = isSpanishSupplier(s.suppliers.find((y) => y.id === po.supplier_id))
+  const nl = domestic ? { key: 'nl' as const, state: 'skip' as const, label: 'Leverancier in Spanje' } : combine('nl', live.map((x) => nlPhase(x, today)))
+  const transport = domestic ? { key: 'transport' as const, state: 'skip' as const, label: 'Eigen vervoer leverancier' } : combine('transport', live.map((x) => transportPhase(s, x)))
+  const ontvangst = combine('ontvangst', live.map((x) => domestic ? domesticReceiptPhase(s, x, today) : receiptPhase(s, x, today)))
   const aflevering: PurchasePhase = forSale ? combine('aflevering', live.map((x) => deliveryPhase(s, x))) : { key: 'aflevering', state: 'skip', label: 'Op voorraad' }
-  if (!live.length) for (const p of [nl, transport, ontvangst]) Object.assign(p, { state: 'done', label: 'Afgesloten' })
+  if (!live.length) for (const p of domestic ? [ontvangst] : [nl, transport, ontvangst]) Object.assign(p, { state: 'done', label: 'Afgesloten' })
 
   const phases = [proforma, inkooporder, nl, transport, ontvangst, aflevering]
   const w = worst(phases)
@@ -77,6 +79,16 @@ function receiptPhase(s: Snapshot, x: InboundShipment, today: string): PurchaseP
   if (t.arrival_date < today) return { key: 'ontvangst', state: 'laat', label: 'Te laat, aankomst {0}', args: [t.arrival_date], href }
   if (t.arrival_date === today || t.status === 'arrived') return { key: 'ontvangst', state: 'actie', label: 'Inboeken', href }
   return { key: 'ontvangst', state: 'wacht', label: t.status === 'departed' ? 'Onderweg, aankomst {0}' : 'Aankomst {0}', args: [t.arrival_date], href }
+}
+
+/** Ontvangst zonder transport (leverancier in Spanje): wachten tot de verwachte datum, dan inboeken; daarna te laat. */
+function domesticReceiptPhase(s: Snapshot, x: InboundShipment, today: string): PurchasePhase {
+  if (x.status === 'received') return { key: 'ontvangst', state: 'done', label: 'Op {0}', args: [shipmentDestination(s, x)] }
+  const href = `#ontvangst-io-${x.purchase_order_id}`
+  if (x.status === 'partial') return { key: 'ontvangst', state: 'actie', label: 'Deels ontvangen, rest inboeken of afsluiten', href }
+  if (x.original_date < today) return { key: 'ontvangst', state: 'laat', label: 'Nog niet geleverd, verwacht {0}', args: [x.original_date], href }
+  if (x.original_date === today) return { key: 'ontvangst', state: 'actie', label: 'Inboeken', href }
+  return { key: 'ontvangst', state: 'wacht', label: 'Levering door leverancier, verwacht {0}', args: [x.original_date], href }
 }
 
 /** Aflevering: na ontvangst gaat de verkooporder verder in de verkoop-flow (planning, afleveren, factureren). */
