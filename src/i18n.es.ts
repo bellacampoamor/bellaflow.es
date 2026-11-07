@@ -812,8 +812,6 @@ export const es: Record<string, string> = {
   "Inkoop vereist": "Compra necesaria",
   "Verkooporders zonder Inkooporders": "Pedidos de venta sin pedidos de compra",
   "Vink aan wat je wilt inkopen. Per leverancier ontstaat één inkooporder.": "Marque lo que desea comprar. Se crea un pedido de compra por proveedor.",
-  "Filter op leverancier": "Filtrar por proveedor",
-  "Alle leveranciers": "Todos los proveedores",
   "Alleen van vandaag": "Solo de hoy",
   "Geen regels met dit filter.": "No hay líneas con este filtro.",
   "Alle verkooporders zijn doorgezet. Nieuwe regels op bestelling verschijnen hier vanzelf.": "Todos los pedidos de venta se han trasladado a compras. Las nuevas líneas bajo pedido aparecerán aquí automáticamente.",

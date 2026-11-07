@@ -812,8 +812,6 @@ export const en: Record<string, string> = {
   "Inkoop vereist": "Purchase required",
   "Verkooporders zonder Inkooporders": "Sales orders without purchase orders",
   "Vink aan wat je wilt inkopen. Per leverancier ontstaat één inkooporder.": "Tick what you want to purchase. Each supplier gets one purchase order.",
-  "Filter op leverancier": "Filter by supplier",
-  "Alle leveranciers": "All suppliers",
   "Alleen van vandaag": "Only from today",
   "Geen regels met dit filter.": "No lines with this filter.",
   "Alle verkooporders zijn doorgezet. Nieuwe regels op bestelling verschijnen hier vanzelf.": "All sales orders have been converted. New lines on order appear here automatically.",

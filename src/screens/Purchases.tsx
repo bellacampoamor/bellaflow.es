@@ -27,7 +27,6 @@ export function Purchases({ tab = 'opvolgen', phase: initialPhase = null }: { ta
   useEffect(() => { if (!inSync) void run((db) => syncPurchaseProformas(db)) }, [inSync, run])
   const [filter, setFilterState] = useState<PurchaseFilter>(tab)
   const [phase, setPhaseState] = useState<PurchasePhaseKey | null>(initialPhase)
-  const [supplierFilter, setSupplierFilter] = useState('')
   const [q, setQ] = useState('')
   const remember = (f: PurchaseFilter, p: PurchasePhaseKey | null) => history.replaceState(null, '', purchasesHref(f, p ?? undefined))
   const setFilter = (f: PurchaseFilter) => { setFilterState(f); setPhaseState(null); remember(f, null) }
@@ -37,13 +36,11 @@ export function Purchases({ tab = 'opvolgen', phase: initialPhase = null }: { ta
     .sort((a, b) => followRank(a.flow.follow) - followRank(b.flow.follow) || b.po.order_date.localeCompare(a.po.order_date) || b.po.number.localeCompare(a.po.number)), [s, today])
   const t = q.trim().toLowerCase()
   const supplierName = (id: string) => s.suppliers.find((x) => x.id === id)?.name ?? ''
-  const matches = (r: typeof rows[number]) => (!supplierFilter || r.po.supplier_id === supplierFilter)
-    && (!t || `${r.po.number} ${r.po.supplier_reference} ${supplierName(r.po.supplier_id)} ${r.orders.map((o) => o.number).join(' ')}`.toLowerCase().includes(t))
+  const matches = (r: typeof rows[number]) => (!t || `${r.po.number} ${r.po.supplier_reference} ${supplierName(r.po.supplier_id)} ${r.orders.map((o) => o.number).join(' ')}`.toLowerCase().includes(t))
   const inTab = rows.filter((r) => inOrdersTab(filter, r.flow.follow) && matches(r))
   const shown = inTab.filter((r) => !phase || purchaseActiveIn(r.flow, phase))
   const late = rows.filter((r) => r.flow.follow === 'te_laat' && matches(r)).length
   const counts = flowCounts(s)
-  const usedSuppliers = s.suppliers.filter((x) => s.purchase_orders.some((po) => po.supplier_id === x.id)).sort((a, b) => a.name.localeCompare(b.name))
   return (
     <>
       <Head title={tx("Inkooporders")} sub={tx("Elke inkooporder loopt van links naar rechts door de flow, van proforma tot aflevering aan de klant. Koperkleur vraagt actie, rood is te laat, blauw loopt, groen is klaar.")}>
@@ -54,13 +51,7 @@ export function Purchases({ tab = 'opvolgen', phase: initialPhase = null }: { ta
       <section className="panel">
         <div className="panel-head" style={{ alignItems: 'flex-end' }}>
           <Tabs<PurchaseFilter> value={filter} onChange={setFilter} tabs={PURCHASE_TABS.map((f) => ({ value: f, label: { opvolgen: tx("Opvolgen"), loopt: tx("Loopt"), afgerond: tx("Afgerond"), alle: tx("Alles") }[f], n: rows.filter((r) => inOrdersTab(f, r.flow.follow) && matches(r)).length }))} />
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 14 }}>
-            <select style={{ width: 'auto', maxWidth: 'min(340px, 100%)' }} aria-label={tx("Filter op leverancier")} value={supplierFilter} onChange={(e) => setSupplierFilter(e.target.value)}>
-              <option value="">{tx("Alle leveranciers")}</option>
-              {usedSuppliers.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
-            </select>
-            <input style={{ maxWidth: 260 }} aria-label={tx("Inkooporders zoeken")} placeholder={tx("Zoek op nummer, leverancier of verkooporder")} value={q} onChange={(e) => setQ(e.target.value)} />
-          </div>
+          <input style={{ maxWidth: 280, marginBottom: 14 }} aria-label={tx("Inkooporders zoeken")} placeholder={tx("Zoek op nummer, leverancier of verkooporder")} value={q} onChange={(e) => setQ(e.target.value)} />
         </div>
         {missing.length > 0 && (
           <div className="note warn" style={{ marginBottom: 12 }}>
