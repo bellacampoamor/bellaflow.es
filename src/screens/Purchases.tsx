@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { ArrowRight, FileText, PackageCheck, Plus, Trash2, Truck } from 'lucide-react'
+import { ArrowRight, FileText, PackageCheck, Plus, Send, Trash2, Truck } from 'lucide-react'
 import { defaultReceiptWarehouse, flowCounts, isSpanishSupplier, inboundWarehouse, linesToPurchase, round2, shipmentDestination, shipmentIsOpen, todayISO } from '../domain/calc'
 import { assignShipmentsToTransport, cancelPurchaseOrder, createPurchaseOrder, markReceivedInNl, setPurchaseLabel, syncPurchaseProformas } from '../domain/services'
 import { followRank, inOrdersTab } from '../domain/orderFlow'
@@ -9,6 +9,7 @@ import type { PurchaseLabel } from '../data/types'
 import { tx } from '../i18n'
 import { go, useApp } from '../ui/app-context'
 import { AreaField, Combo, Empty, eur, fmtDate, Head, Modal, NumInput, Pill, SelectField, Sku, Tabs, TextField, type Tone } from '../ui/kit'
+import { DispatchLog } from './PurchaseDispatch'
 import { ConvertProformaModal, linesWithoutSupplier, proformasInSync, purchaseValue, salesOrdersOf } from './PurchaseQueue'
 
 type Snap = ReturnType<typeof useApp>['s']
@@ -46,6 +47,7 @@ export function Purchases({ tab = 'opvolgen', phase: initialPhase = null }: { ta
       <Head title={tx("Inkooporders")} sub={tx("Elke inkooporder loopt van links naar rechts door de flow, van proforma tot aflevering aan de klant. Koperkleur vraagt actie, rood is te laat, blauw loopt, groen is klaar.")}>
         <a className="btn" href="#inkomend"><Truck size={16} />{tx("Gepland transport")}{counts.inkomend > 0 && <span className="btn-n bad">{tx("{0} te laat", counts.inkomend)}</span>}</a>
         <a className="btn" href="#ontvangst"><PackageCheck size={16} />{tx("Ontvangst")}{counts.ontvangst > 0 && <span className="btn-n">{tx("{0} binnen 7 dagen", counts.ontvangst)}</span>}</a>
+        <a className="btn" href="#inkoop-versturen"><Send size={16} />{tx("Afdrukken en versturen")}</a>
         <a className="btn primary" href="#inkoop-nieuw"><Plus size={16} />{tx("Nieuwe inkooporder")}</a>
       </Head>
       <section className="panel">
@@ -138,6 +140,8 @@ export function PurchaseDetail({ id, convert: convertNow = false }: { id: string
           <option value="showroom">{tx("Showroom")}</option>
           <option value="magazijn">{tx("Magazijn")}</option>
         </select>}
+        {po.status !== 'cancelled' && <a className="btn" href={`#inkoop-print-${id}`}><FileText size={16} />{tx("Afdrukken als PDF")}</a>}
+        {po.status === 'open' && <a className="btn" href={`#inkoop-versturen-${po.order_date}`}><Send size={16} />{tx("Versturen")}</a>}
         {po.status === 'open' && !hasReceipts && <button className="btn danger" onClick={() => setConfirm(true)}>{tx("Inkooporder annuleren")}</button>}
       </Head>
       <div className="stack">
@@ -196,6 +200,7 @@ export function PurchaseDetail({ id, convert: convertNow = false }: { id: string
           </table></div>
         </section>
         {po.notes && <section className="panel"><h2>{tx("Notitie")}</h2><p style={{ margin: 0 }}>{po.notes}</p></section>}
+        <DispatchLog id={id} />
       </div>
       {convert && <ConvertProformaModal ids={[id]} onClose={() => setConvert(false)} onDone={(ids) => { setConvert(false); if (ids[0]) go(`inkoop-${ids[0]}`) }} />}
       {confirm && (

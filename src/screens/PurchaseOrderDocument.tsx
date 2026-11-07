@@ -14,8 +14,33 @@ const T: Record<Language, Record<string, string>> = {
 export function PurchaseOrderDocument({ id }: { id: string }) {
   const { s } = useApp()
   const po = s.purchase_orders.find((x) => x.id === id)
-  useAutoPrint(true, !!po, 'inkoop')
+  useAutoPrint(true, !!po, "inkoop")
   if (!po) return <div className="panel">{tx("Inkooporder niet gevonden.")} <a href="#inkoop">{tx("Inkooporders")}</a>.</div>
+  return (
+    <>
+      <Head title={po.number} back={{ href: "#inkoop", label: tx("Inkooporders") }} />
+      <PurchaseOrderPaper id={id} />
+    </>
+  )
+}
+
+/** Meerdere inkooporders in één afdruk, elke inkooporder op een eigen pagina. */
+export function PurchaseOrdersDocument({ ids, back }: { ids: string[]; back: string }) {
+  const { s } = useApp()
+  const found = ids.filter((id) => s.purchase_orders.some((x) => x.id === id))
+  useAutoPrint(true, found.length > 0, back)
+  if (!found.length) return <div className="panel">{tx("Inkooporder niet gevonden.")} <a href="#inkoop">{tx("Inkooporders")}</a>.</div>
+  return (
+    <>
+      <Head title={found.length === 1 ? tx("1 inkooporder") : tx("{0} inkooporders", found.length)} back={{ href: `#${back}`, label: tx("Terug") }} />
+      <div className="paper-stack">{found.map((id) => <PurchaseOrderPaper key={id} id={id} />)}</div>
+    </>
+  )
+}
+
+export function PurchaseOrderPaper({ id }: { id: string }) {
+  const { s } = useApp()
+  const po = s.purchase_orders.find((x) => x.id === id)!
   const sup = s.suppliers.find((x) => x.id === po.supplier_id)
   const co = s.settings[0]
   const language = co.language_purchase_order ?? 'nl'
@@ -23,8 +48,6 @@ export function PurchaseOrderDocument({ id }: { id: string }) {
   const lines = s.purchase_order_lines.filter((l) => l.purchase_order_id === id)
   const total = round2(lines.reduce((n, l) => n + l.qty * l.unit_cost, 0))
   return (
-    <>
-      <Head title={po.number} back={{ href: '#inkoop', label: tx("Inkooporders") }} />
       <DocPaper language={language}>
         <div className="paper-top">
           <div>
@@ -58,6 +81,5 @@ export function PurchaseOrderDocument({ id }: { id: string }) {
         <div className="totals" style={{ marginTop: 18 }}><div className="grand"><span>{t.grand}</span><span>{eur(total)}</span></div></div>
         {po.notes && <p className="small" style={{ marginTop: 18, marginBottom: 0 }}>{t.notes}: {po.notes}</p>}
       </DocPaper>
-    </>
   )
 }

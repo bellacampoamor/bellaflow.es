@@ -141,10 +141,16 @@ export interface Delivery {
 }
 export type EmailStatus = 'pending' | 'sent' | 'failed' | 'no_recipient' | 'demo'
 export interface OutgoingEmail {
-  id: string; kind: 'getekende_afleverbon' | 'factuur'; delivery_id: string | null; invoice_id?: string | null; to_email: string; bcc_email: string
+  id: string; kind: 'getekende_afleverbon' | 'factuur' | 'inkooporders'; delivery_id: string | null; invoice_id?: string | null; to_email: string; bcc_email: string
   subject: string; body_text: string; status: EmailStatus; error: string; created_at: string; sent_at: string | null
 }
 export interface EmailAttachment { name: string; base64: string }
+/** Log per inkooporder: elke keer dat hij echt verstuurd is (JSON per dag per mail naar de leverancier). */
+export interface PurchaseOrderDispatch {
+  id: string; purchase_order_id: string; email_id: string | null; channel: 'json_mail'
+  /** De dag waarvan de inkooporders zijn verstuurd. */
+  dispatch_date: string; file_name: string; to_email: string; created_at: string
+}
 export interface DeliveryLine {
   id: string; delivery_id: string; sales_order_line_id: string; warehouse_id: string; qty: number
 }
@@ -171,6 +177,7 @@ export interface Snapshot {
   goods_receipts: GoodsReceipt[]; goods_receipt_lines: GoodsReceiptLine[]; stock_movements: StockMovement[]
   deliveries: Delivery[]; delivery_lines: DeliveryLine[]; invoices: Invoice[]; invoice_lines: InvoiceLine[]
   payments: Payment[]; number_series: NumberSeries[]; email_outbox: OutgoingEmail[]
+  purchase_order_dispatches: PurchaseOrderDispatch[]
 }
 export type TableName = keyof Snapshot
 
@@ -179,5 +186,5 @@ export const TABLES: TableName[] = [
   'settings', 'warehouses', 'suppliers', 'customers', 'salespeople', 'products', 'supplier_showroom_items', 'supplier_showroom_details', 'sales_orders', 'sales_order_lines',
   'order_events', 'purchase_orders', 'purchase_order_lines', 'transports', 'inbound_shipments', 'inbound_shipment_lines',
   'goods_receipts', 'goods_receipt_lines', 'stock_movements', 'deliveries', 'delivery_lines', 'invoices',
-  'invoice_lines', 'payments', 'number_series', 'email_outbox',
+  'invoice_lines', 'payments', 'number_series', 'email_outbox', 'purchase_order_dispatches',
 ]

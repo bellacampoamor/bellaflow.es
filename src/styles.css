@@ -716,3 +716,7 @@ tr.focus-flash td { animation: focus-flash-cell 2.6s ease-out; }
   .table-wrap.sticky-flow { overflow-x: clip; }
   .sticky-flow .flow-table thead th { position: sticky; top: var(--top-h, 0px); z-index: 15; background: var(--surface); padding-top: 10px; box-shadow: 0 1px 0 var(--line); }
 }
+
+/* Meerdere documenten in één afdruk: elk op een eigen pagina */
+.paper-stack { display: grid; gap: 18px; }
+@media print { .paper-stack { display: block; } .paper-stack > .paper + .paper { break-before: page; } }

@@ -10,6 +10,7 @@ import type {
 import { parseCsv, sameName } from './catalog'
 import { articleNumberFromScan } from './scan'
 import { INVOICE_MAIL } from './noteText'
+import { isSendable, PURCHASE_MAIL, purchaseJsonFileName, purchaseOrdersJson, toBase64 } from './purchaseExport'
 import { articleSources, categoryName, priceWithSurcharge, finishArticleSync, missingSupplierCodes, planArticleSync } from './articles'
 import { DETAIL_COLUMNS, SHOWROOM_COLUMNS, showroomDetailFromCsv, showroomItemFromCsv } from './showroom'
 import {
@@ -1059,3 +1060,65 @@ export const defaultMethod = (f: Fulfilment): Delivery['method'] =>
 
 export { todayISO }
 export type { OrderType }
+
+// Inkooporders versturen ---------------------------------------------------------
+// Per dag één JSON-bestand per leverancier, per mail. Elke verzending komt in het log van de inkooporder.
+
+/** De JSON-bestanden voor deze inkooporders, één per leverancier. Gebruikt voor downloaden en versturen. */
+export async function purchaseJsonFiles(db: Driver, date: string, ids: string[], s0?: Snapshot) {
+  const s = s0 ?? await loadSnapshot(db)
+  const pos = ids.map((id) => s.purchase_orders.find((p) => p.id === id) ?? fail(tx("Inkooporder niet gevonden.")))
+  for (const po of pos) if (!isSendable(po)) fail(tx("{0} is geen definitieve inkooporder en kan niet worden verstuurd.", po.number))
+  const skus = [...new Set(pos.flatMap((po) => s.purchase_order_lines.filter((l) => l.purchase_order_id === po.id).map((l) => s.products.find((p) => p.id === l.product_id)?.sku ?? '')).filter(Boolean))]
+  const articles = new Map((skus.length ? await db.findArticles({ numbers: skus }) : []).map((a) => [a.article_number, a]))
+  const bySupplier = new Map<string, string[]>()
+  for (const po of pos) bySupplier.set(po.supplier_id, [...(bySupplier.get(po.supplier_id) ?? []), po.id])
+  return [...bySupplier].map(([supplierId, poIds]) => {
+    const sup = s.suppliers.find((x) => x.id === supplierId)
+    return { supplierId, ids: poIds, fileName: purchaseJsonFileName(sup, date), json: JSON.stringify(purchaseOrdersJson(s, poIds, date, articles), null, 2) }
+  })
+}
+
+/**
+ * Verstuurt de inkooporders van een dag: per leverancier één mail met het JSON-bestand, met een bcc naar de winkel.
+ * `to` geeft per leverancier het adres (standaard het e-mailadres van de leverancier). Elke poging wordt per inkooporder gelogd,
+ * ook als het mislukt of er geen adres is, zodat op de inkooporder te zien is wat er gebeurd is.
+ */
+export async function sendPurchaseOrders(db: Driver, input: { date: string; ids: string[]; to?: Record<string, string> }) {
+  if (!input.ids.length) fail(tx("Selecteer eerst een inkooporder."))
+  const s = await loadSnapshot(db)
+  const files = await purchaseJsonFiles(db, input.date, input.ids, s)
+  for (const f of files) {
+    const raw = (input.to?.[f.supplierId] ?? s.suppliers.find((x) => x.id === f.supplierId)?.email ?? '').trim()
+    if (raw && !isEmail(raw)) fail(tx("Vul een geldig e-mailadres in voor {0}.", s.suppliers.find((x) => x.id === f.supplierId)?.name ?? ''))
+  }
+  const co = s.settings[0]
+  const language = co?.language_purchase_order ?? 'nl'
+  const text = PURCHASE_MAIL[language]
+  const results: { supplierId: string; ids: string[]; to: string; status: EmailStatus }[] = []
+  for (const f of files) {
+    const sup = s.suppliers.find((x) => x.id === f.supplierId)
+    const to = (input.to?.[f.supplierId] ?? sup?.email ?? '').trim()
+    const numbers = f.ids.map((id) => s.purchase_orders.find((p) => p.id === id)!.number)
+    const emailId = newId()
+    const now = new Date().toISOString()
+    await db.insert('email_outbox', [{
+      id: emailId, kind: 'inkooporders', delivery_id: null, invoice_id: null, to_email: to, bcc_email: co?.shop_email?.trim() ?? '',
+      subject: text.subject(input.date.split('-').reverse().join('-'), co?.company_name ?? ''), body_text: text.body(sup?.contact_name || sup?.name || '', numbers.map((n) => `- ${n}`).join('\n'), co?.company_name ?? ''),
+      status: to ? 'pending' : 'no_recipient', error: to ? '' : tx("Geen e-mailadres bekend bij de leverancier."), created_at: now, sent_at: null,
+    }])
+    await db.insert('purchase_order_dispatches', f.ids.map((purchase_order_id) => ({ id: newId(), purchase_order_id, email_id: emailId, channel: 'json_mail' as const, dispatch_date: input.date, file_name: f.fileName, to_email: to, created_at: now })))
+    let status: EmailStatus = 'no_recipient'
+    if (to) {
+      try {
+        status = await db.sendEmail(emailId, { name: f.fileName, base64: toBase64(f.json) })
+        await db.update('email_outbox', emailId, { status, error: '', sent_at: status === 'sent' ? new Date().toISOString() : null })
+      } catch (e) {
+        status = 'failed'
+        await db.update('email_outbox', emailId, { status, error: e instanceof Error ? e.message : String(e) })
+      }
+    }
+    results.push({ supplierId: f.supplierId, ids: f.ids, to, status })
+  }
+  return results
+}

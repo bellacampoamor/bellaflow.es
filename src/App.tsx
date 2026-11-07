@@ -19,7 +19,8 @@ import { Driver } from './screens/Driver'
 import { LabelAgent } from './screens/LabelAgent'
 import { ScanApp } from './screens/ScanApp'
 import { SalesOrderDocument } from './screens/SalesOrderDocument'
-import { PurchaseOrderDocument } from './screens/PurchaseOrderDocument'
+import { PurchaseOrderDocument, PurchaseOrdersDocument } from './screens/PurchaseOrderDocument'
+import { PurchaseDispatch } from './screens/PurchaseDispatch'
 import { Reports } from './screens/Reports'
 import { Catalogs } from './screens/Catalogs'
 import { getLanguage, setLanguage, tx, type UiLanguage } from './i18n'
@@ -138,7 +139,7 @@ export function App({ onResetDemo, onSignOut }: { onResetDemo?: () => Promise<vo
 function Route({ screen, param }: { screen: string; param: string }) {
   switch (screen) {
     case 'overzicht': return <Overview />
-    case 'inkoop': return param.startsWith('print-') ? <PurchaseOrderDocument key={param} id={param.slice(6)} /> : param === 'nieuw' ? <PurchaseForm /> : param.startsWith('nieuw-order-') ? <PurchaseForm orderId={param.slice(12)} /> : param.startsWith('omzetten-') ? <PurchaseDetail key={param} id={param.slice(9)} convert /> : param && param !== 'proforma' && !param.startsWith('lijst-') ? <PurchaseDetail key={param} id={param} /> : (() => { const l = parsePurchasesParam(param); return <Purchases key={param} tab={l.tab} phase={l.phase} /> })()
+    case 'inkoop': return param.startsWith('versturen') ? <PurchaseDispatch key={param} date={param.slice(10)} /> : param.startsWith('afdrukken-') ? <PurchaseOrdersDocument key={param} ids={param.slice(21).split(',').filter(Boolean)} back={`inkoop-versturen-${param.slice(10, 20)}`} /> : param.startsWith('print-') ? <PurchaseOrderDocument key={param} id={param.slice(6)} /> : param === 'nieuw' ? <PurchaseForm /> : param.startsWith('nieuw-order-') ? <PurchaseForm orderId={param.slice(12)} /> : param.startsWith('omzetten-') ? <PurchaseDetail key={param} id={param.slice(9)} convert /> : param && param !== 'proforma' && !param.startsWith('lijst-') ? <PurchaseDetail key={param} id={param} /> : (() => { const l = parsePurchasesParam(param); return <Purchases key={param} tab={l.tab} phase={l.phase} /> })()
     case 'inkomend': return <Inbound key={param} focus={param.replace(/^(nl|klaar)-/, '') || undefined} />
     case 'ontvangst': return param.startsWith('io-') ? <ReceiptForm key={param} purchaseOrderId={param.slice(3)} /> : param ? <ReceiptForm key={param} transportId={param} /> : <Receipts />
     case 'orders':
