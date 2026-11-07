@@ -227,6 +227,38 @@ td input.price { width: 104px; }
 .figures { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; margin-bottom: 16px; }
 .figures > div { background: var(--surface); padding: 12px 16px; }
 .figures b { display: block; font: 700 1.35rem var(--display); color: var(--heading); font-variant-numeric: tabular-nums; }
+.ov-date::first-letter { text-transform: uppercase; }
+/* Nu te doen: tegels in de kleur van de stap uit de stappenbalk; te laat in de statuskleur Fout. */
+.ov-todo { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(150px, 100%), 1fr)); gap: 10px; margin-bottom: 16px; }
+@media (min-width: 700px) { .ov-todo { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); } }
+.ov-action { --tint: var(--buy); --tint-fg: var(--buy-fg); display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 10px; background: var(--tint); color: var(--tint-fg); text-decoration: none; border: 1px solid transparent; }
+.ov-action.sell { --tint: var(--sell); --tint-fg: var(--sell-fg); }
+.ov-action.ship { --tint: var(--ship); --tint-fg: var(--ship-fg); }
+.ov-action.bill { --tint: var(--bill); --tint-fg: var(--bill-fg); }
+.ov-action.urgent { --tint: var(--bad-bg); --tint-fg: var(--bad); border-color: var(--bad); }
+.ov-action b { font: 700 1.6rem/1 var(--display); font-variant-numeric: tabular-nums; min-width: 1.4ch; }
+.ov-action span { display: flex; gap: 5px; align-items: center; font-weight: 600; font-size: .9rem; line-height: 1.25; }
+.ov-action:hover { border-color: currentColor; }
+.ov-calm { grid-column: 1 / -1; display: flex; gap: 10px; align-items: center; padding: 12px 14px; border-radius: 10px; background: var(--good-bg); color: var(--good); font-weight: 600; }
+.ov-bad { color: var(--bad); font-weight: 600; }
+/* Twee kolommen: Verkoop (breder) en Inkoop. */
+.ov-cols { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 16px; align-items: start; }
+@media (max-width: 1000px) { .ov-cols { grid-template-columns: minmax(0, 1fr); } }
+.ov-col { display: grid; gap: 16px; min-width: 0; }
+.ov-col-h { display: flex; align-items: center; gap: 8px; font: 700 1rem var(--display); color: var(--heading); padding-bottom: 6px; border-bottom: 3px solid var(--tint); }
+.ov-col-h.sell { --tint: var(--sell); } .ov-col-h.buy { --tint: var(--buy); }
+.ov-col-h .muted { margin-left: auto; font: 400 .85rem var(--body); }
+.ov-group + .ov-group { margin-top: 14px; }
+.ov-group-h { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 5px 10px; border-radius: 6px; background: var(--surface-2); color: var(--heading); font-weight: 700; font-size: .86rem; }
+.ov-group-h > span:first-child::first-letter { text-transform: uppercase; }
+.ov-group-h.now { background: var(--selected); color: var(--on-selected); }
+.ov-group-h.bad { background: var(--bad-bg); color: var(--bad); }
+.ov-count { font-variant-numeric: tabular-nums; font-weight: 700; }
+.ov-group .task { padding-inline: 10px; }
+.ov-more { display: inline-block; padding: 6px 10px 0; }
+.ov-load { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
+.ov-load .fill { width: 140px; flex-shrink: 1; min-width: 60px; margin: 0; height: 7px; }
+.ov-load span { white-space: nowrap; }
 
 /* Voorraad */
 .split-bar { display: flex; height: 7px; border-radius: 4px; overflow: hidden; background: var(--neutral-bg); }

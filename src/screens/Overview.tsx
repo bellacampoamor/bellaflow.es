@@ -1,118 +1,199 @@
-import { addDays, articleNo, deliveryIsOpen, depositAvailable, deliveryValue, invoiceBalance, invoiceState, linesToPurchase, onHandMap, orderStage, reservedMap, openLinesOnTransport, STAGE_LABEL, stockKey, todayISO, uninvoicedDeliveries } from '../domain/calc'
+import type { ReactNode } from 'react'
+import { AlertTriangle, CheckCircle2, Plus, ShoppingCart, Store } from 'lucide-react'
+import { addDays, orderTotal } from '../domain/calc'
+import { overview } from '../domain/overview'
 import { useApp } from '../ui/app-context'
-import { Empty, eur, fmtDate, fmtShort, Head, Pill, Sku } from '../ui/kit'
-import { Plus } from 'lucide-react'
-import { tx } from '../i18n'
+import { Empty, eur, fmtDate, fmtShort, Head, Pill } from '../ui/kit'
+import { locale, tx } from '../i18n'
+
+const MAX = 5
+
+/** "En nog N" onder een ingekorte lijst. */
+const More = ({ n, href }: { n: number; href: string }) => n > 0 ? <a className="ov-more small" href={href}>{tx("En nog {0}", n)} →</a> : null
+
+const Group = ({ title, n, tone = '', children }: { title: string; n?: ReactNode; tone?: string; children: ReactNode }) => (
+  <div className="ov-group">
+    <div className={`ov-group-h ${tone}`}><span>{title}</span>{n != null && <span className="ov-count">{n}</span>}</div>
+    {children}
+  </div>
+)
 
 export function Overview() {
   const { s } = useApp()
-  const today = todayISO()
+  const o = overview(s)
+  const today = o.today
   const name = <T extends { id: string; name: string }>(rows: T[], id: string | null) => rows.find((r) => r.id === id)?.name ?? '–'
-  const custOf = (orderId: string) => name(s.customers, s.sales_orders.find((o) => o.id === orderId)?.customer_id ?? null)
-
-  const inbound = s.transports.filter((t) => t.status !== 'cancelled' && t.arrival_date <= addDays(today, 14) && openLinesOnTransport(s, t.id).length > 0).sort((a, b) => a.arrival_date.localeCompare(b.arrival_date))
-  const deliveries = s.deliveries.filter(deliveryIsOpen).sort((a, b) => a.planned_date.localeCompare(b.planned_date)).slice(0, 6)
-  const orders = s.sales_orders.filter((o) => ['te_plannen', 'wacht_op_goederen'].includes(orderStage(s, o)))
-  const toBill = s.sales_orders.flatMap((o) => o.status === 'open' ? uninvoicedDeliveries(s, o.id) : [])
-  const openInvoices = s.invoices.filter((i) => invoiceBalance(s, i) > 0)
-  const toBuy = linesToPurchase(s)
-  const lowStock = s.products.filter((p) => {
-    const hand = onHandMap(s), res = reservedMap(s)
-    const free = s.warehouses.reduce((n, w) => n + (hand.get(stockKey(p.id, w.id)) ?? 0) - (res.get(stockKey(p.id, w.id)) ?? 0), 0)
-    return p.is_active && free < p.min_stock
-  })
-  const deposits = s.sales_orders.filter((o) => o.status === 'open').reduce((n, o) => n + depositAvailable(s, o.id), 0)
-  const receivable = openInvoices.reduce((n, i) => n + invoiceBalance(s, i), 0)
+  const custOf = (orderId: string) => name(s.customers, o.order(orderId)?.customer_id ?? null)
+  const cityOf = (orderId: string) => o.order(orderId)?.delivery_city ?? ''
+  const longDate = new Date(`${today}T12:00:00`).toLocaleDateString(locale(), { weekday: 'long', day: 'numeric', month: 'long' })
+  const dayLabel = (iso: string) => iso === today ? tx("Vandaag") : fmtShort(iso)
+  const deliveryState = { planned: tx("Gepland"), ready: tx("Klaargezet"), in_transit: tx("Onderweg"), delivered: '', cancelled: '' }
 
   return (
     <>
-      <Head title={tx("Overzicht")} sub={tx("Wat er vandaag speelt, {0}.", fmtShort(today))}>
+      <Head title={tx("Overzicht")} sub={<span className="ov-date">{longDate}</span>}>
         <a className="btn" href="#inkoop-nieuw"><Plus size={16} />{tx("Inkooporder")}</a>
         <a className="btn primary" href="#orders-nieuw"><Plus size={16} />{tx("Nieuwe verkooporder")}</a>
       </Head>
 
-      <div className="figures">
-        <div><b>{s.sales_orders.filter((o) => o.status === 'open' && orderStage(s, o) !== 'gefactureerd').length}</b><span className="muted small">{tx("Lopende verkooporders")}</span></div>
-        <div><b>{inbound.length}</b><span className="muted small">{tx("Transporten binnen 14 dagen")}</span></div>
-        <div><b>{eur(receivable)}</b><span className="muted small">{tx("Open op facturen")}</span></div>
-        <div><b>{eur(deposits)}</b><span className="muted small">{tx("Vooruitbetaald, nog te verrekenen")}</span></div>
+      {/* Nu te doen: alleen wat vandaag een handeling vraagt, te laat eerst. */}
+      <section className="ov-todo" aria-label={tx("Nu te doen")}>
+        {o.actions.length === 0
+          ? <div className="ov-calm"><CheckCircle2 size={20} />{tx("Niets dringends. Alles loopt volgens planning.")}</div>
+          : o.actions.map((a) => (
+            <a key={a.key} className={`ov-action ${a.flow}${a.urgent ? ' urgent' : ''}`} href={a.href}>
+              <b>{a.n}</b>
+              <span>{a.urgent && <AlertTriangle size={14} />}{tx(a.label)}</span>
+            </a>
+          ))}
+      </section>
+
+      <div className="figures ov-money">
+        <div><b>{eur(o.money.revenueMonth)}</b><span className="muted small">{tx("Gefactureerd deze maand")}{o.money.invoicesMonth === 1 ? tx(", 1 factuur") : o.money.invoicesMonth ? tx(", {0} facturen", o.money.invoicesMonth) : ''}</span></div>
+        <div><b>{eur(o.money.toBill)}</b><span className="muted small">{tx("Afgeleverd, nog te factureren")}</span></div>
+        <div><b>{eur(o.money.receivable)}</b><span className="muted small">{tx("Open op facturen")}{o.money.overdue > 0 && <> · <span className="ov-bad">{tx("{0} vervallen", eur(o.money.overdue))}</span></>}</span></div>
+        <div><b>{eur(o.money.deposits)}</b><span className="muted small">{tx("Vooruitbetaald, nog te verrekenen")}</span></div>
       </div>
 
-      <div className="work">
-        <section className="panel">
-          <div className="panel-head"><h2>{tx("Binnenkomende transporten")}</h2><a className="small" href="#inkomend">{tx("Gepland transport")}</a></div>
-          {inbound.length === 0 && <Empty>{tx("Er staan geen transporten gepland.")}</Empty>}
-          {inbound.map((t) => {
-            const lines = openLinesOnTransport(s, t.id)
-            const late = t.arrival_date < today
-            return (
-              <a className="task" key={t.id} href={`#ontvangst-${t.id}`}>
-                <div><div className="task-t">{t.number}</div>
-                  <div className="muted small">{tx("{0} regels, {1} stuks", lines.length, lines.reduce((n, l) => n + l.qty, 0))}{t.carrier ? `, ${t.carrier}` : ''}</div></div>
-                <Pill tone={late ? 'bad' : t.arrival_date === today ? 'warn' : ''}>{late ? tx("Te laat, ") : ''}{fmtShort(t.arrival_date)}</Pill>
-              </a>
-            )
-          })}
-        </section>
+      <div className="ov-cols">
+        {/* Verkoop */}
+        <div className="ov-col">
+          <div className="ov-col-h sell"><Store size={16} />{tx("Verkoop")}<span className="muted small">{tx("{0} lopende verkooporders", o.sales.running)}</span></div>
 
-        <section className="panel">
-          <div className="panel-head"><h2>{tx("Verkooporders die aandacht vragen")}</h2><a className="small" href="#orders">{tx("Alle verkooporders")}</a></div>
-          {orders.length === 0 && <Empty>{tx("Alle verkooporders zijn ingepland.")}</Empty>}
-          {orders.map((o) => {
-            const st = orderStage(s, o)
-            return (
-              <a className="task" key={o.id} href={`#orders-${o.id}`}>
-                <div><div className="task-t">{o.number}</div><div className="muted small">{name(s.customers, o.customer_id)}{o.requested_date ? tx(", gewenst {0}", fmtDate(o.requested_date)) : ''}</div></div>
-                <Pill tone={st === 'te_plannen' ? 'sell' : 'warn'}>{tx(STAGE_LABEL[st])}</Pill>
-              </a>
-            )
-          })}
-        </section>
+          <section className="panel">
+            <div className="panel-head"><h2>{tx("Bezorgplanning, komende 7 dagen")}</h2><a className="small" href="#levering">{tx("Levering")}</a></div>
+            {o.delivery.days.length === 0 && <Empty>{tx("Er staan geen leveringen gepland.")}</Empty>}
+            {o.delivery.days.map((day) => (
+              <Group key={day.late ? 'laat' : day.date} title={day.late ? tx("Te laat") : dayLabel(day.date)} tone={day.late ? 'bad' : day.date === today ? 'now' : ''}
+                n={tx("{0} van {1} klaargezet", day.ready, day.deliveries.length)}>
+                {day.deliveries.map((d) => (
+                  <a className="task" key={d.id} href="#levering">
+                    <div><div className="task-t">{custOf(d.sales_order_id)}</div>
+                      <div className="muted small">{d.number}{cityOf(d.sales_order_id) ? `, ${cityOf(d.sales_order_id)}` : ''}{d.sequence > 1 ? tx(", deellevering {0}", d.sequence) : ''}{day.late ? `, ${fmtShort(d.planned_date)}` : ''}</div></div>
+                    <Pill tone={d.status === 'planned' ? (day.late ? 'bad' : '') : 'good'}>{deliveryState[d.status]}</Pill>
+                  </a>
+                ))}
+              </Group>
+            ))}
+            {o.delivery.later > 0 && <More n={o.delivery.later} href="#levering" />}
+          </section>
 
-        <section className="panel">
-          <div className="panel-head"><h2>{tx("Leveringen aan klanten")}</h2><a className="small" href="#levering">{tx("Planning")}</a></div>
-          {deliveries.length === 0 && <Empty>{tx("Er staan geen leveringen gepland.")}</Empty>}
-          {deliveries.map((d) => (
-            <a className="task" key={d.id} href="#levering">
-              <div><div className="task-t">{d.number}, {custOf(d.sales_order_id)}</div>{d.sequence > 1 && <div className="muted small">{tx("Deellevering {0}", d.sequence)}</div>}</div>
-              <Pill tone={d.planned_date < today ? 'bad' : d.planned_date === today ? 'warn' : ''}>{fmtShort(d.planned_date)}</Pill>
-            </a>
-          ))}
-        </section>
+          <section className="panel">
+            <div className="panel-head"><h2>{tx("Verkooporders die aandacht vragen")}</h2><a className="small" href="#orders">{tx("Alle verkooporders")}</a></div>
+            {o.sales.proformas.length + o.sales.toPlan.length + o.sales.waiting.length === 0 && <Empty>{tx("Alle verkooporders zijn ingepland.")}</Empty>}
+            {o.sales.proformas.length > 0 && (
+              <Group title={tx("Proforma, nog te bevestigen")} n={o.sales.proformas.length}>
+                {o.sales.proformas.slice(0, MAX).map((x) => (
+                  <a className="task" key={x.id} href={`#orders-${x.id}`}>
+                    <div><div className="task-t">{x.number}</div><div className="muted small">{tx("Gescand door {0}, {1}", name(s.salespeople, x.salesperson_id), fmtDate(x.order_date))}</div></div>
+                    <span className="num strong">{eur(orderTotal(s, x.id))}</span>
+                  </a>
+                ))}
+                <More n={o.sales.proformas.length - MAX} href="#orders" />
+              </Group>
+            )}
+            {o.sales.toPlan.length > 0 && (
+              <Group title={tx("Te plannen")} n={o.sales.toPlan.length}>
+                {o.sales.toPlan.slice(0, MAX).map((x) => (
+                  <a className="task" key={x.id} href={`#orders-${x.id}`}>
+                    <div><div className="task-t">{name(s.customers, x.customer_id)}</div><div className="muted small">{x.number}</div></div>
+                    {x.requested_date ? <Pill tone={x.requested_date < today ? 'bad' : x.requested_date <= addDays(today, 3) ? 'warn' : 'sell'}>{tx("Gewenst {0}", fmtShort(x.requested_date))}</Pill> : <Pill tone="sell">{tx("Te plannen")}</Pill>}
+                  </a>
+                ))}
+                <More n={o.sales.toPlan.length - MAX} href="#orders" />
+              </Group>
+            )}
+            {o.sales.waiting.length > 0 && (
+              <Group title={tx("Wacht op goederen")} n={o.sales.waiting.length}>
+                {o.sales.waiting.slice(0, MAX).map((x) => (
+                  <a className="task" key={x.id} href={`#orders-${x.id}`}>
+                    <div><div className="task-t">{name(s.customers, x.customer_id)}</div><div className="muted small">{x.number}</div></div>
+                    {x.requested_date ? <Pill tone={x.requested_date < today ? 'bad' : 'warn'}>{tx("Gewenst {0}", fmtShort(x.requested_date))}</Pill> : <Pill tone="warn">{tx("Wacht op goederen")}</Pill>}
+                  </a>
+                ))}
+                <More n={o.sales.waiting.length - MAX} href="#orders" />
+              </Group>
+            )}
+          </section>
 
-        <section className="panel">
-          <div className="panel-head"><h2>{tx("Geld")}</h2><a className="small" href="#facturatie">{tx("Facturatie")}</a></div>
-          {toBill.length === 0 && openInvoices.length === 0 && <Empty>{tx("Alles is gefactureerd en betaald.")}</Empty>}
-          {toBill.map((d) => (
-            <a className="task" key={d.id} href="#facturatie">
-              <div><div className="task-t">{d.number} {tx("factureren")}</div><div className="muted small">{custOf(d.sales_order_id)}</div></div>
-              <span className="num strong">{eur(deliveryValue(s, d.id))}</span>
-            </a>
-          ))}
-          {openInvoices.map((i) => (
-            <a className="task" key={i.id} href={`#facturatie-${i.id}`}>
-              <div><div className="task-t">{i.number}</div><div className="muted small">{name(s.customers, i.customer_id)}{tx(", vervalt")} {fmtDate(i.due_date)}</div></div>
-              <Pill tone={invoiceState(s, i) === 'te_laat' ? 'bad' : 'bill'}>{eur(invoiceBalance(s, i))}</Pill>
-            </a>
-          ))}
-        </section>
+          <section className="panel">
+            <div className="panel-head"><h2>{tx("Facturatie")}</h2><a className="small" href="#facturatie">{tx("Naar facturatie")}</a></div>
+            {o.billing.toBill.length === 0 && o.billing.openInvoices.length === 0 && <Empty>{tx("Alles is gefactureerd en betaald.")}</Empty>}
+            {o.billing.toBill.length > 0 && (
+              <Group title={tx("Proforma's, klaar om te factureren")} n={o.billing.toBill.length}>
+                {o.billing.toBill.slice(0, MAX).map(({ d, value }) => (
+                  <a className="task" key={d.id} href="#facturatie">
+                    <div><div className="task-t">{custOf(d.sales_order_id)}</div><div className="muted small">{d.proforma_number ?? d.number}{d.delivered_at ? tx(", geleverd {0}", fmtShort(d.delivered_at)) : ''}</div></div>
+                    <span className="num strong">{eur(value)}</span>
+                  </a>
+                ))}
+                <More n={o.billing.toBill.length - MAX} href="#facturatie" />
+              </Group>
+            )}
+            {o.billing.openInvoices.length > 0 && (
+              <Group title={tx("Openstaande facturen")} n={o.billing.openInvoices.length} tone={o.billing.overdue ? 'bad' : ''}>
+                {o.billing.openInvoices.slice(0, MAX).map(({ i, balance }) => (
+                  <a className="task" key={i.id} href={`#facturatie-${i.id}`}>
+                    <div><div className="task-t">{name(s.customers, i.customer_id)}</div><div className="muted small">{i.number}, {i.due_date < today ? tx("vervallen {0}", fmtShort(i.due_date)) : tx("vervalt {0}", fmtShort(i.due_date))}</div></div>
+                    <Pill tone={i.due_date < today ? 'bad' : 'bill'}>{eur(balance)}</Pill>
+                  </a>
+                ))}
+                <More n={o.billing.openInvoices.length - MAX} href="#facturatie" />
+              </Group>
+            )}
+          </section>
+        </div>
 
-        <section className="panel">
-          <div className="panel-head"><h2>{tx("Inkopen")}</h2><a className="small" href="#inkoop">{tx("Inkoop")}</a></div>
-          {toBuy.length === 0 && lowStock.length === 0 && <Empty>{tx("Niets om in te kopen.")}</Empty>}
-          {toBuy.map((l) => (
-            <a className="task" key={l.id} href="#inkoop-proforma">
-              <div><div className="task-t">{l.qty} {tx("×")} {l.description}<Sku code={articleNo(s, l.product_id)} /></div><div className="muted small">{tx("Voor")} {s.sales_orders.find((o) => o.id === l.sales_order_id)?.number}{l.options ? `, ${l.options}` : ''}</div></div>
-              <Pill tone="warn">{tx("Op bestelling")}</Pill>
-            </a>
-          ))}
-          {lowStock.map((p) => (
-            <a className="task" key={p.id} href="#voorraad">
-              <div><div className="task-t">{p.name}<Sku code={p.sku} /></div><div className="muted small">{tx("Minimaal")} {p.min_stock} {tx("vrij op voorraad")}</div></div>
-              <Pill>{tx("Onder minimum")}</Pill>
-            </a>
-          ))}
-        </section>
+        {/* Inkoop */}
+        <div className="ov-col">
+          <div className="ov-col-h buy"><ShoppingCart size={16} />{tx("Inkoop")}</div>
+
+          <section className="panel">
+            <div className="panel-head"><h2>{tx("Binnenkomende transporten")}</h2><a className="small" href="#inkomend">{tx("Gepland transport")}</a></div>
+            {o.purchase.transports.length === 0 && <Empty>{tx("Geen transporten in de komende 14 dagen.")}</Empty>}
+            {o.purchase.transports.map(({ t, lines, qty, sold, load }) => {
+              const late = t.arrival_date < today
+              const cap = t.capacity_m3
+              const pct = cap ? Math.min(100, Math.round((load.m3 / cap) * 100)) : 0
+              return (
+                <a className="task ov-transport" key={t.id} href={`#ontvangst-${t.id}`}>
+                  <div>
+                    <div className="task-t">{t.number}{t.carrier ? <span className="muted small"> · {t.carrier}</span> : null}</div>
+                    <div className="muted small">{tx("{0} regels, {1} stuks", lines, qty)}{sold ? tx(", {0} voor klanten", sold) : ''}</div>
+                    {cap > 0 && <div className="ov-load"><div className="fill" role="img" aria-label={tx("{0} van {1} m³ gevuld", load.m3, cap)}><span style={{ width: `${pct}%`, background: load.m3 > cap ? 'var(--bad)' : 'var(--primary)' }} /></div><span className="small muted">{load.m3} / {cap} m³</span></div>}
+                  </div>
+                  <Pill tone={late ? 'bad' : t.arrival_date === today ? 'warn' : 'info'}>{late ? tx("Te laat, {0}", fmtShort(t.arrival_date)) : dayLabel(t.arrival_date)}</Pill>
+                </a>
+              )
+            })}
+          </section>
+
+          <section className="panel">
+            <div className="panel-head"><h2>{tx("In te kopen")}</h2><a className="small" href="#inkoop-proforma">{tx("Proforma-inkooporders")}</a></div>
+            {o.purchase.proformaBySupplier.length === 0 && o.purchase.lowStock.length === 0 && <Empty>{tx("Niets om in te kopen.")}</Empty>}
+            {o.purchase.proformaBySupplier.length > 0 && (
+              <Group title={tx("Om te zetten naar inkooporder")} n={o.purchase.proformaBySupplier.reduce((n, x) => n + x.proformas, 0)}>
+                {o.purchase.proformaBySupplier.map((x) => (
+                  <a className="task" key={x.supplierId} href="#inkoop-proforma">
+                    <div><div className="task-t">{name(s.suppliers, x.supplierId)}</div><div className="muted small">{tx("{0} proforma's, {1} stuks", x.proformas, x.qty)}</div></div>
+                    {x.value > 0 ? <span className="num strong">{eur(x.value)}</span> : <Pill tone="warn">{tx("Op bestelling")}</Pill>}
+                  </a>
+                ))}
+              </Group>
+            )}
+            {o.purchase.lowStock.length > 0 && (
+              <Group title={tx("Onder minimumvoorraad")} n={o.purchase.lowStock.length}>
+                {o.purchase.lowStock.slice(0, MAX).map((p) => (
+                  <a className="task" key={p.id} href="#voorraad">
+                    <div><div className="task-t">{p.name}</div><div className="muted small">{p.sku}</div></div>
+                    <Pill>{tx("Minimaal {0}", p.min_stock)}</Pill>
+                  </a>
+                ))}
+                <More n={o.purchase.lowStock.length - MAX} href="#voorraad" />
+              </Group>
+            )}
+          </section>
+        </div>
       </div>
     </>
   )
