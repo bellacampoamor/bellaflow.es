@@ -381,6 +381,15 @@ body.route-dragging, body.route-dragging * { cursor: grabbing !important; user-s
 .chip.on span { color: inherit; }
 .chip:disabled { opacity: .6; cursor: not-allowed; border-style: dashed; }
 .chip:disabled:hover { background: var(--surface); }
+/* Zoeken in: aan = gevuld met vinkje en wit aantal, uit = leeg rondje en rood aantal. */
+.src-chip { display: inline-flex; align-items: center; gap: 6px; }
+.src-chip .src-tick { display: inline-grid; place-items: center; width: 16px; height: 16px; border-radius: 50%; border: 1.5px solid var(--line-strong); }
+.src-chip.on .src-tick { border-color: currentColor; }
+.src-chip:not(.on):not(:disabled) { color: var(--muted); }
+.src-chip .src-count { margin-left: 0; padding: 1px 7px; border-radius: 999px; font-size: .8rem; font-weight: 700; background: var(--bad-bg); color: var(--bad); }
+.chip.src-chip.on .src-count { background: #0B182A; color: #FFFFFF; }
+.src-chip:disabled .src-tick { display: none; }
+.src-chip .src-none { margin-left: 0; font-size: .8rem; }
 
 /* Nachtstand: de actieve stap in Warm Copper in plaats van een bijna witte vlak */
 :root[data-theme="dark"] .step.on { background: var(--selected); color: var(--on-selected); }

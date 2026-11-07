@@ -1,6 +1,6 @@
 // Artikel zoeken in de verkooporder: alle catalogi tegelijk, of alleen de gekozen catalogi.
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Plus } from 'lucide-react'
+import { Check, Plus } from 'lucide-react'
 import type { ArticleHit, CatalogArticle, Product } from '../data/types'
 import { categoryName, priceWithSurcharge } from '../domain/articles'
 import { onHandMap, reservedMap, stockKey } from '../domain/calc'
@@ -38,16 +38,21 @@ export function SearchSourceChips({ value, onChange }: { value: SearchSources; o
   return (
     <div className="chips" role="group" aria-label={tx("Zoeken in")}>
       <span className="muted small" style={{ alignSelf: 'center' }}>{tx("Zoeken in")}:</span>
-      <button type="button" className={`chip ${all ? 'on' : ''}`} aria-pressed={all} onClick={() => onChange({ off: [] })}>{tx("Alles")}</button>
+      <button type="button" className={`chip src-chip ${all ? 'on' : ''}`} aria-pressed={all} onClick={() => onChange({ off: [] })}>
+        <span className="src-tick" aria-hidden>{all && <Check size={13} strokeWidth={3} />}</span>{tx("Alles")}
+      </button>
       {withCatalog.map((c) => c.n === 0 ? (
-        <button key={c.supplier_id} type="button" className="chip" disabled title={`${c.supplier.name}: ${tx("Nog geen catalogus ingelezen voor deze leverancier (Catalogi, Catalogus inlezen).")}`}>
-          {short(c.supplier)}<span>{tx("geen catalogus")}</span>
+        <button key={c.supplier_id} type="button" className="chip src-chip" disabled title={`${c.supplier.name}: ${tx("Nog geen catalogus ingelezen voor deze leverancier (Catalogi, Catalogus inlezen).")}`}>
+          {short(c.supplier)}<span className="src-none">{tx("geen catalogus")}</span>
         </button>
-      ) : (
-        <button key={c.supplier_id} type="button" className={`chip ${value.off.includes(c.supplier_id) ? '' : 'on'}`} aria-pressed={!value.off.includes(c.supplier_id)} onClick={() => toggle(c.supplier_id)} title={c.supplier.name}>
-          {short(c.supplier)}<span>{c.n.toLocaleString(locale())}</span>
-        </button>
-      ))}
+      ) : (() => {
+        const on = !value.off.includes(c.supplier_id)
+        return (
+          <button key={c.supplier_id} type="button" className={`chip src-chip ${on ? 'on' : ''}`} aria-pressed={on} onClick={() => toggle(c.supplier_id)} title={`${c.supplier.name}: ${on ? tx("wordt doorzocht") : tx("wordt niet doorzocht")}`}>
+            <span className="src-tick" aria-hidden>{on && <Check size={13} strokeWidth={3} />}</span>{short(c.supplier)}<span className="src-count">{c.n.toLocaleString(locale())}</span>
+          </button>
+        )
+      })())}
     </div>
   )
 }

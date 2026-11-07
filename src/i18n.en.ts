@@ -155,6 +155,8 @@ export const en: Record<string, string> = {
   "Alle zendingen van leveranciers, ook als een bestelling in delen binnenkomt.": "All supplier shipments, including orders that arrive in parts.",
   "geen catalogus": "no catalogue",
   "Nog geen catalogus ingelezen voor deze leverancier (Catalogi, Catalogus inlezen).": "No catalogue imported yet for this supplier (Catalogues, Import catalogue).",
+  "wordt doorzocht": "searched",
+  "wordt niet doorzocht": "not searched",
   "Alles": "All",
   "Alles ineens": "All at once",
   "Alles is gefactureerd en betaald.": "Everything is invoiced and paid.",
