@@ -111,9 +111,8 @@ export function ScanApp() {
         <main className="scan-body">
           <div className="scan-done"><CheckIcon size={36} /></div>
           <h1 className="scan-h">{tx("Proforma {0} aangemaakt", done.number)}</h1>
-          <p>{tx("De artikelen zijn gereserveerd op naam van {0}. Vul samen met de klant de klantgegevens in en bevestig de verkooporder; dan krijgt hij zijn VO-nummer en wordt de betaling geregeld.", me.name)}</p>
-          <a className="btn primary scan-big" href={`#orders-wijzig-${done.id}`}>{tx("Klantgegevens invullen")}</a>
-          <button className="btn scan-big" onClick={() => { setDone(null); setView('scan') }}><ScanLine size={18} />{tx("Nieuwe klant scannen")}</button>
+          <p>{tx("De artikelen zijn gereserveerd op naam van {0}. De klantgegevens en de betaling worden in Bella Flow op de proforma ingevuld; pas dan krijgt de verkooporder zijn VO-nummer.", me.name)}</p>
+          <button className="btn primary scan-big" onClick={() => { setDone(null); setView('scan') }}><ScanLine size={18} />{tx("Nieuwe klant scannen")}</button>
         </main>
       ) : view === 'scan' ? (
         <main className="scan-body">

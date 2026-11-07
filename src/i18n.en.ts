@@ -1093,8 +1093,6 @@ export const en: Record<string, string> = {
   "Kies jezelf. De gescande verkooporder komt op jouw naam.": "Choose yourself. The scanned sales order will be in your name.",
   "Er zijn nog geen verkopers. Voeg ze toe onder Beheer in Bella Flow.": "There are no salespeople yet. Add them under Settings in Bella Flow.",
   "Proforma {0} aangemaakt": "Pro forma {0} created",
-  "De artikelen zijn gereserveerd op naam van {0}. Vul samen met de klant de klantgegevens in en bevestig de verkooporder; dan krijgt hij zijn VO-nummer en wordt de betaling geregeld.": "The items are reserved in the name of {0}. Fill in the customer details together with the customer and confirm the sales order; it then gets its sales order number and payment is arranged.",
-  "Klantgegevens invullen": "Fill in customer details",
   "Nieuwe klant scannen": "Scan for a new customer",
   "Scan het etiket": "Scan the label",
   "Gescand ({0})": "Scanned ({0})",
@@ -1124,4 +1122,5 @@ export const en: Record<string, string> = {
   "De camera kon niet starten. Typ het artikelnummer hieronder.": "The camera could not start. Type the item number below.",
   "Camerabeeld": "Camera view",
   "Camera starten…": "Starting camera…",
+  "De artikelen zijn gereserveerd op naam van {0}. De klantgegevens en de betaling worden in Bella Flow op de proforma ingevuld; pas dan krijgt de verkooporder zijn VO-nummer.": "The items are reserved in the name of {0}. The customer details and payment are filled in on the pro forma in Bella Flow; only then does the sales order get its sales order number.",
 }
