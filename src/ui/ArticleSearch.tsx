@@ -28,16 +28,21 @@ export function SearchSourceChips({ value, onChange }: { value: SearchSources; o
   const { s, db } = useApp()
   const [counts, setCounts] = useState<{ supplier_id: string; n: number }[]>([])
   useEffect(() => { catalogArticleCounts(db).then(setCounts).catch(() => setCounts([])) }, [db])
-  const withCatalog = counts.map((c) => ({ ...c, supplier: s.suppliers.find((x) => x.id === c.supplier_id) })).filter((c) => c.supplier)
+  // Elke actieve leverancier krijgt een knop; zonder ingelezen catalogus staat die uit, met "geen catalogus".
+  const withCatalog = s.suppliers.filter((x) => x.is_active).map((supplier) => ({ supplier_id: supplier.id, supplier, n: counts.find((c) => c.supplier_id === supplier.id)?.n ?? 0 }))
   const toggle = (id: string) => onChange({ ...value, off: value.off.includes(id) ? value.off.filter((x) => x !== id) : [...value.off, id] })
   const all = value.off.length === 0
   return (
     <div className="chips" role="group" aria-label={tx("Zoeken in")}>
       <span className="muted small" style={{ alignSelf: 'center' }}>{tx("Zoeken in")}:</span>
       <button type="button" className={`chip ${all ? 'on' : ''}`} aria-pressed={all} onClick={() => onChange({ off: [] })}>{tx("Alles")}</button>
-      {withCatalog.map((c) => (
+      {withCatalog.map((c) => c.n === 0 ? (
+        <button key={c.supplier_id} type="button" className="chip" disabled title={tx("Nog geen catalogus ingelezen voor deze leverancier (Catalogi, Catalogus inlezen).")}>
+          {c.supplier.name}<span>{tx("geen catalogus")}</span>
+        </button>
+      ) : (
         <button key={c.supplier_id} type="button" className={`chip ${value.off.includes(c.supplier_id) ? '' : 'on'}`} aria-pressed={!value.off.includes(c.supplier_id)} onClick={() => toggle(c.supplier_id)}>
-          {c.supplier!.name}<span>{c.n.toLocaleString(locale())}</span>
+          {c.supplier.name}<span>{c.n.toLocaleString(locale())}</span>
         </button>
       ))}
     </div>

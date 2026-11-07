@@ -153,6 +153,8 @@ export const es: Record<string, string> = {
   "Alle verkooporders zijn ingepland.": "Todos los pedidos de venta están planificados.",
   "Alle zendingen": "Todos los envíos",
   "Alle zendingen van leveranciers, ook als een bestelling in delen binnenkomt.": "Todos los envíos de proveedores, también cuando un pedido llega en partes.",
+  "geen catalogus": "sin catálogo",
+  "Nog geen catalogus ingelezen voor deze leverancier (Catalogi, Catalogus inlezen).": "Aún no se ha importado un catálogo de este proveedor (Catálogos, Importar catálogo).",
   "Alles": "Todo",
   "Alles ineens": "Todo de una vez",
   "Alles is gefactureerd en betaald.": "Todo está facturado y pagado.",

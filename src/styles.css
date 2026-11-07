@@ -379,6 +379,8 @@ body.route-dragging, body.route-dragging * { cursor: grabbing !important; user-s
 .chip:hover { background: var(--sell); }
 .chip.on { background: var(--selected); border-color: var(--selected); color: var(--on-selected); font-weight: 600; }
 .chip.on span { color: inherit; }
+.chip:disabled { opacity: .6; cursor: not-allowed; border-style: dashed; }
+.chip:disabled:hover { background: var(--surface); }
 
 /* Nachtstand: de actieve stap in Warm Copper in plaats van een bijna witte vlak */
 :root[data-theme="dark"] .step.on { background: var(--selected); color: var(--on-selected); }
