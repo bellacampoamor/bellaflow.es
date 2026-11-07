@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { CalendarClock, Copy, FileText, Pencil, Plus, Truck } from 'lucide-react'
+import { CalendarClock, Copy, FileText, Pencil, Plus, ScanLine, Truck, UserPlus } from 'lucide-react'
 import type { Delivery, Payment, SalesOrder } from '../data/types'
 import { articleNo, linePurchaseStatus, linesToPurchase, depositAvailable, depositPaid, invoiceBalance, lineTotal, onHandMap, orderLines, orderOutstanding, orderStage, orderTab, orderTotal, plannedQty, shippedQty, STAGE_LABEL, stockKey, todayISO, uninvoicedDeliveries, type OrderStage, type OrderTab } from '../domain/calc'
 import { addOrderPayment, cancelOrder, createDelivery, defaultMethod, rescheduleOrder, setLineWarehouse } from '../domain/services'
@@ -8,7 +8,7 @@ import { Check, Empty, eur, fmtDate, Head, Modal, NumberField, Pill, SelectField
 import { tx } from '../i18n'
 
 export const stageTone: Record<OrderStage, Tone> = {
-  geannuleerd: '', wacht_op_goederen: 'warn', te_plannen: 'sell', gepland: 'info', deels_geleverd: 'warn', te_factureren: 'bill', gefactureerd: 'good',
+  proforma: 'proforma', geannuleerd: '', wacht_op_goederen: 'warn', te_plannen: 'sell', gepland: 'info', deels_geleverd: 'warn', te_factureren: 'bill', gefactureerd: 'good',
 }
 
 type Filter = 'alle' | OrderTab
@@ -28,22 +28,23 @@ export function Orders() {
       </Head>
       <section className="panel">
         <div className="panel-head" style={{ alignItems: 'flex-end' }}>
-          <Tabs<Filter> value={filter} onChange={setFilter} tabs={(['te_leveren', 'ingepland', 'afgeleverd', 'alle'] as Filter[]).map((f) => ({ value: f, label: { te_leveren: tx("Nog te leveren"), ingepland: tx("Ingepland"), afgeleverd: tx("Afgeleverd"), alle: tx("Alles") }[f], n: rows.filter((r) => inGroup(f, r.tab)).length }))} />
+          <Tabs<Filter> value={filter} onChange={setFilter} tabs={(['proforma', 'te_leveren', 'ingepland', 'afgeleverd', 'alle'] as Filter[]).map((f) => ({ value: f, label: { proforma: tx("Proforma"), te_leveren: tx("Nog te leveren"), ingepland: tx("Ingepland"), afgeleverd: tx("Afgeleverd"), alle: tx("Alles") }[f], n: rows.filter((r) => inGroup(f, r.tab)).length }))} />
           <input style={{ maxWidth: 280, marginBottom: 14 }} aria-label={tx("Verkooporders zoeken")} placeholder={tx("Zoek op nummer of klant")} value={q} onChange={(e) => setQ(e.target.value)} />
         </div>
+        {filter === 'proforma' && <p className="small muted" style={{ marginTop: 0 }}>{tx("Proforma's zijn in de winkel gescand via scan.bellaflow.es. Ze hebben nog geen klant en een tijdelijk nummer (PRO-). Pas na invullen van de klant en bevestigen krijgt de verkooporder zijn VO-nummer.")}</p>}
         {shown.length === 0 && <Empty>{tx("Geen verkooporders in dit overzicht.")}</Empty>}
         {shown.length > 0 && <div className="table-wrap"><table>
           <thead><tr><th aria-label="PDF" /><th>{tx("Verkooporder")}</th><th>{tx("Datum")}</th><th>{tx("Klant")}</th><th>{tx("Soort")}</th><th>{tx("Leverdatum")}</th><th className="num">{tx("Totaal")}</th><th className="num">{tx("Nog te betalen")}</th><th>{tx("Status")}</th></tr></thead>
           <tbody>{shown.map(({ o, stage, cust }) => (
-            <tr key={o.id} className="click" onClick={() => go(`orders-${o.id}`)}>
+            <tr key={o.id} className={o.status === 'proforma' ? 'click is-proforma' : 'click'} onClick={() => go(`orders-${o.id}`)}>
               <td><a className="pdf-ic" href={`#orders-print-${o.id}`} title={tx("Verkooporder {0} afdrukken als PDF", o.number)} aria-label={tx("Verkooporder {0} afdrukken als PDF", o.number)} onClick={(e) => e.stopPropagation()}><FileText size={18} /><span>PDF</span></a></td>
               <td><a className="rowlink" href={`#orders-${o.id}`}>{o.number}</a></td>
               <td>{fmtDate(o.order_date)}</td>
-              <td>{cust?.company || cust?.name}<div className="muted small">{tx(o.channel[0].toUpperCase() + o.channel.slice(1))}</div></td>
-              <td>{o.order_type === 'direct' ? tx("Direct") : tx("Bestelling")}<div className="muted small">{{ meenemen: tx("Meenemen"), bezorgen: tx("Bezorgen"), verzenden: tx("Verzenden") }[o.fulfilment]}</div></td>
+              <td>{cust ? cust.company || cust.name : <span className="muted">{tx("Nog geen klant")}</span>}<div className="muted small">{o.status === 'proforma' ? s.salespeople.find((x) => x.id === o.salesperson_id)?.name : tx(o.channel[0].toUpperCase() + o.channel.slice(1))}</div></td>
+              <td>{o.status === 'proforma' ? <><ScanLine size={14} style={{ verticalAlign: -2 }} /> {tx("Gescand")}</> : <>{o.order_type === 'direct' ? tx("Direct") : tx("Bestelling")}<div className="muted small">{{ meenemen: tx("Meenemen"), bezorgen: tx("Bezorgen"), verzenden: tx("Verzenden") }[o.fulfilment]}</div></>}</td>
               <td>{o.promised_date ? fmtDate(o.promised_date) : o.requested_date ? <span className="muted">{tx("Gewenst")} {fmtDate(o.requested_date)}</span> : <span className="muted">{tx("Nog niet bepaald")}</span>}</td>
               <td className="num">{eur(orderTotal(s, o.id))}</td>
-              <td className="num">{o.status === 'cancelled' ? '–' : eur(orderOutstanding(s, o.id))}</td>
+              <td className="num">{o.status !== 'open' ? '–' : eur(orderOutstanding(s, o.id))}</td>
               <td><Pill tone={stageTone[stage]}>{tx(STAGE_LABEL[stage])}</Pill></td>
             </tr>
           ))}</tbody>
@@ -61,7 +62,8 @@ export function OrderDetail({ id }: { id: string }) {
   const [modal, setModal] = useState<'date' | 'plan' | 'pay' | 'cancel' | null>(null)
   const withSku = (l?: { product_id: string; description: string }) => `${articleNo(s, l?.product_id)} ${l?.description ?? ''}`.trim()
   if (!o) return <div className="panel">{tx("Verkooporder niet gevonden.")} <a href="#orders">{tx("Terug naar verkooporders")}</a>.</div>
-  const c = s.customers.find((x) => x.id === o.customer_id)!
+  const c = s.customers.find((x) => x.id === o.customer_id)
+  const proforma = o.status === 'proforma'
   const lines = orderLines(s, id)
   const stage = orderStage(s, o)
   const deliveries = s.deliveries.filter((d) => d.sales_order_id === id).sort((a, b) => a.sequence - b.sequence)
@@ -92,7 +94,11 @@ export function OrderDetail({ id }: { id: string }) {
 
   return (
     <>
-      <Head title={o.number} sub={<>{c.company || c.name}, {fmtDate(o.order_date)} <Pill tone={stageTone[stage]}>{tx(STAGE_LABEL[stage])}</Pill></>} back={{ href: '#orders', label: tx("Verkooporders") }}>
+      <Head title={o.number} sub={<>{c ? c.company || c.name : tx("Nog geen klant")}, {fmtDate(o.order_date)} <Pill tone={stageTone[stage]}>{tx(STAGE_LABEL[stage])}</Pill></>} back={{ href: '#orders', label: tx("Verkooporders") }}>
+        {proforma && <>
+          <button className="btn danger" onClick={() => setModal('cancel')}>{tx("Proforma annuleren")}</button>
+          <a className="btn primary" href={`#orders-wijzig-${id}`}><UserPlus size={16} />{tx("Klant invullen en bevestigen")}</a>
+        </>}
         {open && stage !== 'gefactureerd' && <>
           {shipped < qty && <button className="btn" onClick={() => setModal('date')}><CalendarClock size={16} />{tx("Leverdatum")}</button>}
           <a className="btn" href={`#orders-wijzig-${id}`}><Pencil size={16} />{tx("Wijzigen")}</a>
@@ -101,6 +107,16 @@ export function OrderDetail({ id }: { id: string }) {
         </>}
       </Head>
 
+      {proforma && (
+        <div className="note proforma" style={{ marginBottom: 16 }}>
+          <div>
+            <strong>{tx("Proforma, nog geen verkooporder")}</strong>
+            <div>{tx("Gescand door {0} in de winkel. {1} is een tijdelijk nummer. Vul samen met de klant de klantgegevens in en bevestig; dan krijgt de verkooporder zijn VO-nummer en start de levering en inkoop. De gescande artikelen zijn zolang gereserveerd.", s.salespeople.find((x) => x.id === o.salesperson_id)?.name ?? '–', o.number)}</div>
+          </div>
+          <a className="btn primary" href={`#orders-wijzig-${id}`}><UserPlus size={16} />{tx("Klant invullen en bevestigen")}</a>
+        </div>
+      )}
+
       {open && arrivals.length > 0 && (
         <div className="note" style={{ marginBottom: 16 }}>
           <strong>{tx("Verwachte ontvangst")}</strong>
@@ -108,9 +124,9 @@ export function OrderDetail({ id }: { id: string }) {
         </div>
       )}
 
-      <section className="panel" style={{ marginBottom: 16 }}>
+      {!proforma && <section className="panel" style={{ marginBottom: 16 }}>
         <div className="track">{TRACK.map((t, i) => <div key={t.k} className={done[t.k] ? 'done' : i === firstOpen ? 'now' : ''}>{tx(t.l)}{t.k === 'delivered' && shipped > 0 && shipped < qty && <div className="track-note">{tx("(deels)")}</div>}</div>)}</div>
-      </section>
+      </section>}
 
       <div className="cols">
         <div className="stack">
@@ -143,7 +159,7 @@ export function OrderDetail({ id }: { id: string }) {
             </table></div>
           </section>
 
-          {onOrder.length > 0 && (
+          {!proforma && onOrder.length > 0 && (
             <section className="panel">
               <div className="panel-head">
                 <h2>{tx("Inkoop voor deze verkooporder")}</h2>
@@ -169,7 +185,7 @@ export function OrderDetail({ id }: { id: string }) {
             </section>
           )}
 
-          <section className="panel">
+          {!proforma && <><section className="panel">
             <div className="panel-head"><h2>{tx("Leveringen")}</h2></div>
             {deliveries.length === 0 && <Empty>{plannable.length ? tx("Nog niets gepland. Plan alles ineens of in delen.") : tx("Plannen kan zodra de goederen binnen zijn.")}</Empty>}
             {deliveries.map((d) => (
@@ -193,19 +209,19 @@ export function OrderDetail({ id }: { id: string }) {
                 </a>
               )
             })}
-          </section>
+          </section></>}
         </div>
 
         <div className="stack">
           <section className="panel">
             <h2>{tx("Klant en levering")}</h2>
             <dl className="dl">
-              <dt>{tx("Klant")}</dt><dd><div>{c.company || c.name}</div><div className="muted small">{[c.phone, c.email].filter(Boolean).join(', ')}</div></dd>
+              <dt>{tx("Klant")}</dt><dd>{c ? <><div>{c.company || c.name}</div><div className="muted small">{[c.phone, c.email].filter(Boolean).join(', ')}</div></> : <span className="muted">{tx("Nog geen klant")}</span>}</dd>
               {o.customer_reference && <><dt>{tx("Referentie")}</dt><dd>{o.customer_reference}</dd></>}
               <dt>{tx("Verkoper")}</dt><dd>{s.salespeople.find((x) => x.id === o.salesperson_id)?.name ?? '–'}</dd>
-              <dt>{tx("Afleverwijze")}</dt><dd>{{ meenemen: tx("Klant neemt mee"), bezorgen: tx("Bezorgen door eigen team"), verzenden: tx("Verzenden met vervoerder") }[o.fulfilment]}</dd>
+              {!proforma && <><dt>{tx("Afleverwijze")}</dt><dd>{{ meenemen: tx("Klant neemt mee"), bezorgen: tx("Bezorgen door eigen team"), verzenden: tx("Verzenden met vervoerder") }[o.fulfilment]}</dd>
               <dt>{tx("Gewenst")}</dt><dd>{fmtDate(o.requested_date)}</dd>
-              <dt>{shipped > 0 ? tx("Beloofd, nog te leveren") : tx("Beloofd")}</dt><dd>{fmtDate(o.promised_date)}</dd>
+              <dt>{shipped > 0 ? tx("Beloofd, nog te leveren") : tx("Beloofd")}</dt><dd>{fmtDate(o.promised_date)}</dd></>}
               {o.fulfilment !== 'meenemen' && <><dt>{tx("Adres")}</dt><dd>{o.delivery_name}<br />{o.delivery_address}<br />{o.delivery_postal_code} {o.delivery_city}</dd>
                 <dt>{tx("Situatie")}</dt><dd>{[o.floor, o.has_elevator && 'lift', o.needs_assembly && 'montage', o.remove_old_furniture && tx("oude meubels mee")].filter(Boolean).join(', ') || '–'}</dd></>}
               {o.delivery_notes && <><dt>{tx("Instructies")}</dt><dd>{o.delivery_notes}</dd></>}

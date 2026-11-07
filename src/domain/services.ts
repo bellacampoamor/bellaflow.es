@@ -8,12 +8,13 @@ import type {
   SalesOrderLine, Snapshot, StockMovement, CatalogArticle, Supplier, ArticleQuery, SupplierShowroomDetail, SupplierShowroomItem, TableName,
 } from '../data/types'
 import { parseCsv, sameName } from './catalog'
+import { articleNumberFromScan } from './scan'
 import { articleSources, categoryName, priceWithSurcharge, finishArticleSync, missingSupplierCodes, planArticleSync } from './articles'
 import { DETAIL_COLUMNS, SHOWROOM_COLUMNS, showroomDetailFromCsv, showroomItemFromCsv } from './showroom'
 import {
   addDays, depositAvailable, freeAt, linesToPurchase, invoicedDeliveryLineIds, lineTotal, onHandMap, orderLines, plannedQty, round2,
   shipmentLineOpen, shippedQty, stockKey, todayISO, vatBreakdown,
-  inboundWarehouse,
+  inboundWarehouse, scanWarehouse,
 } from './calc'
 
 export class FlowError extends Error {}
@@ -284,9 +285,9 @@ export interface OrderInput {
   deposit?: { amount: number; method: Payment['method']; reference: string }
 }
 
-function validateOrder(s: Snapshot, input: OrderInput, opts: { checkTakeNow: boolean } = { checkTakeNow: true }) {
+function validateOrder(s: Snapshot, input: OrderInput, opts: { checkTakeNow: boolean; requireCustomer?: boolean } = { checkTakeNow: true }) {
   const h = input.header
-  if (!h.customer_id) fail(tx("Kies of maak een klant."))
+  if (opts.requireCustomer !== false && !h.customer_id) fail(tx("Kies of maak een klant."))
   if (!h.salesperson_id) fail(tx("Kies een verkoper."))
   if (!input.lines.length) fail(tx("Voeg minimaal één product toe."))
   for (const l of input.lines) {
@@ -323,6 +324,12 @@ export async function createOrder(db: Driver, raw: OrderInput, opts: { autoDeliv
   const lines = input.lines.map((l) => ({ ...l, id: newId(), sales_order_id: id }))
   await db.insert('sales_order_lines', lines)
   await db.insert('order_events', [event(id, 'aangemaakt', `Verkooporder ${number} aangemaakt.`)])
+  await finishNewOrder(db, id, input, lines, opts)
+  return id
+}
+
+/** Vooruitbetaling en wat de klant direct meeneemt, bij een nieuwe of net bevestigde verkooporder. */
+async function finishNewOrder(db: Driver, id: string, input: OrderInput, lines: SalesOrderLine[], opts: { autoDeliverDate?: string }) {
   if (input.deposit?.amount) {
     await db.insert('payments', [{ id: newId(), sales_order_id: id, invoice_id: null, kind: 'vooruitbetaling', method: input.deposit.method, amount: input.deposit.amount, paid_at: input.header.order_date, reference: input.deposit.reference }])
   }
@@ -333,7 +340,96 @@ export async function createOrder(db: Driver, raw: OrderInput, opts: { autoDeliv
     const did = await createDelivery(db, { sales_order_id: id, method: 'meenemen', planned_date: date, carrier: '', notes: '', lines: taken.map((l) => ({ sales_order_line_id: l.id, qty: l.qty })) })
     await markDelivered(db, did, { date, signed_by: input.header.delivery_name || '' })
   }
-  return id
+}
+
+// Proforma (scan.bellaflow.es) -------------------------------------------------
+// Een medewerker scant in de winkel artikelen. Dat wordt een verkooporder met de status Proforma: zonder klant,
+// met een tijdelijk nummer (PRO-). Pas als de medewerker de klant invult en bevestigt, krijgt hij het VO-nummer.
+
+export interface ScanLine { article: CatalogArticle; qty: number }
+
+export async function createProformaOrder(db: Driver, input: { salesperson_id: string; date: string; lines: ScanLine[] }) {
+  if (!input.salesperson_id) fail(tx("Kies eerst wie je bent."))
+  const people = await db.list('salespeople')
+  if (!people.some((p) => p.id === input.salesperson_id)) fail(tx("Deze medewerker bestaat niet meer. Kies opnieuw wie je bent."))
+  const rows = input.lines.filter((l) => l.qty > 0)
+  if (!rows.length) fail(tx("Scan minimaal één artikel."))
+  // Twee keer hetzelfde artikel gescand is één regel.
+  const merged = new Map<string, ScanLine>()
+  for (const l of rows) {
+    const m = merged.get(l.article.article_number)
+    merged.set(l.article.article_number, m ? { ...m, qty: m.qty + l.qty } : l)
+  }
+  const pids: { pid: string; qty: number }[] = []
+  for (const l of merged.values()) pids.push({ pid: await productForArticle(db, l.article), qty: l.qty })
+  const s = await loadSnapshot(db)
+  const lines = splitLinesForStock(s, pids.map(({ pid, qty }) => {
+    const p = s.products.find((x) => x.id === pid)!
+    const wid = scanWarehouse(s, pid, qty)
+    return lineFromProduct(p, { qty, source: wid ? 'voorraad' : 'bestelling', warehouse_id: wid })
+  }))
+  const id = newId()
+  const number = await db.nextNumber('PRO', yearOf(input.date))
+  await db.insert('sales_orders', [{
+    id, number, status: 'proforma', customer_id: null, order_date: input.date, channel: 'winkel', salesperson_id: input.salesperson_id, customer_reference: '',
+    order_type: 'bestelling', fulfilment: 'meenemen', requested_date: null, promised_date: null, delivery_name: '', delivery_phone: '', delivery_address: '',
+    delivery_postal_code: '', delivery_city: '', delivery_latitude: null, delivery_longitude: null, floor: '', has_elevator: false, needs_assembly: false,
+    remove_old_furniture: false, delivery_notes: '', notes: '',
+  }])
+  await db.insert('sales_order_lines', lines.map((l) => ({ ...l, id: newId(), sales_order_id: id })))
+  const seller = people.find((p) => p.id === input.salesperson_id)!.name
+  await db.insert('order_events', [event(id, 'aangemaakt', `Proforma ${number} gescand door ${seller}.`)])
+  return { id, number }
+}
+
+/** Snapshot zonder de regels van deze verkooporder, zodat zijn eigen reservering niet als bezet telt. */
+const withoutOwnLines = (s: Snapshot, id: string): Snapshot => ({ ...s, sales_order_lines: s.sales_order_lines.filter((l) => l.sales_order_id !== id) })
+
+async function replaceLines(db: Driver, s: Snapshot, id: string, lines: OrderLineInput[]) {
+  for (const old of orderLines(s, id)) await db.remove('sales_order_lines', old.id)
+  const rows = lines.map(({ id: _old, article: _a, ...l }) => ({ ...l, id: newId(), sales_order_id: id }))
+  await db.insert('sales_order_lines', rows)
+  return rows
+}
+
+const proformaOf = (s: Snapshot, id: string) => {
+  const o = s.sales_orders.find((x) => x.id === id) ?? fail(tx("Verkooporder niet gevonden."))
+  if (o.status !== 'proforma') fail(tx("Deze verkooporder is geen proforma meer."))
+  return o
+}
+
+/** Bewaart een proforma zonder te bevestigen. Een klant is nog niet nodig; het nummer blijft PRO-. */
+export async function saveProforma(db: Driver, id: string, raw: OrderInput) {
+  const s = await loadSnapshot(db)
+  proformaOf(s, id)
+  validateOrder(withoutOwnLines(s, id), withPlaceholders(raw), { checkTakeNow: false, requireCustomer: false })
+  const input = await resolveArticleLines(db, raw)
+  await replaceLines(db, s, id, input.lines)
+  const { customer_id, ...header } = input.header
+  await db.update('sales_orders', id, { ...header, customer_id: customer_id || null, delivery_latitude: null, delivery_longitude: null })
+  await db.insert('order_events', [event(id, 'gewijzigd', 'Proforma bijgewerkt.')])
+}
+
+/**
+ * Rondt een proforma af: met klant, gecontroleerd als een nieuwe verkooporder. Pas nu krijgt hij het VO-nummer
+ * en de status open; daarna volgen inkoop, levering en facturatie zoals bij elke verkooporder.
+ */
+export async function confirmProforma(db: Driver, id: string, raw: OrderInput, opts: { autoDeliverDate?: string } = {}) {
+  const s = await loadSnapshot(db)
+  const order = proformaOf(s, id)
+  const free = withoutOwnLines(s, id)
+  validateOrder(free, withPlaceholders(raw))
+  const input = await resolveArticleLines(db, raw)
+  const rows = await replaceLines(db, s, id, splitLinesForStock(await loadSnapshot(db).then((x) => withoutOwnLines(x, id)), input.lines))
+  const number = await nextDocumentNumber(db, 'VO', 'prefix_sales_order', yearOf(input.header.order_date))
+  const allTaken = rows.every((l) => l.take_now)
+  await db.update('sales_orders', id, {
+    ...input.header, number, status: 'open', delivery_latitude: null, delivery_longitude: null,
+    order_type: allTaken ? 'direct' : 'bestelling', fulfilment: allTaken ? 'meenemen' : input.header.fulfilment,
+  })
+  await db.insert('order_events', [event(id, 'bevestigd', `Proforma ${order.number} bevestigd als verkooporder ${number}.`)])
+  await finishNewOrder(db, id, input, rows, opts)
+  return number
 }
 
 export async function updateOrder(db: Driver, id: string, raw: OrderInput) {
@@ -634,7 +730,7 @@ export async function createInvoice(db: Driver, input: { sales_order_id: string;
 
   const number = await nextDocumentNumber(db, 'F', 'prefix_invoice', yearOf(input.invoice_date))
   await db.insert('invoices', [{
-    id, number, sales_order_id: order.id, customer_id: order.customer_id, kind, invoice_date: input.invoice_date,
+    id, number, sales_order_id: order.id, customer_id: customer.id, kind, invoice_date: input.invoice_date,
     due_date: addDays(input.invoice_date, s.settings[0]?.payment_days ?? 14), base_amount: b.base, vat_amount: b.vat, total: b.total,
     deposit_settled: round2(deposit), language: customer.language,
   }])
@@ -754,6 +850,16 @@ export async function saveSupplierSurcharge(db: Driver, supplierId: string, pct:
 
 // Schermen lezen catalogusartikelen via deze functies; de opslag zoekt zelf.
 export const searchCatalogArticles = (db: Driver, q: ArticleQuery) => db.searchArticles(q)
+/** Zoekt één artikel op wat een scanner of medewerker invoert: eigen artikelnummer, artikelnummer leverancier of EAN. */
+export async function findArticleByCode(db: Driver, raw: string): Promise<CatalogArticle | null> {
+  const code = raw.trim()
+  if (!code) return null
+  const own = articleNumberFromScan(code)
+  if (own) return (await db.findArticles({ numbers: [own] }))[0] ?? null
+  const c = code.toLowerCase()
+  const hits = await db.searchArticles({ q: code, limit: 20 })
+  return hits.find((a) => a.supplier_sku.toLowerCase() === c || a.ean === code || a.article_number.toLowerCase() === c) ?? null
+}
 export const catalogArticlesBySku = (db: Driver, supplierId: string, skus: string[]) => (skus.length ? db.findArticles({ supplierId, skus }) : Promise.resolve([]))
 export const catalogArticlesByNumber = (db: Driver, numbers: string[]) => (numbers.length ? db.findArticles({ numbers }) : Promise.resolve([]))
 export const catalogArticleElements = (db: Driver, parentId: string) => db.articleElements(parentId)

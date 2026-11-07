@@ -45,7 +45,7 @@ export const fmtDate = (iso?: string | null) => {
 }
 export const fmtShort = (iso: string) => new Date(`${iso.slice(0, 10)}T12:00:00`).toLocaleDateString(locale(), { weekday: 'short', day: 'numeric', month: 'short' })
 
-export type Tone = 'good' | 'warn' | 'bad' | 'info' | 'sell' | 'bill' | ''
+export type Tone = 'good' | 'warn' | 'bad' | 'info' | 'sell' | 'bill' | 'proforma' | ''
 export const Pill = ({ tone = '', children }: { tone?: Tone; children: ReactNode }) => <span className={`pill ${tone}`}>{children}</span>
 
 export function Head({ title, sub, back, children }: { title: ReactNode; sub?: ReactNode; back?: { href: string; label: string }; children?: ReactNode }) {

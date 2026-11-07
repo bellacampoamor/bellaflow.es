@@ -153,6 +153,11 @@ td a.rowlink:hover { text-decoration: underline; }
 .pill.info { background: var(--info-bg); color: var(--info); }
 .pill.sell { background: var(--sell); color: var(--sell-fg); }
 .pill.bill { background: var(--bill); color: var(--bill-fg); }
+/* Proforma: tijdelijk, nog geen klant en nog geen VO-nummer. Gestippeld zodat het nooit voor een gewone status doorgaat. */
+.pill.proforma { background: transparent; color: var(--brand-strong); border: 1.5px dashed var(--brand-line); padding: 1px 8px; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; }
+.note.proforma { background: var(--sell); color: var(--sell-fg); border-left: 4px solid var(--brand-line); display: flex; gap: 12px; align-items: center; justify-content: space-between; flex-wrap: wrap; padding: 12px 14px; }
+.note.proforma strong { font-size: 1rem; }
+tr.is-proforma td { background: color-mix(in srgb, var(--sell) 45%, transparent); }
 
 .tabs { display: flex; gap: 4px; margin-bottom: 14px; overflow-x: auto; scrollbar-width: thin; }
 .tabs button { background: none; border: 0; border-bottom: 2px solid transparent; padding: 6px 11px; font: 500 .9rem var(--body); color: var(--muted); cursor: pointer; white-space: nowrap; }
@@ -559,3 +564,33 @@ body.route-dragging, body.route-dragging * { cursor: grabbing !important; user-s
 }
 .lab-table-wrap { max-height: 380px; overflow-y: auto; }
 .lab-table thead th { position: sticky; top: 0; z-index: 1; }
+
+/* Scan-app (scan.bellaflow.es): telefoon in de winkel, één kolom, grote knoppen. */
+.scan { min-height: 100dvh; display: grid; grid-template-rows: auto 1fr; max-width: 560px; margin: 0 auto; background: var(--bg); }
+.scan-body { padding: 16px; display: grid; align-content: start; gap: 14px; padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px)); }
+.scan-h { font-size: 1.25rem; }
+.scan-bar { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.scan-big { width: 100%; justify-content: center; padding: 14px 18px; font-size: 1.05rem; }
+.scan-people { display: grid; gap: 10px; }
+.scan-person { display: flex; align-items: center; gap: 12px; width: 100%; padding: 16px 18px; font: 600 1.05rem var(--body); color: var(--fg); background: var(--surface); border: 1px solid var(--line-strong); border-radius: 12px; cursor: pointer; text-align: left; }
+.scan-person:hover, .scan-person:focus-visible { border-color: var(--primary); color: var(--brand-strong); }
+.scan-cam { position: relative; aspect-ratio: 4 / 3; background: #0B182A; border-radius: 14px; overflow: hidden; }
+.scan-cam video { width: 100%; height: 100%; object-fit: cover; display: block; }
+.scan-cam.paused video { opacity: .5; }
+.scan-frame { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none; }
+.scan-frame span { width: 78%; height: 34%; border: 3px solid #CE8D61; border-radius: 10px; box-shadow: 0 0 0 999px rgb(11 24 42 / .35); }
+.scan-cam-msg { position: absolute; inset: 0; display: grid; place-items: center; padding: 20px; text-align: center; color: #F2E8DF; font-size: .95rem; }
+.scan-back { display: inline-flex; align-items: center; gap: 6px; justify-self: start; }
+.scan-name { font: 600 1.1rem var(--display); color: var(--heading); }
+.scan-facts { display: flex; flex-wrap: wrap; gap: 10px 24px; }
+.scan-facts div { display: grid; }
+.scan-facts strong { font-size: 1.15rem; }
+.scan-qty { display: grid; grid-template-columns: 56px 1fr 56px; gap: 10px; }
+.scan-qty .btn { height: 56px; justify-content: center; }
+.scan-qty input { font: 600 1.5rem var(--body); text-align: center; color: var(--fg); background: var(--surface); border: 1px solid var(--line-strong); border-radius: 10px; min-width: 0; }
+.scan-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.scan-list li { display: flex; align-items: center; gap: 10px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; }
+.scan-li-main { flex: 1; min-width: 0; }
+.scan-done { width: 64px; height: 64px; border-radius: 50%; display: grid; place-items: center; background: var(--good-bg); color: var(--good); }
+.bad-text { color: var(--bad); }
+.warn-text { color: var(--warn); display: inline-flex; align-items: center; gap: 4px; }

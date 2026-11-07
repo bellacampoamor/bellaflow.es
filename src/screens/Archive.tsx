@@ -19,7 +19,7 @@ export function Archive() {
   const [tab, setTab] = useState<Tab>('alles')
   const [q, setQ] = useState('')
   const all = archiveRows(s)
-  const customer = (id: string) => { const c = s.customers.find((x) => x.id === id); return c?.company || c?.name || '' }
+  const customer = (id: string | null) => { const c = s.customers.find((x) => x.id === id); return c?.company || c?.name || '' }
   const t = q.trim().toLowerCase()
   const rows = all.filter((r) => (tab === 'alles' || (tab === 'compleet') === r.complete) && (!t || `${r.order.number} ${customer(r.order.customer_id)} ${r.delivery.number} ${r.delivery.proforma_number ?? ''} ${r.invoice?.number ?? ''}`.toLowerCase().includes(t)))
   return (

@@ -16,6 +16,7 @@ import { Stock } from './screens/Stock'
 import { Admin } from './screens/Admin'
 import { Driver } from './screens/Driver'
 import { LabelAgent } from './screens/LabelAgent'
+import { ScanApp } from './screens/ScanApp'
 import { SalesOrderDocument } from './screens/SalesOrderDocument'
 import { PurchaseOrderDocument } from './screens/PurchaseOrderDocument'
 import { Reports } from './screens/Reports'
@@ -92,6 +93,7 @@ export function App({ onResetDemo, onSignOut }: { onResetDemo?: () => Promise<vo
 
   if (screen === 'chauffeur') return <Driver param={param} />
   if (screen === 'client') return <LabelAgent />
+  if (screen === 'scan') return <ScanApp />
 
   return (
     <>

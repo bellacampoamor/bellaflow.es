@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { CreditCard, Layers, Plus, Trash2 } from 'lucide-react'
 import type { CatalogArticle, Customer, Fulfilment, Payment } from '../data/types'
 import { inboundByProduct, lineTotal, onHandMap, plannedQty, reservedMap, round2, stockKey, todayISO, vatBreakdown } from '../domain/calc'
-import { catalogArticlesByNumber, createOrder, lineFromProduct, saveRecord, splitLinesForStock, updateOrder, type OrderHeader, type OrderLineInput } from '../domain/services'
+import { catalogArticlesByNumber, confirmProforma, createOrder, lineFromProduct, saveProforma, saveRecord, splitLinesForStock, updateOrder, type OrderHeader, type OrderLineInput } from '../domain/services'
 import { priceWithSurcharge } from '../domain/articles'
 import { ArticleSearch, ElementsModal, SearchSourceChips, useSearchSources, type ArticlePick } from '../ui/ArticleSearch'
 import { loadSnapshot } from '../data/driver'
@@ -43,8 +43,11 @@ export function OrderForm({ id }: { id?: string }) {
   const [arts, setArts] = useState<Map<string, CatalogArticle>>(new Map())
   const today = todayISO()
   const existing = id ? s.sales_orders.find((o) => o.id === id) : undefined
+  // Een proforma uit de winkel wordt hier afgerond: klant erbij, afhandeling per regel en eventueel een vooruitbetaling.
+  const isProforma = existing?.status === 'proforma'
+  const fresh = !existing || isProforma
 
-  const [h, setH] = useState<OrderHeader>(() => existing ? (({ id: _i, number: _n, status: _s, ...rest }) => rest)(existing) : {
+  const [h, setH] = useState<OrderHeader>(() => existing ? (({ id: _i, number: _n, status: _s, ...rest }) => ({ ...rest, customer_id: rest.customer_id ?? '', ...(isProforma ? { fulfilment: 'bezorgen' as const } : {}) }))(existing) : {
     customer_id: '', order_date: today, channel: 'winkel', salesperson_id: '', customer_reference: '', order_type: 'bestelling', fulfilment: 'bezorgen',
     requested_date: null, promised_date: null, delivery_name: '', delivery_phone: '', delivery_address: '', delivery_postal_code: '', delivery_city: '', delivery_latitude: null, delivery_longitude: null,
     floor: '', has_elevator: false, needs_assembly: false, remove_old_furniture: false, delivery_notes: '', notes: '',
@@ -125,6 +128,11 @@ export function OrderForm({ id }: { id?: string }) {
   const save = async () => {
     if (lines.some((l) => !l.product_id && !l.article)) return toast(tx("Kies bij elke regel een product of verwijder de regel."), true)
     const payload = lines.map(({ key: _k, ...l }) => (id ? l : (({ id: _i, ...r }) => r)(l as Line & { id?: string })) as OrderLineInput)
+    if (isProforma) {
+      const ok = await run((db) => confirmProforma(db, id!, { header: h, lines: payload, deposit: deposit > 0 ? { amount: deposit, method: depositMethod, reference: depositRef } : undefined }), tx("Proforma bevestigd, de verkooporder heeft nu zijn VO-nummer"))
+      if (ok) go(`orders-${id}`)
+      return
+    }
     if (existing) {
       if (await run((db) => updateOrder(db, id!, { header: h, lines: payload }), tx("Verkooporder opgeslagen"))) go(`orders-${id}`)
       return
@@ -135,6 +143,11 @@ export function OrderForm({ id }: { id?: string }) {
       newId = await createOrder(db, { header: h, lines: finalLines, deposit: deposit > 0 ? { amount: deposit, method: depositMethod, reference: depositRef } : undefined })
     }, allTaken ? tx("Verkooporder geregistreerd en meegegeven") : someTaken ? tx("Verkooporder aangemaakt, meegenomen artikelen afgeboekt") : tx("Verkooporder aangemaakt"))
     if (ok) go(`orders-${newId}`)
+  }
+  const keepProforma = async () => {
+    if (lines.some((l) => !l.product_id && !l.article)) return toast(tx("Kies bij elke regel een product of verwijder de regel."), true)
+    const payload = lines.map(({ key: _k, ...l }) => l as OrderLineInput)
+    if (await run((db) => saveProforma(db, id!, { header: h, lines: payload }), tx("Proforma bewaard"))) go(`orders-${id}`)
   }
   const saveCustomer = async () => {
     if (!newCust?.name.trim()) return toast(tx("Vul de naam van de klant in."), true)
@@ -153,7 +166,8 @@ export function OrderForm({ id }: { id?: string }) {
 
   return (
     <>
-      <Head title={existing ? tx("{0} wijzigen", existing.number) : tx("Nieuwe verkooporder")} back={existing ? { href: `#orders-${id}`, label: existing.number } : { href: '#orders', label: tx("Verkooporders") }} />
+      <Head title={isProforma ? tx("Proforma {0} afronden", existing!.number) : existing ? tx("{0} wijzigen", existing.number) : tx("Nieuwe verkooporder")} back={existing ? { href: `#orders-${id}`, label: existing.number } : { href: '#orders', label: tx("Verkooporders") }} />
+      {isProforma && <div className="note proforma" style={{ marginBottom: 16 }}><div><strong>{tx("Proforma")}</strong><div>{tx("Vul samen met de klant de klantgegevens in, kies per regel de afhandeling en bevestig. Pas bij bevestigen krijgt de verkooporder zijn VO-nummer.")}</div></div></div>}
       <div className="cols">
         <div className="stack">
           <section className="panel acc acc-klant">
@@ -201,8 +215,8 @@ export function OrderForm({ id }: { id?: string }) {
                       <NumberField label={tx("Prijs incl. IVA")} value={l.unit_price} step="0.01" min={0} onChange={(v) => patch(l.key, { unit_price: v })} />
                       <NumberField label={tx("Korting %")} value={l.discount_pct} step="0.5" min={0} onChange={(v) => patch(l.key, { discount_pct: v })} />
                       <SelectField className="span-2" label={tx("Afhandeling")} value={l.take_now ? 'meenemen' : l.source} onChange={(v) => setHandling(l, v as 'meenemen' | 'voorraad' | 'bestelling')} options={[
-                        ...(existing && !l.take_now ? [] : [{ value: 'meenemen', label: tx("Klant neemt direct mee") }]),
-                        ...(l.take_now && existing ? [] : [{ value: 'voorraad', label: tx("Uit voorraad, later leveren") }, { value: 'bestelling', label: tx("Op bestelling") }]),
+                        ...(!fresh && !l.take_now ? [] : [{ value: 'meenemen', label: tx("Klant neemt direct mee") }]),
+                        ...(l.take_now && !fresh ? [] : [{ value: 'voorraad', label: tx("Uit voorraad, later leveren") }, { value: 'bestelling', label: tx("Op bestelling") }]),
                       ]} />
                       {l.source === 'voorraad' && (
                         <SelectField className="span-2" label={tx("Uit magazijn")} value={l.warehouse_id} onChange={(v) => patch(l.key, { warehouse_id: v })} options={warehouses.map((w) => ({ value: w.id, label: tx("{0} ({1} vrij)", w.name, l.product_id ? freeFor(l, w.id) : 0) }))} />
@@ -210,8 +224,8 @@ export function OrderForm({ id }: { id?: string }) {
                     </div>
                     <div className="panel-head" style={{ margin: '8px 0 0' }}>
                       <div className="small">
-                        {short && !l.take_now && !existing && <span className="strong">{tx("Bij opslaan: {0} uit voorraad, {1} op bestelling", Math.max(0, free), l.qty - Math.max(0, free))}{others.length ? tx(". Wel op {0}", others.map((w) => `${w.name} (${freeAt(l.product_id, w.id)})`).join(', ')) : ''}. </span>}
-                        {short && (l.take_now || existing) && <span style={{ color: 'var(--bad)', fontWeight: 600 }}>{tx("Maar")} {free} {tx("vrij op dit magazijn")}{others.length ? tx(". Wel op {0}", others.map((w) => `${w.name} (${freeAt(l.product_id, w.id)})`).join(', ')) : ''}. </span>}
+                        {short && !l.take_now && fresh && <span className="strong">{tx("Bij opslaan: {0} uit voorraad, {1} op bestelling", Math.max(0, free), l.qty - Math.max(0, free))}{others.length ? tx(". Wel op {0}", others.map((w) => `${w.name} (${freeAt(l.product_id, w.id)})`).join(', ')) : ''}. </span>}
+                        {short && (l.take_now || !fresh) && <span style={{ color: 'var(--bad)', fontWeight: 600 }}>{tx("Maar")} {free} {tx("vrij op dit magazijn")}{others.length ? tx(". Wel op {0}", others.map((w) => `${w.name} (${freeAt(l.product_id, w.id)})`).join(', ')) : ''}. </span>}
                         {l.source === 'bestelling' && l.product_id && <span className="muted">{tx("Komt op de lijst \"Nog in te kopen\"")}{inbound.get(l.product_id) ? tx(". Al {0} ingekocht", inbound.get(l.product_id)) : ''}. </span>}
                       </div>
                       <div className="actions">
@@ -266,7 +280,7 @@ export function OrderForm({ id }: { id?: string }) {
               {lines.length > 0 && <div className="muted small"><span>{tx("Marge excl. IVA")}</span><span>{eur(margin)}</span></div>}
             </div>
           </section>
-          {!existing && (
+          {fresh && (
             <section className="panel">
               <h2><CreditCard size={16} style={{ verticalAlign: -2, marginRight: 6 }} />{tx("Vooruitbetaling")}</h2>
               <div className="stack" style={{ gap: 10 }}>
@@ -282,7 +296,8 @@ export function OrderForm({ id }: { id?: string }) {
               </div>
             </section>
           )}
-          <button className="btn primary" type="button" onClick={save}>{existing ? tx("Wijzigingen opslaan") : allTaken ? tx("Verkooporder afronden en meegeven") : tx("Verkooporder aanmaken")}</button>
+          {isProforma && <button className="btn" type="button" onClick={keepProforma}>{tx("Bewaren als proforma")}</button>}
+          <button className="btn primary" type="button" onClick={save}>{isProforma ? tx("Bevestigen als verkooporder") : existing ? tx("Wijzigingen opslaan") : allTaken ? tx("Verkooporder afronden en meegeven") : tx("Verkooporder aanmaken")}</button>
           <a className="btn" href={existing ? `#orders-${id}` : '#orders'}>{tx("Annuleren")}</a>
         </div>
       </div>

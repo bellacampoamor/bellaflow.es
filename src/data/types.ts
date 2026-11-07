@@ -78,12 +78,13 @@ export interface ArticleQuery {
 export type OrderType = 'direct' | 'bestelling'
 export type Fulfilment = 'meenemen' | 'verzenden' | 'bezorgen'
 export interface SalesOrder {
-  id: string; number: string; customer_id: string; order_date: string
+  /** Proforma: tijdelijk nummer (PRO-), klant mag ontbreken. Het VO-nummer komt pas bij bevestigen. */
+  id: string; number: string; customer_id: string | null; order_date: string
   channel: 'winkel' | 'online' | 'telefoon' | 'beurs'; salesperson_id: string; customer_reference: string
   order_type: OrderType; fulfilment: Fulfilment; requested_date: string | null; promised_date: string | null
   delivery_name: string; delivery_phone: string; delivery_address: string; delivery_postal_code: string
   delivery_city: string; delivery_latitude: number | null; delivery_longitude: number | null; floor: string; has_elevator: boolean; needs_assembly: boolean
-  remove_old_furniture: boolean; delivery_notes: string; notes: string; status: 'open' | 'cancelled'
+  remove_old_furniture: boolean; delivery_notes: string; notes: string; status: 'proforma' | 'open' | 'cancelled'
 }
 export interface SalesOrderLine {
   id: string; sales_order_id: string; product_id: string; description: string; options: string

@@ -62,7 +62,8 @@ export function plannedQty(s: Snapshot, lineId: string) {
 }
 
 export function reservedMap(s: Snapshot) {
-  const open = new Set(s.sales_orders.filter((o) => o.status === 'open').map((o) => o.id))
+  // Een proforma reserveert ook: wat in de winkel gescand is, kan niet nog eens verkocht worden.
+  const open = new Set(s.sales_orders.filter((o) => o.status === 'open' || o.status === 'proforma').map((o) => o.id))
   const m = new Map<string, number>()
   for (const l of s.sales_order_lines) {
     if (!l.warehouse_id || !open.has(l.sales_order_id)) continue
@@ -144,15 +145,16 @@ export function invoicedDeliveryLineIds(s: Snapshot) {
 }
 
 export type OrderStage =
-  | 'geannuleerd' | 'wacht_op_goederen' | 'te_plannen' | 'gepland' | 'deels_geleverd' | 'te_factureren' | 'gefactureerd'
+  | 'proforma' | 'geannuleerd' | 'wacht_op_goederen' | 'te_plannen' | 'gepland' | 'deels_geleverd' | 'te_factureren' | 'gefactureerd'
 
 export const STAGE_LABEL: Record<OrderStage, string> = {
-  geannuleerd: 'Geannuleerd', wacht_op_goederen: 'Wacht op goederen', te_plannen: 'Te plannen', gepland: 'Gepland',
+  proforma: 'Proforma', geannuleerd: 'Geannuleerd', wacht_op_goederen: 'Wacht op goederen', te_plannen: 'Te plannen', gepland: 'Gepland',
   deels_geleverd: 'Deels geleverd', te_factureren: 'Te factureren', gefactureerd: 'Gefactureerd',
 }
 
 export function orderStage(s: Snapshot, o: SalesOrder): OrderStage {
   if (o.status === 'cancelled') return 'geannuleerd'
+  if (o.status === 'proforma') return 'proforma'
   const lines = orderLines(s, o.id)
   const total = lines.reduce((n, l) => n + l.qty, 0)
   const shipped = lines.reduce((n, l) => n + shippedQty(s, l.id), 0)
@@ -167,12 +169,13 @@ export function orderStage(s: Snapshot, o: SalesOrder): OrderStage {
   return 'wacht_op_goederen'
 }
 
-export type OrderTab = 'te_leveren' | 'ingepland' | 'afgeleverd'
+export type OrderTab = 'proforma' | 'te_leveren' | 'ingepland' | 'afgeleverd'
 
 /** Tabblad op Verkooporders. Geannuleerde verkooporders staan alleen onder Alles. */
 export function orderTab(s: Snapshot, o: SalesOrder): OrderTab | null {
   const stage = orderStage(s, o)
   if (stage === 'geannuleerd') return null
+  if (stage === 'proforma') return 'proforma'
   if (stage === 'te_factureren' || stage === 'gefactureerd') return 'afgeleverd'
   if (stage === 'gepland') return 'ingepland'
   if (stage === 'deels_geleverd') {
@@ -264,6 +267,18 @@ export function transportLoad(s: Snapshot, transportId: string) {
   return { ...out, m3: Math.round(out.m3 * 10) / 10 }
 }
 
+
+/** Vrije voorraad van een product over alle actieve locaties. */
+export const freeTotal = (s: Snapshot, productId: string | null | undefined) =>
+  productId ? s.warehouses.filter((w) => w.is_active).reduce((n, w) => n + Math.max(0, freeAt(s, productId, w.id)), 0) : 0
+
+/** Waar een gescande regel vandaan komt: eerst de showroom, anders de locatie met de meeste vrije voorraad. Null is op bestelling. */
+export function scanWarehouse(s: Snapshot, productId: string, qty: number) {
+  const active = s.warehouses.filter((w) => w.is_active)
+  const showroom = active.find((w) => w.kind === 'winkel' && freeAt(s, productId, w.id) >= qty)
+  if (showroom) return showroom.id
+  return [...active].sort((a, b) => freeAt(s, productId, b.id) - freeAt(s, productId, a.id)).find((w) => freeAt(s, productId, w.id) > 0)?.id ?? null
+}
 
 export const freeAt = (s: Snapshot, productId: string, warehouseId: string) =>
   (onHandMap(s).get(stockKey(productId, warehouseId)) ?? 0) - (reservedMap(s).get(stockKey(productId, warehouseId)) ?? 0)
