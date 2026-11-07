@@ -124,7 +124,7 @@ export function PurchaseDetail({ id }: { id: string }) {
               const open = !!x && shipmentIsOpen(x) && po.status === 'open'
               return (
                 <tr key={l.id}>
-                  <td className="strong">{s.products.find((p) => p.id === l.product_id)?.name}<Sku code={s.products.find((p) => p.id === l.product_id)?.sku} /></td>
+                  <td className="strong">{s.products.find((p) => p.id === l.product_id)?.name}<Sku code={s.products.find((p) => p.id === l.product_id)?.sku} />{sol?.options && <div className="muted small" style={{ fontWeight: 400 }}>{sol.options}</div>}</td>
                   <td>{so ? <a className="rowlink" href={`#orders-${so.id}`}>{so.number}</a> : <span className="muted">{tx("Voorraad")}</span>}</td>
                   <td className="num">{l.qty}</td><td className="num">{eur(l.unit_cost)}</td><td className="num">{eur(l.qty * l.unit_cost)}</td>
                   <td>{x && open && (!t || t.status === 'planned')
