@@ -25,7 +25,7 @@ export function Invoices({ focus }: { focus?: string }) {
   useEffect(() => { if (missing) void run((db) => ensureProformas(db)) }, [missing, run])
   return (
     <>
-      <Head title={tx("Facturatie")} sub={tx("Elke afgemelde levering krijgt een proforma. Klik op de regels die je wilt factureren: pas dan ontstaat de factuur. Vooruitbetalingen worden verrekend.")} />
+      <Head title={tx("Facturatie")} back={{ href: '#orders', label: tx("Verkooporders") }} sub={tx("Elke afgemelde levering krijgt een proforma. Klik op de regels die je wilt factureren: pas dan ontstaat de factuur. Vooruitbetalingen worden verrekend.")} />
       <div className="stack">
         <section className="panel">
           <div className="panel-head">

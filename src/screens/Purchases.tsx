@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
-import { ArrowRight, FileText, Plus, Trash2 } from 'lucide-react'
-import { defaultReceiptWarehouse, isSpanishSupplier, inboundWarehouse, linesToPurchase, round2, shipmentDestination, shipmentIsOpen, todayISO } from '../domain/calc'
+import { ArrowRight, FileText, PackageCheck, Plus, Trash2, Truck } from 'lucide-react'
+import { defaultReceiptWarehouse, flowCounts, isSpanishSupplier, inboundWarehouse, linesToPurchase, round2, shipmentDestination, shipmentIsOpen, todayISO } from '../domain/calc'
 import { assignShipmentsToTransport, cancelPurchaseOrder, createPurchaseOrder, markReceivedInNl, setPurchaseLabel, syncPurchaseProformas } from '../domain/services'
 import { followRank, inOrdersTab } from '../domain/orderFlow'
 import { PURCHASE_PHASE_LABEL, PURCHASE_PHASES, PURCHASE_TABS, purchaseActiveIn, purchaseFlow, purchasesHref, type PurchasePhaseKey, type PurchaseTab } from '../domain/purchaseFlow'
@@ -43,10 +43,13 @@ export function Purchases({ tab = 'opvolgen', phase: initialPhase = null }: { ta
   const inTab = rows.filter((r) => inOrdersTab(filter, r.flow.follow) && matches(r))
   const shown = inTab.filter((r) => !phase || purchaseActiveIn(r.flow, phase))
   const late = rows.filter((r) => r.flow.follow === 'te_laat' && matches(r)).length
+  const counts = flowCounts(s)
   const usedSuppliers = s.suppliers.filter((x) => s.purchase_orders.some((po) => po.supplier_id === x.id)).sort((a, b) => a.name.localeCompare(b.name))
   return (
     <>
       <Head title={tx("Inkooporders")} sub={tx("Elke inkooporder loopt van links naar rechts door de flow, van proforma tot aflevering aan de klant. Koperkleur vraagt actie, rood is te laat, blauw loopt, groen is klaar.")}>
+        <a className="btn" href="#inkomend"><Truck size={16} />{tx("Gepland transport")}{counts.inkomend > 0 && <span className="btn-n bad">{tx("{0} te laat", counts.inkomend)}</span>}</a>
+        <a className="btn" href="#ontvangst"><PackageCheck size={16} />{tx("Ontvangst")}{counts.ontvangst > 0 && <span className="btn-n">{tx("{0} binnen 7 dagen", counts.ontvangst)}</span>}</a>
         <a className="btn primary" href="#inkoop-nieuw"><Plus size={16} />{tx("Nieuwe inkooporder")}</a>
       </Head>
       <section className="panel">
@@ -79,7 +82,7 @@ export function Purchases({ tab = 'opvolgen', phase: initialPhase = null }: { ta
           {filter === 'opvolgen' && late > 0 && <> <strong style={{ color: 'var(--bad)' }}>{tx("{0} te laat.", late)}</strong></>}
         </p>
         {inTab.length === 0 && <Empty>{filter === 'opvolgen' ? tx("Niets op te volgen. Alles loopt.") : tx("Geen inkooporders in dit overzicht.")}</Empty>}
-        {inTab.length > 0 && <div className="table-wrap"><table className="flow-table">
+        {inTab.length > 0 && <div className="table-wrap sticky-flow"><table className="flow-table">
           <thead><tr>
             <th aria-label="PDF" /><th>{tx("Inkooporder")}</th>
             {PURCHASE_PHASES.map((k, i) => {

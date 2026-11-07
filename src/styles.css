@@ -89,22 +89,6 @@ a { color: var(--link); }
 .util a:hover { background: var(--surface-2); color: var(--fg); }
 .util a.on { background: var(--surface-2); color: var(--heading); font-weight: 600; }
 
-/* Procesbalk: de zes stappen uit de illustratie */
-.ribbon-wrap { background: var(--surface); border-bottom: 1px solid var(--line); padding-block: 12px; position: sticky; top: var(--top-h, 0px); z-index: 20; }
-.ribbon { display: grid; grid-template-columns: repeat(6, minmax(142px, 1fr)); gap: 3px; overflow-x: auto; scrollbar-width: none; }
-.ribbon::-webkit-scrollbar { display: none; }
-.step { --tint: var(--buy); --tint-fg: var(--buy-fg); position: relative; display: flex; align-items: center; gap: 9px; padding: 9px 22px 9px 26px; background: var(--tint); color: var(--tint-fg); text-decoration: none; clip-path: polygon(0 0, calc(100% - 13px) 0, 100% 50%, calc(100% - 13px) 100%, 0 100%, 13px 50%); min-width: 0; }
-.step:first-child { clip-path: polygon(0 0, calc(100% - 13px) 0, 100% 50%, calc(100% - 13px) 100%, 0 100%); padding-left: 14px; border-radius: 8px 0 0 8px; }
-.step:last-child { clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%, 13px 50%); border-radius: 0 8px 8px 0; }
-.step.sell { --tint: var(--sell); --tint-fg: var(--sell-fg); }
-.step.ship { --tint: var(--ship); --tint-fg: var(--ship-fg); }
-.step.bill { --tint: var(--bill); --tint-fg: var(--bill-fg); }
-.step .ico { flex: none; width: 30px; height: 30px; border-radius: 50%; background: var(--surface); display: grid; place-items: center; }
-.step .t { min-width: 0; line-height: 1.15; font-family: var(--display); font-weight: 600; font-size: .9rem; }
-.step .t small { display: block; font: 500 .74rem var(--body); opacity: .85; margin-top: 2px; white-space: nowrap; }
-.step.on { background: var(--tint-fg); color: var(--surface); }
-.step.on .ico { color: var(--tint-fg); }
-
 /* Werkvlak */
 main { padding-block: 22px 56px; }
 .head { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; margin-bottom: 18px; }
@@ -221,7 +205,7 @@ td input.price { width: 104px; }
 .figures > div { background: var(--surface); padding: 12px 16px; }
 .figures b { display: block; font: 700 1.35rem var(--display); color: var(--heading); font-variant-numeric: tabular-nums; }
 .ov-date::first-letter { text-transform: uppercase; }
-/* Nu te doen: tegels in de kleur van de stap uit de stappenbalk; te laat in de statuskleur Fout. */
+/* Nu te doen: tegels in de kleur van de flow; te laat in de statuskleur Fout. */
 .ov-todo { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(150px, 100%), 1fr)); gap: 10px; margin-bottom: 16px; }
 @media (min-width: 700px) { .ov-todo { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); } }
 .ov-action { --tint: var(--buy); --tint-fg: var(--buy-fg); display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 10px; background: var(--tint); color: var(--tint-fg); text-decoration: none; border: 1px solid transparent; }
@@ -277,10 +261,10 @@ td input.price { width: 104px; }
 @media print {
   /* Zonder paginamarge heeft de browser geen ruimte voor titel, url en paginanummer; de witruimte zit op het document zelf. */
   @page { margin: 0; }
-  .demo-bar, .top, .ribbon-wrap, .head, .no-print, .toast { display: none !important; }
+  .demo-bar, .top, .head, .no-print, .toast { display: none !important; }
   main { padding: 0; } .paper { border: 0; max-width: none; padding: 0 15mm; box-shadow: none; } body { background: #fff; }
 }
-@media (prefers-reduced-motion: no-preference) { .btn, .step { transition: background-color .12s; } }
+@media (prefers-reduced-motion: no-preference) { .btn { transition: background-color .12s; } }
 
 .login { min-height: 80vh; display: grid; place-items: center; }
 .login form { width: min(380px, 100%); display: grid; gap: 12px; }
@@ -327,7 +311,6 @@ body.route-dragging, body.route-dragging * { cursor: grabbing !important; user-s
 .load-row { display: grid; gap: 6px; margin-bottom: 10px; }
 
 /* Inkoop en verkoop als aparte flows */
-.ribbon { grid-template-columns: repeat(3, minmax(190px, 1fr)); }
 .util a.flow-link { color: var(--heading); font-weight: 600; }
 .util a.flow-link.on { background: var(--selected); color: var(--on-selected); }
 .queue-head td { background: var(--surface-2); }
@@ -414,15 +397,7 @@ body.route-dragging, body.route-dragging * { cursor: grabbing !important; user-s
 .src-chip:disabled .src-tick { display: none; }
 .src-chip .src-none { margin-left: 0; font-size: .8rem; }
 
-/* Nachtstand: de actieve stap in Warm Copper in plaats van een bijna witte vlak */
-:root[data-theme="dark"] .step.on { background: var(--selected); color: var(--on-selected); }
-:root[data-theme="dark"] .step.on .ico { background: var(--surface); color: var(--selected); }
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) .step.on { background: var(--selected); color: var(--on-selected); }
-  :root:not([data-theme="light"]) .step.on .ico { background: var(--surface); color: var(--selected); }
-}
-
-/* Hoofdmenu op smalle schermen: één regel die zijwaarts scrolt, en de stappenbalk scrolt mee weg */
+/* Hoofdmenu op smalle schermen: één regel die zijwaarts scrolt */
 @media (max-width: 760px) {
   .top { padding-top: max(6px, env(safe-area-inset-top, 0px)); padding-bottom: 4px; }
   .top-row { gap: 4px; flex-wrap: nowrap; flex-direction: column; align-items: stretch; }
@@ -430,9 +405,7 @@ body.route-dragging, body.route-dragging * { cursor: grabbing !important; user-s
   .util::-webkit-scrollbar { display: none; }
   .util a, .util .btn-toggle { flex: none; white-space: nowrap; }
   .brand { align-self: flex-start; }
-  .ribbon-wrap { position: static; }
 }
-@media (max-height: 560px) { .ribbon-wrap { position: static; } }
 
 /* Merkje op documenten */
 .doc-mark { display: flex; flex-direction: column; align-items: center; gap: 3px; margin-top: 26px; color: var(--muted); font-size: 7.5pt; text-align: center; }
@@ -729,3 +702,14 @@ a.next:hover { filter: brightness(.96); }
 .focus-flash { animation: focus-flash 2.6s ease-out; border-radius: 8px; }
 tr.focus-flash td { animation: focus-flash-cell 2.6s ease-out; }
 @keyframes focus-flash-cell { 0%, 60% { background: var(--sell); } 100% { background: transparent; } }
+
+/* Aantal op een knop, bijv. Levering en Gepland transport in de kop van Verkooporders en Inkooporders. */
+.btn .btn-n { font-size: 12px; font-weight: 600; padding: 1px 7px; border-radius: 999px; background: var(--surface-2); color: var(--muted); }
+.btn .btn-n.bad { background: var(--bad-bg); color: var(--bad); }
+
+/* Verkooporders en Inkooporders: de fasekoppen 1 t/m 6 blijven bij scrollen vast onder het hoofdmenu (besluit Rick 7 november 2026).
+   Sticky werkt niet binnen een horizontaal scrollende wrapper, dus op brede schermen knipt de wrapper in plaats van te scrollen. */
+@media (min-width: 1180px) {
+  .table-wrap.sticky-flow { overflow-x: clip; }
+  .sticky-flow .flow-table thead th { position: sticky; top: var(--top-h, 0px); z-index: 15; background: var(--surface); padding-top: 10px; box-shadow: 0 1px 0 var(--line); }
+}

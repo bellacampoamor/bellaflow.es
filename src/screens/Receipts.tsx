@@ -70,7 +70,7 @@ export function Receipts() {
   const history = [...s.goods_receipts].sort((a, b) => b.received_date.localeCompare(a.received_date) || b.number.localeCompare(a.number))
   return (
     <>
-      <Head title={tx("Goederenontvangst")} sub={tx("Boek per transport in wat er binnenkomt, op de locatie waar het echt ligt. Eén regel mag over meerdere locaties verdeeld worden.")}>
+      <Head title={tx("Goederenontvangst")} back={{ href: '#inkoop', label: tx("Inkooporders") }} sub={tx("Boek per transport in wat er binnenkomt, op de locatie waar het echt ligt. Eén regel mag over meerdere locaties verdeeld worden.")}>
         <a className="btn" href="#rapportage-leverbaar">{tx("Welke verkooporders zijn leverbaar?")}</a>
       </Head>
       <TransportPicker value="" />

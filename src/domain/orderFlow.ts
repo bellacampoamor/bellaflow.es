@@ -161,7 +161,7 @@ export const followRank = (f: FollowUp) => FOLLOW_RANK[f]
 
 export const needsFollowUp = (f: OrderFlow) => f.follow === 'te_laat' || f.follow === 'actie'
 
-/** Aantal verkooporders (ook proforma's) waar iemand iets moet doen; voor de stappenbalk. */
+/** Aantal verkooporders (ook proforma's) waar iemand iets moet doen */
 export const followUpCount = (s: Snapshot, today = todayISO()) =>
   s.sales_orders.filter((o) => o.status !== 'cancelled' && needsFollowUp(orderFlow(s, o, today))).length
 

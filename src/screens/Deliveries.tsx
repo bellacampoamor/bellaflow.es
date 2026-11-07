@@ -173,7 +173,7 @@ export function Deliveries({ focus }: { focus?: string }) {
 
   return (
     <>
-      <Head title={tx("Levering aan klant")} sub={tx("Plan per dag de beste rijroute, zet de verkooporder klaar en druk de afleverbon af. De klant tekent bij aflevering voor ontvangst.")} />
+      <Head title={tx("Levering aan klant")} back={{ href: '#orders', label: tx("Verkooporders") }} sub={tx("Plan per dag de beste rijroute, zet de verkooporder klaar en druk de afleverbon af. De klant tekent bij aflevering voor ontvangst.")} />
       <Tabs value={tab} onChange={setTab} tabs={[{ value: 'planning', label: tx("Planning"), n: planning.length }, { value: 'done', label: tx("Afgerond"), n: done.length }]} />
       {tab === 'planning' && <div className="stack">
         {days.length === 0 && <section className="panel"><Empty>{tx("Er staat niets gepland. Plan een levering vanuit een verkooporder.")}</Empty></section>}

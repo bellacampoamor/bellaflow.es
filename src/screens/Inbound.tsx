@@ -70,7 +70,7 @@ export function Inbound({ focus }: { focus?: string } = {}) {
 
   return (
     <>
-      <Head title={tx("Gepland transport")} sub={tx("Registreer wat in Nederland klaarstaat en koppel het aan een transport zodra er genoeg is. De verkooporder toont dan wanneer het product wordt verwacht.")}>
+      <Head title={tx("Gepland transport")} back={{ href: '#inkoop', label: tx("Inkooporders") }} sub={tx("Registreer wat in Nederland klaarstaat en koppel het aan een transport zodra er genoeg is. De verkooporder toont dan wanneer het product wordt verwacht.")}>
         <button className="btn primary" onClick={newTransport}><Plus size={16} />{tx("Nieuw transport")}</button>
       </Head>
       <Tabs<'plan' | 'done'> value={tab} onChange={setTab} tabs={[{ value: 'plan', label: tx("Inplannen"), n: unassigned.length + atSupplier.length }, { value: 'done', label: tx("Afgerond"), n: done.length }]} />

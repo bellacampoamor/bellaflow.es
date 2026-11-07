@@ -1,8 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { BookOpen, FileBarChart, Headset, Languages, Moon, Store, Sun, Boxes, ClipboardList, FileText, LayoutDashboard, PackageCheck, Settings2, ShoppingCart, Truck, Warehouse as WarehouseIcon } from 'lucide-react'
-import { flowCounts } from './domain/calc'
-import { followUpCount, parseOrdersParam } from './domain/orderFlow'
-import { parsePurchasesParam, purchaseFollowUpCount } from './domain/purchaseFlow'
+import { parseOrdersParam } from './domain/orderFlow'
+import { parsePurchasesParam } from './domain/purchaseFlow'
 import { useApp, useHash } from './ui/app-context'
 import { Logo, Modal } from './ui/kit'
 import { Overview } from './screens/Overview'
@@ -25,28 +24,15 @@ import { Reports } from './screens/Reports'
 import { Catalogs } from './screens/Catalogs'
 import { getLanguage, setLanguage, tx, type UiLanguage } from './i18n'
 
-// Twee gescheiden processen, elk met eigen menu-optie en eigen stappen.
+// Twee gescheiden processen, elk met eigen menu-optie. Er is geen stappenbalk meer: het spoor per
+// verkooporder en inkooporder toont de flow in detail, met de fasekoppen vast bij scrollen (besluit Rick 7 november 2026).
 const FLOWS = {
-  verkoop: {
-    label: 'Verkoop', icon: Store, home: 'orders',
-    steps: [
-      { key: 'orders', label: '4. Verkooporders', sub: (n: number) => tx("{0} op te volgen", n), icon: ClipboardList, tint: 'sell' },
-      { key: 'levering', label: '5. Levering', sub: (n: number) => tx("{0} vandaag", n), icon: Truck, tint: 'ship' },
-      { key: 'facturatie', label: '6. Facturatie', sub: (n: number) => tx("{0} te factureren", n), icon: FileText, tint: 'bill' },
-    ],
-  },
-  inkoop: {
-    label: 'Inkoop', icon: ShoppingCart, home: 'inkoop',
-    steps: [
-      { key: 'inkoop', label: '1. Inkooporders', sub: (n: number) => tx("{0} op te volgen", n), icon: ShoppingCart, tint: '' },
-      { key: 'inkomend', label: '2. Gepland transport', sub: (n: number) => (n ? tx("{0} te laat", n) : tx("op schema")), icon: Truck, tint: '' },
-      { key: 'ontvangst', label: '3. Ontvangst', sub: (n: number) => tx("{0} binnen 7 dagen", n), icon: PackageCheck, tint: '' },
-    ],
-  },
+  verkoop: { label: 'Verkoop', icon: Store, home: 'orders', screens: ['orders', 'levering', 'facturatie'] },
+  inkoop: { label: 'Inkoop', icon: ShoppingCart, home: 'inkoop', screens: ['inkoop', 'inkomend', 'ontvangst'] },
 } as const
 type FlowKey = keyof typeof FLOWS
 const flowOf = (screen: string): FlowKey | null =>
-  (Object.keys(FLOWS) as FlowKey[]).find((k) => FLOWS[k].steps.some((st) => st.key === screen)) ?? null
+  (Object.keys(FLOWS) as FlowKey[]).find((k) => (FLOWS[k].screens as readonly string[]).includes(screen)) ?? null
 
 const THEME_KEY = 'bella-flow-theme'
 function useTheme() {
@@ -67,7 +53,7 @@ function useTheme() {
 export function App({ onResetDemo, onSignOut }: { onResetDemo?: () => Promise<void>; onSignOut?: () => void }) {
   const { s } = useApp()
   const [theme, toggleTheme] = useTheme()
-  // De stappenbalk plakt direct onder het hoofdmenu, dat op smalle schermen hoger is.
+  // Vaste fasekoppen plakken direct onder het hoofdmenu, dat op smalle schermen hoger is.
   const headerRef = useRef<HTMLElement>(null)
   useEffect(() => {
     const el = headerRef.current
@@ -90,7 +76,6 @@ export function App({ onResetDemo, onSignOut }: { onResetDemo?: () => Promise<vo
   const dash = hash.indexOf('-')
   const screen = dash < 0 ? hash : hash.slice(0, dash)
   const param = dash < 0 ? '' : hash.slice(dash + 1)
-  const counts = { ...flowCounts(s), orders: followUpCount(s), inkoop: purchaseFollowUpCount(s) }
   const flow = flowOf(screen)
 
   if (screen === 'chauffeur') return <Driver param={param} />
@@ -127,21 +112,6 @@ export function App({ onResetDemo, onSignOut }: { onResetDemo?: () => Promise<vo
           </nav>
         </div>
       </header>
-      {flow && (
-        <div className="ribbon-wrap wrap">
-          <nav className="inner ribbon" aria-label={tx(FLOWS[flow].label)}>
-            {FLOWS[flow].steps.map((st) => {
-              const Icon = st.icon
-              return (
-                <a key={st.key} href={`#${st.key}`} className={`step ${st.tint} ${screen === st.key ? 'on' : ''}`} aria-current={screen === st.key ? 'page' : undefined}>
-                  <span className="ico"><Icon size={16} /></span>
-                  <span className="t">{tx(st.label)}<small>{st.sub(counts[st.key])}</small></span>
-                </a>
-              )
-            })}
-          </nav>
-        </div>
-      )}
       <main className="wrap">
         <div className="inner">
           <Route screen={screen} param={param} />

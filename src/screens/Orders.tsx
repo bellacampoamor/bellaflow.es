@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
-import { CalendarClock, Copy, FileText, Pencil, Plus, Truck, UserPlus } from 'lucide-react'
+import { CalendarClock, Copy, FileText, Pencil, Plus, ReceiptText, Truck, UserPlus } from 'lucide-react'
 import type { Delivery, Payment, SalesOrder } from '../data/types'
-import { articleNo, linePurchaseStatus, linesToPurchase, depositAvailable, depositPaid, invoiceBalance, lineTotal, onHandMap, orderLines, orderOutstanding, orderStage, orderTotal, plannedQty, shippedQty, stockKey, todayISO, uninvoicedDeliveries } from '../domain/calc'
+import { articleNo, flowCounts, linePurchaseStatus, linesToPurchase, depositAvailable, depositPaid, invoiceBalance, lineTotal, onHandMap, orderLines, orderOutstanding, orderStage, orderTotal, plannedQty, shippedQty, stockKey, todayISO, uninvoicedDeliveries } from '../domain/calc'
 import { addOrderPayment, cancelOrder, createDelivery, defaultMethod, rescheduleOrder, setLineWarehouse } from '../domain/services'
 import { go, useApp } from '../ui/app-context'
 import { Check, Empty, eur, fmtDate, Head, Modal, NumberField, Pill, SelectField, Sku, Tabs, TextField, type Tone } from '../ui/kit'
@@ -30,9 +30,12 @@ export function Orders({ tab = 'opvolgen', phase: initialPhase = null }: { tab?:
   const inTab = rows.filter((r) => inOrdersTab(filter, r.flow.follow) && matches(r))
   const shown = inTab.filter((r) => !phase || activeIn(r.flow, phase))
   const late = rows.filter((r) => r.flow.follow === 'te_laat').length
+  const counts = flowCounts(s, today)
   return (
     <>
       <Head title={tx("Verkooporders")} sub={tx("Elke verkooporder loopt van links naar rechts door de flow. Koperkleur vraagt actie, rood is te laat, blauw loopt, groen is klaar.")}>
+        <a className="btn" href="#levering"><Truck size={16} />{tx("Levering")}{counts.levering > 0 && <span className="btn-n">{tx("{0} vandaag", counts.levering)}</span>}</a>
+        <a className="btn" href="#facturatie"><ReceiptText size={16} />{tx("Facturatie")}{counts.facturatie > 0 && <span className="btn-n">{tx("{0} te factureren", counts.facturatie)}</span>}</a>
         <a className="btn primary" href="#orders-nieuw"><Plus size={16} />{tx("Nieuwe verkooporder")}</a>
       </Head>
       <section className="panel">
@@ -45,7 +48,7 @@ export function Orders({ tab = 'opvolgen', phase: initialPhase = null }: { tab?:
           {filter === 'opvolgen' && late > 0 && <> <strong style={{ color: 'var(--bad)' }}>{tx("{0} te laat.", late)}</strong></>}
         </p>
         {inTab.length === 0 && <Empty>{filter === 'opvolgen' ? tx("Niets op te volgen. Alles loopt.") : tx("Geen verkooporders in dit overzicht.")}</Empty>}
-        {inTab.length > 0 && <div className="table-wrap"><table className="flow-table">
+        {inTab.length > 0 && <div className="table-wrap sticky-flow"><table className="flow-table">
           <thead><tr>
             <th aria-label="PDF" /><th>{tx("Verkooporder")}</th>
             {PHASES.map((k, i) => {
