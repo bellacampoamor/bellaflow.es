@@ -1,10 +1,10 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { Plus } from 'lucide-react'
 import type { Customer, DocumentLanguage, Language, Salesperson, Settings, Supplier, Warehouse } from '../data/types'
 import { saveRecord, saveSettings, saveSupplier, saveSupplierSurcharge, type PrefixField } from '../domain/services'
 import { priceWithSurcharge } from '../domain/articles'
 import { useApp } from '../ui/app-context'
-import { AreaField, Check, eur, Head, Modal, NumberField, Pill, SelectField, Tabs, TextField } from '../ui/kit'
+import { AreaField, BackToTop, Check, eur, Head, Modal, NumberField, Pager, Pill, SelectField, Tabs, TextField } from '../ui/kit'
 import { CustomerFields } from './OrderForm'
 import { tx } from '../i18n'
 
@@ -52,10 +52,7 @@ export function Admin() {
         <tbody>{s.suppliers.map((x) => <tr key={x.id} className="click" onClick={() => setSu(x)}><td className="strong">{x.name}</td><td>{x.code || '–'}</td><td className="muted">{x.postal_code || '–'}</td><td>{x.city}</td><td>{x.country}</td><td className="muted">{x.contact_name || x.email || '–'}</td><td className="num">{x.lead_time_days} {tx("dagen")}</td></tr>)}</tbody>
       </table></div></section>}
 
-      {tab === 'klanten' && <section className="panel"><div className="table-wrap"><table>
-        <thead><tr><th>{tx("Naam")}</th><th>{tx("Soort")}</th><th>{tx("Plaats")}</th><th>{tx("Telefoon")}</th><th>{tx("E-mail")}</th><th>{tx("Factuurtaal")}</th></tr></thead>
-        <tbody>{s.customers.map((c) => <tr key={c.id} className="click" onClick={() => setCu(c)}><td className="strong">{c.company || c.name}</td><td>{tx(c.kind[0].toUpperCase() + c.kind.slice(1))}</td><td>{c.city}</td><td>{c.phone}</td><td className="muted">{c.email}</td><td>{{ es: tx("Spaans"), nl: tx("Nederlands"), en: tx("Engels") }[c.language]}</td></tr>)}</tbody>
-      </table></div></section>}
+      {tab === 'klanten' && <CustomerList customers={s.customers} onOpen={setCu} />}
 
       {tab === 'verkopers' && <section className="panel"><div className="table-wrap"><table>
         <thead><tr><th>{tx("Naam")}</th><th>{tx("E-mail")}</th><th>{tx("Telefoon")}</th><th>{tx("Status")}</th></tr></thead>
@@ -191,6 +188,28 @@ export function Admin() {
 }
 
 /** Toeslag per leverancier op de prijs van de leverancier, voor transport en distributie van Nederland naar Spanje. */
+const CUSTOMER_PAGE_SIZE = 50
+
+/** Klantenlijst onder Beheer: 50 regels per pagina, met paginering en een knop naar boven, zoals in Catalogi. */
+function CustomerList({ customers, onOpen }: { customers: Customer[]; onOpen: (c: Customer) => void }) {
+  const [page, setPage] = useState(1)
+  const listTop = useRef<HTMLElement>(null)
+  const pages = Math.max(1, Math.ceil(customers.length / CUSTOMER_PAGE_SIZE))
+  const current = Math.min(page, pages)
+  const shown = customers.slice((current - 1) * CUSTOMER_PAGE_SIZE, current * CUSTOMER_PAGE_SIZE)
+  const goPage = (p: number) => { setPage(p); listTop.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }) }
+  return (
+    <section className="panel" ref={listTop}>
+      <div className="table-wrap"><table>
+        <thead><tr><th>{tx("Naam")}</th><th>{tx("Soort")}</th><th>{tx("Plaats")}</th><th>{tx("Telefoon")}</th><th>{tx("E-mail")}</th><th>{tx("Factuurtaal")}</th></tr></thead>
+        <tbody>{shown.map((c) => <tr key={c.id} className="click" onClick={() => onOpen(c)}><td className="strong">{c.company || c.name}</td><td>{tx(c.kind[0].toUpperCase() + c.kind.slice(1))}</td><td>{c.city}</td><td>{c.phone}</td><td className="muted">{c.email}</td><td>{{ es: tx("Spaans"), nl: tx("Nederlands"), en: tx("Engels") }[c.language]}</td></tr>)}</tbody>
+      </table></div>
+      {customers.length > 0 && <Pager page={current} size={CUSTOMER_PAGE_SIZE} total={customers.length} onPage={goPage} />}
+      <BackToTop />
+    </section>
+  )
+}
+
 function Surcharges() {
   const { s, run } = useApp()
   const [draft, setDraft] = useState<Record<string, string>>({})
