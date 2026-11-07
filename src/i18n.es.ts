@@ -884,8 +884,6 @@ export const es: Record<string, string> = {
   "Nog leeg. Koppel hierboven de inkoopregels.": "Aún vacío. Vincule arriba las líneas de compra.",
   "Deze inkooporder heeft regels voor een verkooporder en houdt het label Verkoop.": "Este pedido de compra tiene líneas para un pedido de venta y mantiene la etiqueta Venta.",
   "Het label Verkoop hoort bij regels van een verkooporder.": "La etiqueta Venta corresponde a líneas de un pedido de venta.",
-  "Filter op label": "Filtrar por etiqueta",
-  "Alle labels": "Todas las etiquetas",
   "{0} van {1} inkooporders": "{0} de {1} pedidos de compra",
   "Geen inkooporders met dit filter.": "No hay pedidos de compra con este filtro.",
   "Label aangepast": "Etiqueta modificada",
