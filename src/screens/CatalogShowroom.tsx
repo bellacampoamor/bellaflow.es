@@ -12,7 +12,8 @@ const price = (x: SupplierShowroomItem) => (x.price === null ? '–' : x.currenc
 
 /** Beschikbaar in het magazijn van de leverancier: vandaag of eerder is beschikbaar, later is een datum, anders geen datum. */
 function Available({ x }: { x: SupplierShowroomItem }) {
-  if (!x.available_date) return <span className="muted small">{x.available_text || tx("Geen datum beschikbaar")}</span>
+  // Zonder tekst is de beschikbaarheid niet opgehaald (zoals bij elementen die niet los in de showroom staan).
+  if (!x.available_date) return <span className="muted small">{x.available_text || '–'}</span>
   if (x.available_date <= todayISO()) return <Pill tone="good">{tx("Beschikbaar")}</Pill>
   return <Pill tone="info">{tx("Vanaf {0}", fmtDate(x.available_date))}</Pill>
 }

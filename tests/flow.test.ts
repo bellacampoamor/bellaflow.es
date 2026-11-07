@@ -853,11 +853,20 @@ describe('showroom', () => {
   })
   it('leest de echte showroom-export volledig in', async () => {
     const real = readFileSync('public/assets/catalogus/supplier_showroom_items.csv', 'utf8')
-    expect(await importShowroom(db, real)).toEqual({ added: 6758, updated: 0 })
+    // 6.758 artikelen uit de showroomlijst plus 2.633 elementen die alleen op productpagina's staan.
+    expect(await importShowroom(db, real)).toEqual({ added: 9391, updated: 0 })
+    await importShowroomDetails(db, readFileSync('public/assets/catalogus/supplier_showroom_details.csv', 'utf8'))
     const s = await loadSnapshot(db)
     const sup = s.suppliers.find((x) => x.name === SUP)!
-    const { parentOf } = showroomParts(s.supplier_showroom_items)
-    expect(showroomOf(s, sup).length).toBe(6758 - parentOf.size)
+    const { parts, parentOf, detailOf } = showroomParts(s.supplier_showroom_items, s.supplier_showroom_details)
+    expect(showroomOf(s, sup).length).toBe(9391 - parentOf.size)
+    expect(s.supplier_showroom_details).toHaveLength(6758)
+    // Elk element uit de details is een bekend artikel.
+    const known = new Set(s.supplier_showroom_items.map((x) => x.supplier_sku))
+    expect(s.supplier_showroom_details.flatMap((d) => d.elements).every((e) => known.has(e))).toBe(true)
+    const alg = s.supplier_showroom_items.find((x) => x.supplier_sku === 'ALG-120R-BEI-BKE')!
+    expect(parts.get(alg.id)!.map((x) => x.supplier_sku)).toEqual(['17-1161-450', '17-1161-450B', '16-0292-241'])
+    expect(detailOf(alg)!.specifications).toContainEqual({ label: 'Aantal personen', value: '4 Personen' })
     expect(s.supplier_showroom_items.find((x) => x.supplier_sku === 'PRX-BBR-LMP-FLO')).toMatchObject({ price: 248.75, series: 'Proxima' })
     expect(s.supplier_showroom_items.every((x) => x.price !== null)).toBe(true)
   })

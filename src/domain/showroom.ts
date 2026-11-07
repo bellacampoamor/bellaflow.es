@@ -72,8 +72,10 @@ export function showroomParts(items: SupplierShowroomItem[], details: SupplierSh
     parts.set(parent.id, list)
     if (!parentOf.has(child.id)) parentOf.set(child.id, parent)
   }
+  const detailIds = new Set<string>()
   for (const x of items) {
     const d = detailOf.get(key(x.supplier_name, x.supplier_sku))
+    if (d) detailIds.add(x.id)
     for (const sku of d?.elements ?? []) { const c = bySku.get(key(x.supplier_name, sku)); if (c) add(x, c) }
   }
   const byName = new Map<string, SupplierShowroomItem>()
@@ -85,7 +87,8 @@ export function showroomParts(items: SupplierShowroomItem[], details: SupplierSh
     if (!parent || detailOf.has(key(parent.supplier_name, parent.supplier_sku))) continue
     add(parent, x); nameParts.push(x)
   }
-  for (const list of parts.values()) list.sort((a, b) => (partOf(a.name)?.n ?? 0) - (partOf(b.name)?.n ?? 0))
+  // Elementen uit de showroom houden de volgorde van de showroom; onderdelen uit de naam gaan op volgorde van deel.
+  for (const [id, list] of parts) if (!detailIds.has(id)) list.sort((a, b) => (partOf(a.name)?.n ?? 0) - (partOf(b.name)?.n ?? 0))
   // Een artikel dat zelf elementen heeft, blijft altijd in de lijst, ook als het element is van een ander artikel.
   for (const id of [...parentOf.keys()]) if (parts.has(id)) parentOf.delete(id)
   return { parts, parentOf, detailOf: (x: SupplierShowroomItem) => detailOf.get(key(x.supplier_name, x.supplier_sku)) }
