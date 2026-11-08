@@ -9,7 +9,7 @@ import { CustomerFields } from './OrderForm'
 import { tx } from '../i18n'
 import { isSpanishSupplier } from '../domain/calc'
 import { ROLE_LABEL, roleOf, STAFF_ROLES } from '../domain/staff'
-import { HDB_DEFAULTS, imageSrc } from '../domain/issuers'
+import { BELLA_DEFAULTS, HDB_DEFAULTS, imageSrc } from '../domain/issuers'
 
 // Geen tabblad Producten: de producten zijn de artikelen uit de catalogi van de leveranciers, met een eigen artikelnummer.
 type Tab = 'magazijnen' | 'leveranciers' | 'toeslagen' | 'klanten' | 'medewerkers' | 'bedrijf'
@@ -116,8 +116,8 @@ export function Admin() {
         <h2>{tx("Kassa: Bella Outdoor and Furnishing")}</h2>
         <p className="small muted">{tx("Logo linksboven en klein beeldmerk onderaan op de eenvoudige factuur van Bella. De bedrijfsgegevens komen uit Bedrijfsgegevens hierboven.")}</p>
         <div className="form-grid">
-          <LogoUpload label={tx("Logo")} value={co.logo_bella ?? ''} onChange={(v) => setCo({ ...co, logo_bella: v })} max={1000} />
-          <LogoUpload label={tx("Beeldmerk")} value={co.mark_bella ?? ''} onChange={(v) => setCo({ ...co, mark_bella: v })} max={300} />
+          <LogoUpload label={tx("Logo")} value={co.logo_bella ?? BELLA_DEFAULTS.logo_bella} onChange={(v) => setCo({ ...co, logo_bella: v })} max={1000} />
+          <LogoUpload label={tx("Beeldmerk")} value={co.mark_bella ?? BELLA_DEFAULTS.mark_bella} onChange={(v) => setCo({ ...co, mark_bella: v })} max={300} />
         </div>
         </section>
         <section className="panel section">

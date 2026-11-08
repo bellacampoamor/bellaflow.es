@@ -216,6 +216,10 @@ describe('Kassa met twee bedrijven (Bella en HDB)', () => {
     expect(q.prefix_invoice_simplified).toBeUndefined()
     expect(q.hdb_tax_id).toBeUndefined()
     expect(q.logo_hdb).toBeUndefined()
+    expect(p.logo_bella).toBe('assets/brand/bella-logo.png')
+    expect(p.mark_bella).toBe('assets/brand/bella-beeldmerk.png')
+    expect(settingsUpgrade({ logo_bella: '' }).logo_bella).toBeUndefined()
+    expect(issuerInfo(undefined, 'bella').logo).toBe('assets/brand/bella-logo.png')
   })
 })
 

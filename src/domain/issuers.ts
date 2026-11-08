@@ -21,6 +21,12 @@ export const HDB_DEFAULTS = {
   mark_hdb: 'assets/brand/hdb-beeldmerk.png',
 } as const
 
+/** Standaardlogo's van Bella (aangeleverd door Rick, 8 november 2026). Een upload onder Instellingen gaat voor. */
+export const BELLA_DEFAULTS = {
+  logo_bella: 'assets/brand/bella-logo.png',
+  mark_bella: 'assets/brand/bella-beeldmerk.png',
+} as const
+
 /** Nummerreeks per bedrijf: eigen teller en eigen voorvoegsel onder Instellingen. */
 export const ISSUER_SERIES = {
   bella: { series: 'FS', field: 'prefix_invoice_simplified', fallback: 'FS-BELLA' },
@@ -47,7 +53,7 @@ export function issuerInfo(co: Settings | undefined, key: Issuer): IssuerInfo {
   }
   return {
     key, name: co?.company_name ?? '', short: 'Bella', tax_id: co?.tax_id ?? '', address: co?.address ?? '', postal_code: co?.postal_code ?? '', city: co?.city ?? '',
-    province: co?.province ?? '', country: 'España', phone: co?.phone ?? '', email: co?.email ?? '', logo: co?.logo_bella ?? '', mark: co?.mark_bella ?? '',
+    province: co?.province ?? '', country: 'España', phone: co?.phone ?? '', email: co?.email ?? '', logo: co?.logo_bella ?? BELLA_DEFAULTS.logo_bella, mark: co?.mark_bella ?? BELLA_DEFAULTS.mark_bella,
   }
 }
 
@@ -67,6 +73,8 @@ export function settingsUpgrade(co: Partial<Settings>): Partial<Settings> {
   if (!co.prefix_invoice_simplified || co.prefix_invoice_simplified === 'FS') patch.prefix_invoice_simplified = 'FS-BELLA'
   if (co.prefix_invoice_simplified_hdb === undefined) patch.prefix_invoice_simplified_hdb = 'FS-HDB'
   if (co.language_invoice_simplified === undefined) patch.language_invoice_simplified = 'es'
+  // Nog nooit een logo voor Bella ingesteld: de aangeleverde logo's. Bewust verwijderd (leeg) blijft leeg.
+  for (const [k, v] of Object.entries(BELLA_DEFAULTS)) if ((co as Record<string, unknown>)[k] === undefined) (patch as Record<string, unknown>)[k] = v
   for (const [k, v] of Object.entries(HDB_DEFAULTS)) if ((co as Record<string, unknown>)[k] === undefined) (patch as Record<string, unknown>)[k] = v
   return patch
 }
