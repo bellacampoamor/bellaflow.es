@@ -35,6 +35,7 @@
   --shadow: 0 12px 40px rgb(64 68 78 / .22);
   --logo-plate: transparent;
   --logo-pad: 0;
+  --top-glow: transparent;
   --photo-bg: #FFFFFF; --photo-fg: #6D5D5F;
   --display: 'Outfit', 'Avenir Next', 'Segoe UI', sans-serif;
   --body: 'Figtree', 'Segoe UI', system-ui, sans-serif;
@@ -46,7 +47,7 @@
   --buy: #4A505C; --buy-fg: #E0E3E8; --sell: #5F4235; --sell-fg: #F2D6C2; --ship: #54484A; --ship-fg: #EADCD8; --bill: #1F3D54; --bill-fg: #C9DBE7;
   --acc-klant: #9FC3DC; --acc-producten: #E0AC87; --acc-levering: #D2B3AE; --acc-notitie: #C3C9D4;
   --good: #AFD6B3; --good-bg: #2F463A; --warn: #E9C786; --warn-bg: #4D3D22; --bad: #F4B0A8; --bad-bg: #57302D; --info: #BAD2E1; --info-bg: #2B4354;
-  --neutral-bg: #4A4E59; --overlay: rgb(11 24 42 / .62); --shadow: 0 12px 40px rgb(11 24 42 / .5); --logo-plate: #F2E8DF; --logo-pad: 5px 10px; --photo-bg: #FFFFFF; --photo-fg: #6D5D5F; color-scheme: dark;
+  --neutral-bg: #4A4E59; --overlay: rgb(11 24 42 / .62); --shadow: 0 12px 40px rgb(11 24 42 / .5); --logo-plate: #F2E8DF; --logo-pad: 5px 10px; --top-glow: #E0E3E8; --photo-bg: #FFFFFF; --photo-fg: #6D5D5F; color-scheme: dark;
 } }
 :root[data-theme="dark"] {
   --heading: #F2E8DF; --link: #E0AC87; --brand-line: #CE8D61; --brand-strong: #CE8D61;
@@ -55,7 +56,7 @@
   --buy: #4A505C; --buy-fg: #E0E3E8; --sell: #5F4235; --sell-fg: #F2D6C2; --ship: #54484A; --ship-fg: #EADCD8; --bill: #1F3D54; --bill-fg: #C9DBE7;
   --acc-klant: #9FC3DC; --acc-producten: #E0AC87; --acc-levering: #D2B3AE; --acc-notitie: #C3C9D4;
   --good: #AFD6B3; --good-bg: #2F463A; --warn: #E9C786; --warn-bg: #4D3D22; --bad: #F4B0A8; --bad-bg: #57302D; --info: #BAD2E1; --info-bg: #2B4354;
-  --neutral-bg: #4A4E59; --overlay: rgb(11 24 42 / .62); --shadow: 0 12px 40px rgb(11 24 42 / .5); --logo-plate: #F2E8DF; --logo-pad: 5px 10px; --photo-bg: #FFFFFF; --photo-fg: #6D5D5F; color-scheme: dark;
+  --neutral-bg: #4A4E59; --overlay: rgb(11 24 42 / .62); --shadow: 0 12px 40px rgb(11 24 42 / .5); --logo-plate: #F2E8DF; --logo-pad: 5px 10px; --top-glow: #E0E3E8; --photo-bg: #FFFFFF; --photo-fg: #6D5D5F; color-scheme: dark;
 }
 
 * { box-sizing: border-box; }
@@ -80,6 +81,26 @@ a { color: var(--link); }
 .top { background: var(--surface); padding-block: 8px; border-bottom: 1px solid var(--line); position: sticky; top: 0; z-index: 30; }
 .top-row { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; justify-content: space-between; }
 .brand { display: inline-flex; background: var(--logo-plate); padding: var(--logo-pad); border-radius: 8px; max-width: 100%; }
+/* Kop: het logo staat zonder plaat. In de nachtstand loopt de kop vanaf de linkerrand heel lichtgrijs (#E0E3E8) onder het logo door
+   en vloeit rechts van het logo zacht over in het donkere vlak. App.tsx meet de plek van logo en menu (--logo-x, --logo-w,
+   --glow-fade, --glow-row); de waarden hier zijn alleen de terugval. Slaat het menu om naar een eigen regel (.top-wrapped),
+   dan blijft het licht bij de rij van het logo en loopt het onderaan zacht weg, zodat het menu op donker staat. */
+.top {
+  --logo-x: max(16px, (100% - 1320px) / 2); --logo-w: 240px; --glow-row: 100%; --glow-fade: 160px;
+  --glow-end: calc(var(--logo-x) + var(--logo-w) + 8px);
+  background-image: linear-gradient(90deg,
+    var(--top-glow) 0, var(--top-glow) var(--glow-end),
+    color-mix(in oklab, var(--top-glow) 62%, transparent) calc(var(--glow-end) + var(--glow-fade) * .3),
+    color-mix(in oklab, var(--top-glow) 22%, transparent) calc(var(--glow-end) + var(--glow-fade) * .65),
+    transparent calc(var(--glow-end) + var(--glow-fade)));
+  background-repeat: no-repeat; background-size: 100% var(--glow-row);
+}
+.top.top-wrapped { background-image: linear-gradient(180deg, transparent calc(100% - 14px), var(--surface)), linear-gradient(90deg,
+    var(--top-glow) 0, var(--top-glow) var(--glow-end),
+    color-mix(in oklab, var(--top-glow) 62%, transparent) calc(var(--glow-end) + var(--glow-fade) * .3),
+    color-mix(in oklab, var(--top-glow) 22%, transparent) calc(var(--glow-end) + var(--glow-fade) * .65),
+    transparent calc(var(--glow-end) + var(--glow-fade))); }
+.top .brand { background: none; padding: 0; border-radius: 0; }
 .brand picture { display: flex; }
 .logo { display: block; height: 44px; width: auto; max-width: 100%; }
 @media (max-width: 520px) { .logo { height: 32px; } }

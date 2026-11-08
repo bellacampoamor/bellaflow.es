@@ -61,10 +61,23 @@ export function App({ onResetDemo, onSignOut }: { onResetDemo?: () => Promise<vo
   useEffect(() => {
     const el = headerRef.current
     if (!el) return
-    const measure = () => document.documentElement.style.setProperty('--top-h', `${el.offsetHeight}px`)
+    const measure = () => {
+      document.documentElement.style.setProperty('--top-h', `${el.offsetHeight}px`)
+      // Lichte overgang achter het logo (nachtstand): plek van logo en menu meten, zie .top in styles.css.
+      const brand = el.querySelector<HTMLElement>('.brand'), nav = el.querySelector<HTMLElement>('.util')
+      if (!brand || !nav) return
+      const h = el.getBoundingClientRect(), b = brand.getBoundingClientRect(), n = nav.getBoundingClientRect()
+      const wrapped = n.top >= b.bottom - 4
+      el.classList.toggle('top-wrapped', wrapped)
+      el.style.setProperty('--logo-x', `${Math.round(b.left - h.left)}px`)
+      el.style.setProperty('--logo-w', `${Math.round(b.width)}px`)
+      el.style.setProperty('--glow-row', wrapped ? `${Math.round(b.bottom - h.top + 8)}px` : '100%')
+      el.style.setProperty('--glow-fade', `${wrapped ? 140 : Math.max(24, Math.min(220, Math.round(n.left - b.right - 24)))}px`)
+    }
     measure()
     const ro = new ResizeObserver(measure)
     ro.observe(el)
+    el.querySelectorAll('.brand, .util').forEach((x) => ro.observe(x))
     return () => ro.disconnect()
   }, [])
   const [language, setUiLanguage] = useState(getLanguage)
