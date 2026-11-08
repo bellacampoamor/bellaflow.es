@@ -5,8 +5,10 @@ import type { CatalogArticle } from '../src/data/types'
 import { freeAt, onHandMap, stockKey } from '../src/domain/calc'
 import { seedDemo } from '../src/domain/demo'
 import { addPosLine, DUMMY_SKU, isDummyCode, missingCustomerData, POS_CUSTOMER_NOTE, posTotals, SIMPLIFIED_LIMIT, type PosLine } from '../src/domain/pos'
-import { importShowroom, posCheckout, productForArticle, saveRecord, syncCatalogArticles } from '../src/domain/services'
+import { importShowroom, posCheckout, saveSettings, productForArticle, saveRecord, syncCatalogArticles } from '../src/domain/services'
 import { invoiceReport } from '../src/domain/calc'
+import { HDB_DEFAULTS, issuerInfo, legalLine, settingsUpgrade } from '../src/domain/issuers'
+import { overview } from '../src/domain/overview'
 import type { Customer } from '../src/data/types'
 import { showNum } from '../src/ui/NumInput'
 
@@ -127,7 +129,8 @@ describe('Factura simplificada (kassa)', () => {
     const r = await checkout([dummy(50)])
     const inv = db.data.invoices.find((i) => i.id === r.invoiceId)!
     expect(inv.simplified).toBe(true)
-    expect(inv.number).toMatch(/^FS-2026-\d{4}$/)
+    expect(inv.number).toMatch(/^FS-BELLA-2026-\d{4}$/)
+    expect(inv.issuer).toBe('bella')
     await db.update('settings', db.data.settings[0].id, { prefix_invoice_simplified: 'TPV' })
     const r2 = await checkout([dummy(20)])
     expect(r2.invoiceNumber).toMatch(/^TPV-2026-0002$/)
@@ -168,6 +171,61 @@ describe('Factura simplificada (kassa)', () => {
     const c = { name: 'A', company: '', address: '', city: 'B', tax_id: '', notes: '' }
     expect(missingCustomerData(c)).toEqual(['Adres', 'NIE of paspoortnummer'])
     expect(missingCustomerData({ ...c, notes: POS_CUSTOMER_NOTE })).toHaveLength(4)
+  })
+})
+
+describe('Kassa met twee bedrijven (Bella en HDB)', () => {
+  it('HDB krijgt een eigen reeks FS-HDB en eigen teller, Bella blijft FS-BELLA', async () => {
+    const b1 = await checkout([dummy(30)])
+    const h1 = await checkout([dummy(45)], { issuer: 'hdb' })
+    const h2 = await checkout([dummy(10)], { issuer: 'hdb' })
+    const b2 = await checkout([dummy(20)])
+    expect(b1.invoiceNumber).toBe('FS-BELLA-2026-0001')
+    expect(h1.invoiceNumber).toBe('FS-HDB-2026-0001')
+    expect(h2.invoiceNumber).toBe('FS-HDB-2026-0002')
+    expect(b2.invoiceNumber).toBe('FS-BELLA-2026-0002')
+    expect(db.data.invoices.find((i) => i.id === h1.invoiceId)!.issuer).toBe('hdb')
+    await db.update('settings', db.data.settings[0].id, { prefix_invoice_simplified_hdb: 'HDB-TPV' })
+    expect((await checkout([dummy(5)], { issuer: 'hdb' })).invoiceNumber).toBe('HDB-TPV-2026-0003')
+  })
+
+  it('HDB staat in een eigen kassaoverzicht en telt niet mee in de omzet van Bella', async () => {
+    const before = overview(db.data, TODAY).money.revenueMonth
+    await checkout([dummy(100)], { issuer: 'hdb' })
+    await checkout([dummy(40)])
+    const bella = invoiceReport(db.data, '2026-01-01', '2026-12-31', true, 'bella')
+    const hdb = invoiceReport(db.data, '2026-01-01', '2026-12-31', true, 'hdb')
+    expect(bella.rows.map((r) => r.invoice.total)).toEqual([40])
+    expect(hdb.rows.map((r) => r.invoice.total)).toEqual([100])
+    expect(overview(db.data, TODAY).money.revenueMonth).toBeCloseTo(before + 40)
+  })
+
+  it('juridische regel en standaardgegevens van HDB', () => {
+    const i = issuerInfo(undefined, 'hdb')
+    expect(legalLine(i)).toBe('Handmade Bali Treasures SL, Avd de Constitución s/n, 03179, Formentera del Segura (ALC), Spain, CIF: B05730825')
+    expect(i.logo).toBe(HDB_DEFAULTS.logo_hdb)
+  })
+
+  it('bestaande instellingen: FS wordt FS-BELLA, HDB en Spaans komen erbij, ingevulde waarden blijven', () => {
+    const p = settingsUpgrade({ prefix_invoice_simplified: 'FS' })
+    expect(p.prefix_invoice_simplified).toBe('FS-BELLA')
+    expect(p.prefix_invoice_simplified_hdb).toBe('FS-HDB')
+    expect(p.language_invoice_simplified).toBe('es')
+    expect(p.hdb_tax_id).toBe('B05730825')
+    const q = settingsUpgrade({ prefix_invoice_simplified: 'X', prefix_invoice_simplified_hdb: 'Y', language_invoice_simplified: 'nl', hdb_tax_id: '', logo_hdb: '' })
+    expect(q.prefix_invoice_simplified).toBeUndefined()
+    expect(q.hdb_tax_id).toBeUndefined()
+    expect(q.logo_hdb).toBeUndefined()
+  })
+})
+
+describe('Voorvoegsels', () => {
+  it('FS-BELLA en FS-HDB mogen, spaties en losse streepjes niet', async () => {
+    await saveSettings(db, { prefix_invoice_simplified: 'FS-BELLA', prefix_invoice_simplified_hdb: 'FS-HDB' })
+    expect(db.data.settings[0].prefix_invoice_simplified_hdb).toBe('FS-HDB')
+    await expect(saveSettings(db, { prefix_invoice: 'FS BELLA' })).rejects.toThrow()
+    await expect(saveSettings(db, { prefix_invoice: 'FS-' })).rejects.toThrow()
+    await expect(saveSettings(db, { prefix_invoice: 'ABCDEFGHIJKLM' })).rejects.toThrow()
   })
 })
 

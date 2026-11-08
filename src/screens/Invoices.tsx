@@ -8,6 +8,7 @@ import { Empty, eur, fmtDate, Head, Modal, NumberField, Pill, SelectField, Tabs,
 import { tx } from '../i18n'
 import { INVOICE_TEXT, invoiceTitle } from '../domain/noteText'
 import { POS_CUSTOMER_NOTE } from '../domain/pos'
+import { imageSrc, issuerInfo, issuerOf, legalLine } from '../domain/issuers'
 
 const STATE = { betaald: ['Betaald', 'good'], open: ['Open', 'bill'], te_laat: ['Te laat', 'bad'] } as const
 
@@ -63,7 +64,7 @@ export function Invoices({ focus }: { focus?: string }) {
               return (
                 <tr key={i.id} className="click" onClick={() => go(`facturatie-${i.id}`)}>
                   <td><a className="pdf-ic" href={`#facturatie-${i.id}`} title={tx("Factuur {0} openen als PDF", i.number)} aria-label={tx("Factuur {0} openen als PDF", i.number)}><FileText size={18} /><span>PDF</span></a></td>
-                  <td><a className="rowlink" href={`#facturatie-${i.id}`}>{i.number}</a></td><td>{fmtDate(i.invoice_date)}</td><td>{c.company || c.name}</td>
+                  <td><a className="rowlink" href={`#facturatie-${i.id}`}>{i.number}</a>{i.issuer === 'hdb' && <> <Pill tone="info">HDB</Pill></>}</td><td>{fmtDate(i.invoice_date)}</td><td>{c.company || c.name}</td>
                   <td>{tx(i.kind[0].toUpperCase() + i.kind.slice(1))}</td><td className="num">{eur(i.total)}</td><td className="num">{i.deposit_settled ? eur(i.deposit_settled) : <span className="zero">–</span>}</td>
                   <td className="num">{eur(invoiceBalance(s, i))}</td><td>{fmtDate(i.due_date)}</td><td><Pill tone={tone}>{tx(label)}</Pill></td>
                 </tr>
@@ -115,8 +116,12 @@ export function InvoiceDetail({ id, autoPrint = false }: { id: string; autoPrint
   const o = s.sales_orders.find((x) => x.id === inv.sales_order_id)!
   const lines = s.invoice_lines.filter((l) => l.invoice_id === id)
   const co = s.settings[0]
-  const language = documentLanguage(co.language_invoice, inv.language)
+  // Eenvoudige factuur (kassa): eigen afdruktaal (standaard Spaans) en de gegevens en het logo van het uitgevende bedrijf.
+  const language = documentLanguage(inv.simplified ? co.language_invoice_simplified ?? 'es' : co.language_invoice, inv.language)
   const t = INVOICE_TEXT[language]
+  const issuer = inv.simplified ? issuerInfo(co, issuerOf(inv)) : null
+  const nif = issuer ? issuer.tax_id : co.tax_id
+  const base = import.meta.env.BASE_URL
   // Facturen van voor het artikelnummer op de factuurregel
   const articleOf = (dl: string | null) => articleNo(s, s.sales_order_lines.find((x) => x.id === s.delivery_lines.find((y) => y.id === dl)?.sales_order_line_id)?.product_id)
   const b = vatBreakdown(lines.map((l) => ({ total: l.line_total, vat_rate: l.vat_rate })))
@@ -133,21 +138,28 @@ export function InvoiceDetail({ id, autoPrint = false }: { id: string; autoPrint
   }
   return (
     <>
-      <Head title={inv.number} sub={<>{c.company || c.name} <Pill tone={tone}>{tx(label)}</Pill></>} back={{ href: '#facturatie', label: tx("Facturatie") }}>
+      <Head title={inv.number} sub={<>{c.company || c.name} <Pill tone={tone}>{tx(label)}</Pill>{issuer?.key === 'hdb' && <> <Pill tone="info">HDB</Pill></>}</>} back={{ href: '#facturatie', label: tx("Facturatie") }}>
         <a className="btn" href={`#orders-${o.id}`}>{tx("Naar")} {o.number}</a>
         {canPrint && <button className="btn" onClick={() => window.print()}>{tx("Afdrukken of PDF")}</button>}
         <button className="btn" onClick={() => setMailTo(mail?.to_email || c.email || '')}><Mail size={15} style={{ verticalAlign: -2, marginRight: 4 }} />{mail ? tx("Opnieuw mailen") : tx("Mailen")}</button>
         {balance > 0 && <button className="btn primary" onClick={() => { setAmount(balance); setPay(true) }}>{tx("Betaling registreren")}</button>}
       </Head>
       {mail && <div className="no-print" style={{ marginBottom: 12 }}><Pill tone={MAIL_STATE[mail.status][1]}>{tx(MAIL_STATE[mail.status][0], mail.to_email)}</Pill>{mail.status === 'failed' && mail.error && <span className="small muted"> {mail.error}</span>}</div>}
-      {!hasTaxId(co.tax_id) && <div className="note warn no-print" style={{ marginBottom: 12 }}>{tx("De QR-code op deze factuur klopt pas als het CIF is ingevuld onder Beheer.")}</div>}
+      {!hasTaxId(nif) && <div className="note warn no-print" style={{ marginBottom: 12 }}>{tx("De QR-code op deze factuur klopt pas als het CIF is ingevuld onder Beheer.")}</div>}
       <DocPaper language={language}>
         <div className="paper-top invoice-top">
+          {issuer ? (
+            <div className="issuer-head">
+              {issuer.logo ? <img className="issuer-logo" src={imageSrc(issuer.logo, base)} alt={issuer.name} /> : <h2 style={{ fontSize: '1.3rem' }}>{issuer.name}</h2>}
+              {(issuer.phone || issuer.email) && <div className="small muted">{[issuer.phone, issuer.email].filter(Boolean).join(', ')}</div>}
+            </div>
+          ) : (
           <div>
             <h2 style={{ fontSize: '1.3rem' }}>{co.company_name}</h2>
             <div className="small muted">{[co.address, `${co.postal_code} ${co.city}`.trim(), co.province, co.phone, co.email].filter(Boolean).join(', ')}<br />{t.tax}: {co.tax_id}</div>
           </div>
-          <TaxQr url={invoiceQrUrl({ nif: co.tax_id, number: inv.number, date: inv.invoice_date, total: inv.total }, IS_PRODUCTION)} />
+          )}
+          <TaxQr url={invoiceQrUrl({ nif, number: inv.number, date: inv.invoice_date, total: inv.total }, IS_PRODUCTION)} />
           <div style={{ textAlign: 'right' }}>
             <h1 style={{ fontSize: '1.45rem' }}>{invoiceTitle(t, inv)}</h1>
             <div className="strong">{inv.number}</div>
@@ -171,7 +183,12 @@ export function InvoiceDetail({ id, autoPrint = false }: { id: string; autoPrint
           {paid > 0 && <div><span>{t.paid}</span><span>−{eur(paid)}</span></div>}
           <div className="grand"><span>{t.due_amt}</span><span>{eur(balance)}</span></div>
         </div>
-        {(!inv.simplified || co.invoice_footer) && <p className="small muted" style={{ marginTop: 26, marginBottom: 0 }}>{!inv.simplified && <>{t.pay}: {co.iban}</>}{co.invoice_footer ? <>{!inv.simplified && <br />}{co.invoice_footer}</> : ''}</p>}
+        {!inv.simplified && <p className="small muted" style={{ marginTop: 26, marginBottom: 0 }}>{t.pay}: {co.iban}{co.invoice_footer ? <><br />{co.invoice_footer}</> : ''}</p>}
+        {issuer?.key === 'bella' && co.invoice_footer && <p className="small muted" style={{ marginTop: 26, marginBottom: 0 }}>{co.invoice_footer}</p>}
+        {issuer && <div className="issuer-foot">
+          {issuer.mark && <img src={imageSrc(issuer.mark, base)} alt="" />}
+          <span>{legalLine(issuer)}</span>
+        </div>}
       </DocPaper>
       {mailTo !== null && (
         <Modal title={tx("Factuur mailen")} onClose={() => setMailTo(null)} footer={<>

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Printer } from 'lucide-react'
 import { invoiceReport, periodRange, round2, todayISO, type ReportPeriod } from '../domain/calc'
 import { POS_CUSTOMER_NOTE } from '../domain/pos'
+import { issuerInfo, type Issuer } from '../domain/issuers'
 import type { Language } from '../data/types'
 import { tx } from '../i18n'
 import { go, useApp } from '../ui/app-context'
@@ -42,7 +43,9 @@ function InvoiceList({ kassa = false }: { kassa?: boolean }) {
   const [customFrom, setCustomFrom] = useState(`${today.slice(0, 7)}-01`)
   const [customTo, setCustomTo] = useState(today)
   const { from, to } = periodRange(period, today, customFrom, customTo)
-  const report = invoiceReport(s, from, to, kassa)
+  // Kassa: per bedrijf een eigen lijst (HDB valt buiten de boekhouding van Bella).
+  const [issuer, setIssuer] = useState<Issuer>('bella')
+  const report = invoiceReport(s, from, to, kassa, kassa ? issuer : undefined)
   const options: [ReportPeriod, string][] = [['maand', tx("Deze maand")], ['kwartaal', tx("Laatste 3 maanden")], ['jaar', tx("Dit jaar (YTD)")], ['vrij', tx("Van t/m")]]
   const company = s.settings[0]
   const language = company?.language_reports ?? 'nl'
@@ -68,6 +71,9 @@ function InvoiceList({ kassa = false }: { kassa?: boolean }) {
         <div className="chips">
           {options.map(([value, label]) => <button key={value} className={`chip${period === value ? ' on' : ''}`} aria-pressed={period === value} onClick={() => setPeriod(value)}>{label}</button>)}
         </div>
+        {kassa && <div className="chips" style={{ marginTop: 10 }}>
+          {(['bella', 'hdb'] as Issuer[]).map((k) => <button key={k} className={`chip${issuer === k ? ' on' : ''}`} aria-pressed={issuer === k} onClick={() => setIssuer(k)}>{k === 'hdb' ? `HDB · ${issuerInfo(company, 'hdb').name}` : `Bella · ${company?.company_name ?? ''}`}</button>)}
+        </div>}
         {period === 'vrij' && <div className="report-dates">
           <TextField label={tx("Van")} type="date" value={customFrom} onChange={setCustomFrom} />
           <TextField label={tx("T/m")} type="date" value={customTo} onChange={setCustomTo} />
@@ -75,7 +81,7 @@ function InvoiceList({ kassa = false }: { kassa?: boolean }) {
       </section>
       <DocPaper language={language}>
         <div className="paper-top">
-          <div><h2>{company?.company_name}</h2></div>
+          <div><h2>{kassa ? issuerInfo(company, issuer).name : company?.company_name}</h2>{kassa && <div className="small muted">CIF: {issuerInfo(company, issuer).tax_id}</div>}</div>
           <div style={{ textAlign: 'right' }}>
             <h1>{kassa ? t.titleKassa : t.title}</h1>
             <div className="small muted">{t.period(from ? fmtDate(from) : '–', to ? fmtDate(to) : '–')}</div>

@@ -4,7 +4,7 @@ import type { Session, SupabaseClient } from '@supabase/supabase-js'
 import { App } from './App'
 import { LocalDriver } from './data/localDriver'
 import { createSupabase, SupabaseDriver } from './data/supabaseDriver'
-import { renameOldSuppliers, restoreSettings, restoreSuppliers, seedDemo } from './domain/demo'
+import { renameOldSuppliers, restoreSettings, restoreSuppliers, seedDemo, upgradeSettings } from './domain/demo'
 import { importShowroom, importShowroomDetails, syncCatalogArticles } from './domain/services'
 import { AppProvider } from './ui/app-context'
 import { LogoFull } from './ui/kit'
@@ -35,6 +35,7 @@ const bootLocal = () => (localBoot ??= (async () => {
   const d = new LocalDriver()
   if (d.isEmpty) await seedDemo(d)
   await renameOldSuppliers(d)
+  await upgradeSettings(d)
   await loadCatalogFiles(d)
   return d
 })())
@@ -53,6 +54,7 @@ function LocalRoot() {
     await seedDemo(driver)
     await restoreSuppliers(driver, suppliers)
     await restoreSettings(driver, settings)
+    await upgradeSettings(driver)
     await loadCatalogFiles(driver)
     setVersion((v) => v + 1)
   }

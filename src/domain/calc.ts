@@ -344,9 +344,10 @@ export function periodRange(period: ReportPeriod, today: string, from = '', to =
 
 /** Facturen binnen de periode, op factuurnummer, met totalen. Lege grens betekent geen grens. */
 /** Factuuroverzicht. simplified: true = alleen facturas simplificadas (kassa), false = alleen gewone facturen, weglaten = alle. */
-export function invoiceReport(s: Snapshot, from: string, to: string, simplified?: boolean) {
+export function invoiceReport(s: Snapshot, from: string, to: string, simplified?: boolean, issuer?: 'bella' | 'hdb') {
   const invoices = s.invoices
     .filter((i) => simplified === undefined || !!i.simplified === simplified)
+    .filter((i) => !issuer || (i.issuer === 'hdb' ? 'hdb' : 'bella') === issuer)
     .filter((i) => { const day = i.invoice_date.slice(0, 10); return (!from || day >= from) && (!to || day <= to) })
     .sort((a, b) => a.number.localeCompare(b.number))
   const rows = invoices.map((invoice) => {

@@ -1,3 +1,4 @@
+import { HDB_DEFAULTS, settingsUpgrade } from './issuers'
 // Voorbeeldgegevens. Alles is verzonnen en wordt opgebouwd met dezelfde functies als de echte app,
 // zodat de voorbeeldsituatie altijd klopt. Datums lopen mee met vandaag.
 import { newId, type Driver } from '../data/driver'
@@ -36,6 +37,14 @@ export async function restoreSettings(db: Driver, previous: Settings | undefined
   await db.update('settings', 'default', patch)
 }
 
+/** Nieuwe instellingen voor de kassa met twee bedrijven aanvullen in een bestaande browseropslag. */
+export async function upgradeSettings(db: Driver) {
+  const [co] = await db.list('settings')
+  if (!co) return
+  const patch = settingsUpgrade(co)
+  if (Object.keys(patch).length) await db.update('settings', co.id, patch)
+}
+
 export async function restoreSuppliers(db: Driver, previous: Supplier[]) {
   const current = await db.list('suppliers')
   for (const { id: _id, ...old } of previous) {
@@ -52,7 +61,7 @@ export async function seedDemo(db: Driver, today = todayISO()) {
     id: 'default', company_name: 'Bella Outdoor and Furnishing', tax_id: '(CIF invullen in Beheer)', address: '(adres invullen in Beheer)',
     postal_code: '', city: 'Campoamor', province: 'Alicante', phone: '', email: '', iban: '(IBAN invullen in Beheer)',
     payment_days: 14, invoice_footer: '',
-    prefix_sales_order: 'VO', prefix_purchase: 'IO', prefix_receipt: 'OV', prefix_delivery: 'LV', prefix_invoice: 'F', prefix_transport: 'TR', prefix_proforma: 'PF', prefix_invoice_simplified: 'FS', language_reports: 'nl', delivery_note_mode: 'papier', shop_email: 'winkel@voorbeeld.test', language_purchase_order: 'nl', language_sales_order: 'klant', language_delivery_note: 'klant', language_invoice: 'klant',
+    prefix_sales_order: 'VO', prefix_purchase: 'IO', prefix_receipt: 'OV', prefix_delivery: 'LV', prefix_invoice: 'F', prefix_transport: 'TR', prefix_proforma: 'PF', prefix_invoice_simplified: 'FS-BELLA', prefix_invoice_simplified_hdb: 'FS-HDB', language_invoice_simplified: 'es', ...HDB_DEFAULTS, language_reports: 'nl', delivery_note_mode: 'papier', shop_email: 'winkel@voorbeeld.test', language_purchase_order: 'nl', language_sales_order: 'klant', language_delivery_note: 'klant', language_invoice: 'klant',
   }])
 
   const wh = (code: string, name: string, kind: Warehouse['kind'], city: string, receives = true): Warehouse => ({

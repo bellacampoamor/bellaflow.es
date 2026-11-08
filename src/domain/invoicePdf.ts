@@ -1,13 +1,31 @@
-import { PDFDocument, StandardFonts, type PDFFont, type PDFPage } from 'pdf-lib'
+import { PDFDocument, StandardFonts, type PDFFont, type PDFImage, type PDFPage } from 'pdf-lib'
 import qrcode from 'qrcode-generator'
 import type { Language, Snapshot } from '../data/types'
 import { articleNo, documentLanguage, invoiceBalance, invoiceQrUrl, IS_PRODUCTION, vatBreakdown } from './calc'
 import { DOC_MARK, INVOICE_TEXT, invoiceTitle } from './noteText'
 import { POS_CUSTOMER_NOTE } from './pos'
+import { imageSrc, issuerInfo, issuerOf, legalLine } from './issuers'
 import { A4, drawDocMark, INK, MARGIN, MUTED, safe, wrap, ymd } from './signedNotePdf'
 
 const LOCALE: Record<Language, string> = { es: 'es-ES', nl: 'nl-NL', en: 'en-GB' }
 const QR_SIZE = 85.04 // 30 mm, de kleinste toegestane maat (Orden HAC/1177/2024, art. 21)
+
+/** Logo of beeldmerk uit Beheer in de pdf: een upload (data-URL) of een standaardbestand. Lukt het niet, dan zonder afbeelding. */
+async function loadImage(doc: PDFDocument, src: string): Promise<PDFImage | null> {
+  if (!src) return null
+  try {
+    let bytes: Uint8Array
+    if (src.startsWith('data:')) {
+      const bin = atob(src.slice(src.indexOf(',') + 1))
+      bytes = Uint8Array.from(bin, (ch) => ch.charCodeAt(0))
+    } else {
+      const res = await fetch(imageSrc(src, import.meta.env.BASE_URL))
+      if (!res.ok) return null
+      bytes = new Uint8Array(await res.arrayBuffer())
+    }
+    return bytes[0] === 0x89 ? await doc.embedPng(bytes) : await doc.embedJpg(bytes)
+  } catch { return null }
+}
 
 /** Bouwt de factuur als pdf (zelfde inhoud als de afgedrukte factuur, met de QR van 30 x 30 mm) en geeft die terug als base64. */
 export async function invoicePdf(s: Snapshot, invoiceId: string) {
@@ -15,7 +33,10 @@ export async function invoicePdf(s: Snapshot, invoiceId: string) {
   const o = s.sales_orders.find((x) => x.id === inv.sales_order_id)!
   const c = s.customers.find((x) => x.id === inv.customer_id)!
   const co = s.settings[0]
-  const language = documentLanguage(co?.language_invoice, inv.language)
+  // Eenvoudige factuur (kassa): eigen afdruktaal en het uitgevende bedrijf (Bella of HDB).
+  const language = documentLanguage(inv.simplified ? co?.language_invoice_simplified ?? 'es' : co?.language_invoice, inv.language)
+  const issuer = inv.simplified ? issuerInfo(co, issuerOf(inv)) : null
+  const nif = issuer ? issuer.tax_id : co?.tax_id ?? ''
   const t = INVOICE_TEXT[language]
   const money = (n: number) => new Intl.NumberFormat(LOCALE[language], { style: 'currency', currency: 'EUR' }).format(n || 0)
   const lines = s.invoice_lines.filter((l) => l.invoice_id === inv.id)
@@ -29,7 +50,9 @@ export async function invoicePdf(s: Snapshot, invoiceId: string) {
   let page: PDFPage = doc.addPage(A4)
   const width = A4[0] - MARGIN * 2
   let y = A4[1] - MARGIN
-  const room = (need: number) => { if (y - need < MARGIN + 30) { page = doc.addPage(A4); y = A4[1] - MARGIN } }
+  // Ruimte onderaan voor het beeldmerk met de juridische gegevens van het uitgevende bedrijf.
+  const foot = issuer ? 95 : 30
+  const room = (need: number) => { if (y - need < MARGIN + foot) { page = doc.addPage(A4); y = A4[1] - MARGIN } }
   const text = (s0: string, x: number, yy: number, o0: { font?: PDFFont; size?: number; color?: typeof INK; right?: boolean } = {}) => {
     const font = o0.font ?? regular, size = o0.size ?? 9, str = safe(s0)
     page.drawText(str, { x: o0.right ? x - font.widthOfTextAtSize(str, size) : x, y: yy, size, font, color: o0.color ?? INK })
@@ -41,13 +64,24 @@ export async function invoicePdf(s: Snapshot, invoiceId: string) {
 
   // Kop: bedrijf links, QR in het midden, titel rechts.
   const top = y
-  block(co?.company_name ?? '', MARGIN, 200, { font: bold, size: 14 })
-  block([co?.address, `${co?.postal_code ?? ''} ${co?.city ?? ''}`.trim(), co?.province, co?.phone, co?.email].filter(Boolean).join(', '), MARGIN, 200, { color: MUTED, size: 8.5 })
-  block(`${t.tax}: ${co?.tax_id ?? ''}`, MARGIN, 200, { color: MUTED, size: 8.5 })
+  const logo = issuer ? await loadImage(doc, issuer.logo) : null
+  const mark = issuer ? await loadImage(doc, issuer.mark) : null
+  if (issuer) {
+    if (logo) {
+      const h = Math.min(52, (logo.height / logo.width) * 180), w = (logo.width / logo.height) * h
+      page.drawImage(logo, { x: MARGIN, y: y - h, width: w, height: h })
+      y -= h + 6
+    } else block(issuer.name, MARGIN, 200, { font: bold, size: 14 })
+    if (issuer.phone || issuer.email) block([issuer.phone, issuer.email].filter(Boolean).join(', '), MARGIN, 200, { color: MUTED, size: 8.5 })
+  } else {
+    block(co?.company_name ?? '', MARGIN, 200, { font: bold, size: 14 })
+    block([co?.address, `${co?.postal_code ?? ''} ${co?.city ?? ''}`.trim(), co?.province, co?.phone, co?.email].filter(Boolean).join(', '), MARGIN, 200, { color: MUTED, size: 8.5 })
+    block(`${t.tax}: ${co?.tax_id ?? ''}`, MARGIN, 200, { color: MUTED, size: 8.5 })
+  }
   const leftEnd = y
 
   const qr = qrcode(0, 'M')
-  qr.addData(invoiceQrUrl({ nif: co?.tax_id ?? '', number: inv.number, date: inv.invoice_date, total: inv.total }, IS_PRODUCTION), 'Byte')
+  qr.addData(invoiceQrUrl({ nif, number: inv.number, date: inv.invoice_date, total: inv.total }, IS_PRODUCTION), 'Byte')
   qr.make()
   const n = qr.getModuleCount(), cell = QR_SIZE / n, qx = MARGIN + 215, qy = top - 12 - QR_SIZE
   text('QR tributario:', qx, top - 8, { size: 7.5, color: MUTED })
@@ -90,7 +124,7 @@ export async function invoicePdf(s: Snapshot, invoiceId: string) {
     const desc = wrap(l.description, regular, 8.5, col.qty - 40 - col.desc)
     const codeLines = wrap(code, regular, 8, col.desc - col.code - 6)
     const h = Math.max(desc.length, codeLines.length) * 11 + 4
-    if (y - h < MARGIN + 30) { page = doc.addPage(A4); y = A4[1] - MARGIN; head() }
+    if (y - h < MARGIN + foot) { page = doc.addPage(A4); y = A4[1] - MARGIN; head() }
     const yy = y - 9
     codeLines.forEach((s0, i) => text(s0, col.code, yy - i * 11, { size: 8 }))
     desc.forEach((s0, i) => text(s0, col.desc, yy - i * 11, { size: 8.5 }))
@@ -120,7 +154,20 @@ export async function invoicePdf(s: Snapshot, invoiceId: string) {
   y -= 18
   room(30)
   if (!inv.simplified) block(`${t.pay}: ${co?.iban ?? ''}`, MARGIN, width, { color: MUTED, size: 8.5 })
-  if (co?.invoice_footer) block(co.invoice_footer, MARGIN, width, { color: MUTED, size: 8.5 })
+  if (co?.invoice_footer && issuer?.key !== 'hdb') block(co.invoice_footer, MARGIN, width, { color: MUTED, size: 8.5 })
+
+  // Eenvoudige factuur: klein beeldmerk midden onderaan met de juridische gegevens van het uitgevende bedrijf, op elke pagina.
+  if (issuer) {
+    const lines0 = wrap(safe(legalLine(issuer)), regular, 7.5, width)
+    for (const pg of doc.getPages()) {
+      let yy = 44 + (lines0.length - 1) * 9
+      lines0.forEach((l) => { pg.drawText(l, { x: (A4[0] - regular.widthOfTextAtSize(l, 7.5)) / 2, y: yy, size: 7.5, font: regular, color: MUTED }); yy -= 9 })
+      if (mark) {
+        const h = 26, w = (mark.width / mark.height) * h
+        pg.drawImage(mark, { x: (A4[0] - w) / 2, y: 56 + (lines0.length - 1) * 9, width: w, height: h })
+      }
+    }
+  }
 
   await drawDocMark(doc, regular, safe(DOC_MARK[language]))
   return { name: `${invoiceTitle(t, inv)} ${inv.number}.pdf`, base64: await doc.saveAsBase64() }

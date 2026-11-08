@@ -9,6 +9,7 @@ import { CustomerFields } from './OrderForm'
 import { tx } from '../i18n'
 import { isSpanishSupplier } from '../domain/calc'
 import { ROLE_LABEL, roleOf, STAFF_ROLES } from '../domain/staff'
+import { HDB_DEFAULTS, imageSrc } from '../domain/issuers'
 
 // Geen tabblad Producten: de producten zijn de artikelen uit de catalogi van de leveranciers, met een eigen artikelnummer.
 type Tab = 'magazijnen' | 'leveranciers' | 'toeslagen' | 'klanten' | 'medewerkers' | 'bedrijf'
@@ -104,9 +105,36 @@ export function Admin() {
         <div className="form-grid">
           <SelectField label={tx("Inkooporder")} value={co.language_purchase_order ?? 'nl'} onChange={(v: Language) => setCo({ ...co, language_purchase_order: v })} options={[{ value: 'nl', label: tx("Nederlands") }, { value: 'en', label: tx("Engels") }, { value: 'es', label: tx("Spaans") }]} />
           <SelectField label={tx("Lijsten (factuuroverzicht)")} value={co.language_reports ?? 'nl'} onChange={(v: Language) => setCo({ ...co, language_reports: v })} options={[{ value: 'nl', label: tx("Nederlands") }, { value: 'en', label: tx("Engels") }, { value: 'es', label: tx("Spaans") }]} />
-          {([['language_sales_order', tx("Verkooporder")], ['language_delivery_note', tx("Afleverbon")], ['language_invoice', tx("Factuur")]] as const).map(([field, label]) => (
-            <SelectField key={field} label={label} value={co[field] ?? 'klant'} onChange={(v: DocumentLanguage) => setCo({ ...co, [field]: v })} options={[{ value: 'klant', label: tx("Taal van de klant") }, { value: 'es', label: tx("Spaans") }, { value: 'en', label: tx("Engels") }, { value: 'nl', label: tx("Nederlands") }]} />
+          {([['language_sales_order', tx("Verkooporder")], ['language_delivery_note', tx("Afleverbon")], ['language_invoice', tx("Factuur")], ['language_invoice_simplified', tx("Eenvoudige factuur (kassa)")]] as const).map(([field, label]) => (
+            <SelectField key={field} label={label} value={co[field] ?? (field === 'language_invoice_simplified' ? 'es' : 'klant')} onChange={(v: DocumentLanguage) => setCo({ ...co, [field]: v })} options={[{ value: 'klant', label: tx("Taal van de klant") }, { value: 'es', label: tx("Spaans") }, { value: 'en', label: tx("Engels") }, { value: 'nl', label: tx("Nederlands") }]} />
           ))}
+        </div>
+        </section>
+        </div>
+        <div className="cols-even same-height">
+        <section className="panel section">
+        <h2>{tx("Kassa: Bella Outdoor and Furnishing")}</h2>
+        <p className="small muted">{tx("Logo linksboven en klein beeldmerk onderaan op de eenvoudige factuur van Bella. De bedrijfsgegevens komen uit Bedrijfsgegevens hierboven.")}</p>
+        <div className="form-grid">
+          <LogoUpload label={tx("Logo")} value={co.logo_bella ?? ''} onChange={(v) => setCo({ ...co, logo_bella: v })} max={1000} />
+          <LogoUpload label={tx("Beeldmerk")} value={co.mark_bella ?? ''} onChange={(v) => setCo({ ...co, mark_bella: v })} max={300} />
+        </div>
+        </section>
+        <section className="panel section">
+        <h2>{tx("Kassa: Handmade Bali Treasures SL (HDB)")}</h2>
+        <p className="small muted">{tx("Tweede bedrijf aan de kassa (HomeDecoBali), buiten de boekhouding van Bella. Deze gegevens staan onderaan de eenvoudige factuur van HDB.")}</p>
+        <div className="form-grid">
+          <TextField className="span-2" label={tx("Juridische naam")} value={co.hdb_company_name ?? HDB_DEFAULTS.hdb_company_name} onChange={(v) => setCo({ ...co, hdb_company_name: v })} />
+          <TextField label={tx("CIF")} value={co.hdb_tax_id ?? HDB_DEFAULTS.hdb_tax_id} onChange={(v) => setCo({ ...co, hdb_tax_id: v })} />
+          <TextField className="span-2" label={tx("Adres")} value={co.hdb_address ?? HDB_DEFAULTS.hdb_address} onChange={(v) => setCo({ ...co, hdb_address: v })} />
+          <TextField label={tx("Postcode")} value={co.hdb_postal_code ?? HDB_DEFAULTS.hdb_postal_code} onChange={(v) => setCo({ ...co, hdb_postal_code: v })} />
+          <TextField label={tx("Plaats")} value={co.hdb_city ?? HDB_DEFAULTS.hdb_city} onChange={(v) => setCo({ ...co, hdb_city: v })} />
+          <TextField label={tx("Provincie")} value={co.hdb_province ?? HDB_DEFAULTS.hdb_province} onChange={(v) => setCo({ ...co, hdb_province: v })} />
+          <TextField label={tx("Land")} value={co.hdb_country ?? HDB_DEFAULTS.hdb_country} onChange={(v) => setCo({ ...co, hdb_country: v })} />
+          <TextField label={tx("Telefoon")} value={co.hdb_phone ?? ''} onChange={(v) => setCo({ ...co, hdb_phone: v })} />
+          <TextField label={tx("E-mail")} value={co.hdb_email ?? ''} onChange={(v) => setCo({ ...co, hdb_email: v })} />
+          <LogoUpload label={tx("Logo")} value={co.logo_hdb ?? HDB_DEFAULTS.logo_hdb} onChange={(v) => setCo({ ...co, logo_hdb: v })} max={1000} />
+          <LogoUpload label={tx("Beeldmerk")} value={co.mark_hdb ?? HDB_DEFAULTS.mark_hdb} onChange={(v) => setCo({ ...co, mark_hdb: v })} max={300} />
         </div>
         </section>
         </div>
@@ -114,8 +142,8 @@ export function Admin() {
         <h2>{tx("Documentnummers")}</h2>
         <p className="small muted">{tx("Nummers bestaan uit voorvoegsel, jaar en teller. Een nieuw voorvoegsel geldt voor nieuwe documenten en de teller loopt door. Bestaande documenten houden hun nummer.")}</p>
         <div className="form-grid">
-          {([['prefix_purchase', tx("Inkooporders")], ['prefix_delivery', tx("Afleverbonnen")], ['prefix_proforma', tx("Proforma's")], ['prefix_invoice', tx("Facturen")], ['prefix_invoice_simplified', tx("Facturas simplificadas (kassa)")], ['prefix_sales_order', tx("Verkooporders")], ['prefix_receipt', tx("Goederenontvangsten")], ['prefix_transport', tx("Transporten")]] as [PrefixField, string][]).map(([field, label]) => (
-            <TextField key={field} label={label} value={co[field] ?? ''} onChange={(v) => setCo({ ...co, [field]: v.toUpperCase() })} hint={tx("Bijvoorbeeld {0}", `${co[field] || (field === 'prefix_proforma' ? 'PF' : field === 'prefix_invoice_simplified' ? 'FS' : '…')}-${new Date().getFullYear()}-0001`)} />
+          {([['prefix_purchase', tx("Inkooporders")], ['prefix_delivery', tx("Afleverbonnen")], ['prefix_proforma', tx("Proforma's")], ['prefix_invoice', tx("Facturen")], ['prefix_invoice_simplified', tx("Eenvoudige fact Bella")], ['prefix_invoice_simplified_hdb', tx("Eenvoudige fact HDB")], ['prefix_sales_order', tx("Verkooporders")], ['prefix_receipt', tx("Goederenontvangsten")], ['prefix_transport', tx("Transporten")]] as [PrefixField, string][]).map(([field, label]) => (
+            <TextField key={field} label={label} value={co[field] ?? ''} onChange={(v) => setCo({ ...co, [field]: v.toUpperCase() })} hint={tx("Bijvoorbeeld {0}", `${co[field] || (field === 'prefix_proforma' ? 'PF' : field === 'prefix_invoice_simplified' ? 'FS-BELLA' : field === 'prefix_invoice_simplified_hdb' ? 'FS-HDB' : '…')}-${new Date().getFullYear()}-0001`)} />
           ))}
         </div>
         </section>
@@ -245,5 +273,45 @@ function Surcharges() {
         })}</tbody>
       </table></div>
     </section>
+  )
+}
+
+/**
+ * Logo of beeldmerk uploaden voor de eenvoudige factuur. De afbeelding wordt in de browser verkleind (max. `max` pixels)
+ * en als PNG (data-URL) bij de instellingen bewaard; na upload is hij direct zichtbaar. Opslaan gaat met de knop Opslaan.
+ */
+function LogoUpload({ label, value, onChange, max }: { label: string; value: string; onChange: (v: string) => void; max: number }) {
+  const { toast } = useApp()
+  const input = useRef<HTMLInputElement>(null)
+  const pick = (file: File | undefined) => {
+    if (!file) return
+    if (!/^image\/(png|jpeg|webp|svg\+xml)$/.test(file.type)) return toast(tx("Kies een afbeelding (PNG, JPG, WebP of SVG)."), true)
+    const reader = new FileReader()
+    reader.onload = () => {
+      const img = new Image()
+      img.onload = () => {
+        const scale = Math.min(1, max / Math.max(img.naturalWidth || max, img.naturalHeight || max))
+        const canvas = document.createElement('canvas')
+        canvas.width = Math.max(1, Math.round((img.naturalWidth || max) * scale))
+        canvas.height = Math.max(1, Math.round((img.naturalHeight || max) * scale))
+        canvas.getContext('2d')!.drawImage(img, 0, 0, canvas.width, canvas.height)
+        onChange(canvas.toDataURL('image/png'))
+      }
+      img.onerror = () => toast(tx("Deze afbeelding kan niet worden gelezen."), true)
+      img.src = String(reader.result)
+    }
+    reader.readAsDataURL(file)
+  }
+  return (
+    <div className="field span-2 logo-upload">
+      <span className="lbl">{label}</span>
+      <div className="logo-preview">{value ? <img src={imageSrc(value, import.meta.env.BASE_URL)} alt={label} /> : <span className="small muted">{tx("Nog geen afbeelding")}</span>}</div>
+      <div className="actions">
+        <button type="button" className="btn sm" onClick={() => input.current?.click()}>{value ? tx("Andere afbeelding") : tx("Uploaden")}</button>
+        {value && <button type="button" className="btn sm" onClick={() => onChange('')}>{tx("Verwijderen")}</button>}
+        <span className="small muted">{tx("Wordt bewaard met Opslaan.")}</span>
+      </div>
+      <input ref={input} type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" hidden onChange={(e) => { pick(e.target.files?.[0]); e.target.value = '' }} />
+    </div>
   )
 }

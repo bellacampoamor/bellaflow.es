@@ -75,7 +75,8 @@ export function overview(s: Snapshot, today = todayISO()) {
 
   // Geld
   const monthStart = `${today.slice(0, 7)}-01`
-  const monthInvoices = s.invoices.filter((i) => i.invoice_date >= monthStart && i.invoice_date <= today)
+  // HDB-facturen (kassa) vallen buiten de boekhouding van Bella en tellen hier niet mee.
+  const monthInvoices = s.invoices.filter((i) => i.issuer !== 'hdb' && i.invoice_date >= monthStart && i.invoice_date <= today)
   const money = {
     revenueMonth: round2(monthInvoices.reduce((n, i) => n + i.total, 0)),
     invoicesMonth: monthInvoices.length,

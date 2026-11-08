@@ -5,8 +5,15 @@ export interface Settings {
   province: string; phone: string; email: string; iban: string
   payment_days: number; invoice_footer: string
   prefix_sales_order: string; prefix_purchase: string; prefix_receipt: string; prefix_delivery: string; prefix_invoice: string; prefix_transport: string; prefix_proforma: string
-  /** Voorvoegsel van de facturas simplificadas (kassa), standaard FS. */
-  prefix_invoice_simplified?: string
+  /** Voorvoegsel van de eenvoudige facturen (kassa) van Bella, standaard FS-BELLA, en van HDB, standaard FS-HDB. */
+  prefix_invoice_simplified?: string; prefix_invoice_simplified_hdb?: string
+  /** Afdruktaal van de eenvoudige factuur (kassa), standaard Spaans. */
+  language_invoice_simplified?: DocumentLanguage
+  /** Logo (linksboven) en beeldmerk (klein onderaan) op de eenvoudige factuur: data-URL of pad in public/. */
+  logo_bella?: string; mark_bella?: string; logo_hdb?: string; mark_hdb?: string
+  /** Tweede bedrijf aan de kassa: Handmade Bali Treasures SL (HomeDecoBali), buiten de boekhouding van Bella. */
+  hdb_company_name?: string; hdb_trade_name?: string; hdb_tax_id?: string; hdb_address?: string; hdb_postal_code?: string; hdb_city?: string
+  hdb_province?: string; hdb_country?: string; hdb_phone?: string; hdb_email?: string
   delivery_note_mode: 'papier' | 'digitaal'; shop_email: string; language_purchase_order: Language; language_reports: Language; language_sales_order: DocumentLanguage; language_delivery_note: DocumentLanguage; language_invoice: DocumentLanguage
 }
 export interface Warehouse {
@@ -164,6 +171,8 @@ export interface Invoice {
   base_amount: number; vat_amount: number; total: number; deposit_settled: number; language: Language
   /** Factura simplificada (kassa), met een eigen nummerreeks. */
   simplified?: boolean
+  /** Uitgevend bedrijf van een eenvoudige factuur: Bella (standaard) of HDB. */
+  issuer?: 'bella' | 'hdb'
 }
 export interface InvoiceLine {
   id: string; invoice_id: string; delivery_line_id: string | null; article_number: string; description: string; qty: number

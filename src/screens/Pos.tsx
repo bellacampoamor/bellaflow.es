@@ -8,7 +8,8 @@ import { findArticleByCode, posCheckout, saveRecord } from '../domain/services'
 import { loadSnapshot } from '../data/driver'
 import { ArticleSearch, type ArticlePick } from '../ui/ArticleSearch'
 import { go, useApp } from '../ui/app-context'
-import { Combo, Empty, eur, Field, Head, Modal, NumInput, TextField } from '../ui/kit'
+import { Check, Combo, Empty, eur, Field, Head, Modal, NumInput, TextField } from '../ui/kit'
+import { issuerInfo } from '../domain/issuers'
 import { CustomerFields } from './OrderForm'
 import { tx } from '../i18n'
 
@@ -70,11 +71,15 @@ export function Pos() {
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState('')
   const [newCust, setNewCust] = useState<(Omit<Customer, 'id'> & { id?: string }) | null>(null)
-  const [done, setDone] = useState<{ orderNumber: string; invoiceId: string; invoiceNumber: string; change: number; note: string; corrected: number } | null>(null)
+  const [done, setDone] = useState<{ issuer: string; orderNumber: string; invoiceId: string; invoiceNumber: string; change: number; note: string; corrected: number } | null>(null)
   const [focusKey, setFocusKey] = useState<string | null>(null)
+  // Welk bedrijf de eenvoudige factuur uitgeeft: Bella (standaard) of HDB (Handmade Bali Treasures SL). Na elke verkoop weer Bella.
+  const [hdb, setHdb] = useState(false)
   const scanRef = useRef<HTMLInputElement>(null)
 
   const shop = posWarehouse(s.warehouses)
+  const bella = issuerInfo(s.settings[0], 'bella'), hdbInfo = issuerInfo(s.settings[0], 'hdb')
+  const issuer = hdb ? hdbInfo : bella
   const productOf = (id?: string) => (id ? s.products.find((p) => p.id === id) : undefined)
   const customers = useMemo(() => s.customers.filter((c) => c.notes !== POS_CUSTOMER_NOTE), [s.customers])
   const custOptions = useMemo(() => customers.map((c) => ({ value: c.id, label: c.company || c.name, sub: [c.company ? c.name : '', c.city, c.phone].filter(Boolean).join(', '), search: `${c.email} ${c.tax_id}` })), [customers])
@@ -163,15 +168,15 @@ export function Pos() {
     let result: Awaited<ReturnType<typeof posCheckout>> | null = null
     let note = ''
     const ok = await run(async (d) => {
-      result = await posCheckout(d, { salesperson_id: me.id, customer_id: customerId || null, date: todayISO(), lines, payment: { method, reference }, invoiceEmail: mailTo })
+      result = await posCheckout(d, { salesperson_id: me.id, customer_id: customerId || null, date: todayISO(), lines, payment: { method, reference }, invoiceEmail: mailTo, issuer: hdb ? 'hdb' : 'bella' })
       const snap = await loadSnapshot(d)
       const m = snap.email_outbox.find((x) => x.kind === 'factuur' && x.invoice_id === result!.invoiceId)
       note = !m ? '' : m.status === 'sent' ? tx("Gemaild naar {0}.", m.to_email) : m.status === 'demo' ? tx("Testversie: de mail naar {0} is niet echt verstuurd.", m.to_email) : tx("Mailen is mislukt: {0}", m.error)
     })
     if (!ok || !result) return
     const r = result as Awaited<ReturnType<typeof posCheckout>>
-    setDone({ orderNumber: r.orderNumber, invoiceId: r.invoiceId, invoiceNumber: r.invoiceNumber, change, note, corrected: r.corrections.filter((x) => !x.dummy).length })
-    setLines([]); setCustomerId(''); setReference(''); setReceived(0); setMail(null); setMethod('pin'); setMessage('')
+    setDone({ issuer: issuer.name, orderNumber: r.orderNumber, invoiceId: r.invoiceId, invoiceNumber: r.invoiceNumber, change, note, corrected: r.corrections.filter((x) => !x.dummy).length })
+    setLines([]); setCustomerId(''); setReference(''); setReceived(0); setMail(null); setMethod('pin'); setMessage(''); setHdb(false)
   }
 
   const saveCustomer = async () => {
@@ -223,7 +228,7 @@ export function Pos() {
               <div className="pos-done-icon"><CheckIcon size={28} /></div>
               <div style={{ flex: 1 }}>
                 <h2 style={{ margin: 0 }}>{tx("Afgerekend: factura simplificada {0}", done.invoiceNumber)}</h2>
-                <div className="small muted">{tx("Verkooporder {0}, afgeleverd en betaald.", done.orderNumber)} {done.note}</div>
+                <div className="small muted">{tx("Factuur van {0}.", done.issuer)} {tx("Verkooporder {0}, afgeleverd en betaald.", done.orderNumber)} {done.note}</div>
                 {done.change > 0 && <div className="pos-change">{tx("Wisselgeld")}: {eur(done.change)}</div>}
                 {done.corrected > 0 && <div className="small warn-text"><AlertTriangle size={13} /> {tx("Voorraadverschil bijgeboekt voor {0} artikel(en); zie Voorraad, mutaties.", done.corrected)}</div>}
               </div>
@@ -270,6 +275,11 @@ export function Pos() {
         </div>
 
         <div className="stack pos-side">
+          <section className={`panel pos-issuer${hdb ? ' hdb' : ''}`}>
+            <div className="small muted">{tx("Factuur van")}</div>
+            <div className="strong">{issuer.name}</div>
+            <Check label={tx("Factuur van HDB ({0})", hdbInfo.name)} checked={hdb} onChange={setHdb} />
+          </section>
           <section className="panel">
             <div className="pos-total"><span>{tx("Totaal")}</span><strong>{eur(totals.total)}</strong></div>
             <div className="totals" style={{ maxWidth: 'none' }}>
