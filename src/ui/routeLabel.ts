@@ -32,6 +32,7 @@ export function routeLabel(hash: string, s?: Snapshot | null): string {
       return num(s?.invoices, param.replace(/^print-/, '')) || tx("Facturatie")
     case 'rapportage':
       return param === 'kassa' ? tx("Factuuroverzicht kassa") : param === 'leverbaar' ? tx("Leverbaar") : tx("Factuuroverzicht")
+    case 'kassabeheer': return param === 'dagafsluiting' ? tx("Dagafsluiting") : tx("Factuuroverzicht kassa")
     case 'archief': return tx("Archief")
     case 'catalogi': return tx("Catalogi")
     case 'voorraad': return tx("Voorraad")

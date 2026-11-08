@@ -22,6 +22,7 @@ import { SalesOrderDocument } from './screens/SalesOrderDocument'
 import { PurchaseOrderDocument, PurchaseOrdersDocument } from './screens/PurchaseOrderDocument'
 import { PurchaseDispatch } from './screens/PurchaseDispatch'
 import { Reports } from './screens/Reports'
+import { KassaAdmin } from './screens/KassaAdmin'
 import { Catalogs } from './screens/Catalogs'
 import { Pos } from './screens/Pos'
 import { getLanguage, setLanguage, tx, type UiLanguage } from './i18n'
@@ -153,7 +154,7 @@ export function App({ onResetDemo, onSignOut }: { onResetDemo?: () => Promise<vo
 // Klein, bescheiden menu Beheer (besluit Rick 8 november 2026): Rapportage, Catalogi en Instellingen
 // (het vroegere Beheer). Het uitklapvlak staat vast in beeld, zodat het op een telefoon niet wordt afgesneden
 // door het zijwaarts scrollende menu.
-const ADMIN_SCREENS = ['rapportage', 'archief', 'catalogi', 'instellingen', 'beheer']
+const ADMIN_SCREENS = ['rapportage', 'archief', 'kassabeheer', 'catalogi', 'instellingen', 'beheer']
 function AdminMenu({ screen }: { screen: string }) {
   const [open, setOpen] = useState(false)
   const [pos, setPos] = useState({ top: 0, right: 0 })
@@ -196,6 +197,7 @@ function AdminMenu({ screen }: { screen: string }) {
       {open && (
         <div ref={box} className="admin-pop" role="menu" style={{ top: pos.top, right: pos.right }}>
           {item('#rapportage', screen === 'rapportage' || screen === 'archief', <FileBarChart size={16} />, tx("Rapportage"))}
+          {item('#kassabeheer', screen === 'kassabeheer', <Calculator size={16} />, tx("Kassa"))}
           {item('#catalogi', screen === 'catalogi', <BookOpen size={16} />, tx("Catalogi"))}
           {item('#instellingen', screen === 'instellingen' || screen === 'beheer', <Settings2 size={16} />, tx("Instellingen"))}
         </div>
@@ -219,7 +221,9 @@ function Route({ screen, param }: { screen: string; param: string }) {
       return <OrderDetail id={param} />
     case 'levering': return param.startsWith('print-') ? <DeliveryNote key={param} id={param.slice(6)} autoPrint /> : param.startsWith('archief-') ? <DeliveryNote key={param} id={param.slice(8)} fromArchive /> : param.startsWith('naar-') ? <Deliveries key={param} focus={param.slice(5)} /> : param ? <DeliveryNote key={param} id={param} /> : <Deliveries />
     case 'facturatie': return param.startsWith('print-') ? <InvoiceDetail key={param} id={param.slice(6)} autoPrint /> : param.startsWith('naar-') ? <Invoices key={param} focus={param.slice(5)} /> : param ? <InvoiceDetail key={param} id={param} /> : <Invoices />
-    case 'rapportage': return <Reports key={param} tab={param === 'leverbaar' ? 'leverbaar' : param === 'kassa' ? 'kassa' : 'facturen'} />
+    // Het factuuroverzicht van de kassa staat sinds 8 november 2026 onder Beheer > Kassa; de oude link werkt nog.
+    case 'rapportage': return param === 'kassa' ? <KassaAdmin key={param} tab="overzicht" /> : <Reports key={param} tab={param === 'leverbaar' ? 'leverbaar' : 'facturen'} />
+    case 'kassabeheer': return <KassaAdmin key={param} tab={param === 'dagafsluiting' ? 'dagafsluiting' : 'overzicht'} />
     case 'archief': return <Reports tab="archief" />
     case 'catalogi': return <Catalogs supplierId={param} />
     case 'voorraad': return <Stock />

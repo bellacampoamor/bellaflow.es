@@ -11,7 +11,7 @@ import { Archive } from './Archive'
 import { Deliverable } from './Deliverable'
 import { useNavUi } from '../ui/nav'
 
-export type ReportTab = 'facturen' | 'kassa' | 'leverbaar' | 'archief'
+export type ReportTab = 'facturen' | 'leverbaar' | 'archief'
 
 // Vaste teksten van de afgedrukte lijst, in de taal uit Instellingen.
 type ListText = { title: string; titleKassa: string; period: (from: string, to: string) => string; empty: string; number: string; date: string; order: string; customer: string; base: string; vat: string; total: string; sum: (n: number) => string; method: string; noCustomer: string; methods: Record<string, string>; perMethod: string }
@@ -25,19 +25,19 @@ const T: Record<Language, ListText> = {
 export function Reports({ tab }: { tab: ReportTab }) {
   return (
     <>
-      <Head title={tx("Rapportage")} sub={tab === 'archief' ? tx("Alle afgeleverde leveringen met hun afleverbonnen en facturen.") : tab === 'leverbaar' ? tx("Welke verkooporders kunnen worden afgeleverd met wat er binnen is.") : tab === 'kassa' ? tx("Facturas simplificadas van de kassa, met de betaalwijze. Afdrukken of PDF maakt er een A4-document van.") : tx("Kies een periode. Afdrukken of PDF maakt er een A4-document van.")}>
-        {(tab === 'facturen' || tab === 'kassa') && <button className="btn primary" onClick={() => window.print()}><Printer size={16} />{tx("Afdrukken of PDF")}</button>}
+      <Head title={tx("Rapportage")} sub={tab === 'archief' ? tx("Alle afgeleverde leveringen met hun afleverbonnen en facturen.") : tab === 'leverbaar' ? tx("Welke verkooporders kunnen worden afgeleverd met wat er binnen is.") : tx("Kies een periode. Afdrukken of PDF maakt er een A4-document van.")}>
+        {tab === 'facturen' && <button className="btn primary" onClick={() => window.print()}><Printer size={16} />{tx("Afdrukken of PDF")}</button>}
       </Head>
       <div className="no-print">
-        <Tabs<ReportTab> value={tab} onChange={(v) => go(v === 'archief' ? 'archief' : v === 'leverbaar' ? 'rapportage-leverbaar' : v === 'kassa' ? 'rapportage-kassa' : 'rapportage')} tabs={[{ value: 'facturen', label: tx("Factuuroverzicht") }, { value: 'kassa', label: tx("Factuuroverzicht kassa") }, { value: 'leverbaar', label: tx("Leverbaar") }, { value: 'archief', label: tx("Archief") }]} />
+        <Tabs<ReportTab> value={tab} onChange={(v) => go(v === 'archief' ? 'archief' : v === 'leverbaar' ? 'rapportage-leverbaar' : 'rapportage')} tabs={[{ value: 'facturen', label: tx("Factuuroverzicht") }, { value: 'leverbaar', label: tx("Leverbaar") }, { value: 'archief', label: tx("Archief") }]} />
       </div>
-      {tab === 'facturen' ? <InvoiceList key="f" /> : tab === 'kassa' ? <InvoiceList key="k" kassa /> : tab === 'leverbaar' ? <Deliverable /> : <Archive />}
+      {tab === 'facturen' ? <InvoiceList key="f" /> : tab === 'leverbaar' ? <Deliverable /> : <Archive />}
     </>
   )
 }
 
-/** Gewone facturen, of met kassa alleen de facturas simplificadas van de kassa (eigen nummerreeks), met betaalwijze. */
-function InvoiceList({ kassa = false }: { kassa?: boolean }) {
+/** Gewone facturen, of met kassa alleen de facturas simplificadas van de kassa (eigen nummerreeks), met betaalwijze. Kassa staat onder Beheer > Kassa. */
+export function InvoiceList({ kassa = false }: { kassa?: boolean }) {
   const { s } = useApp()
   const today = todayISO()
   const [period, setPeriod] = useNavUi<ReportPeriod>('period', 'maand')

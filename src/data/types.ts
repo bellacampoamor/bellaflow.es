@@ -185,6 +185,22 @@ export interface Payment {
   method: 'pin' | 'contant' | 'overboeking' | 'online'; amount: number; paid_at: string; reference: string
 }
 export interface NumberSeries { id: string; last_number: number }
+/** Dagafsluiting en kasopmaak van de kassa, per bedrijf en per dag. Na afsluiten niet meer te wijzigen. */
+export interface CashClosing {
+  id: string; issuer: 'bella' | 'hdb'; business_date: string; salesperson_id: string
+  /** Wisselgeld bij de start: wat bij de vorige afsluiting in de kas bleef. */
+  opening_float: number
+  /** Volgens het systeem op die dag ontvangen: contant, pin, overig (overboeking, online). */
+  cash_sales: number; card_sales: number; other_sales: number
+  /** Eenvoudige facturen van die dag: aantal, eerste en laatste nummer, totalen. */
+  invoice_count: number; first_invoice: string; last_invoice: string; base_amount: number; vat_amount: number; total: number
+  /** Telling per coupure ("50": 3, "0.2": 4). */
+  counts: Record<string, number>
+  expected_cash: number; counted_cash: number; difference: number
+  /** Pintotaal volgens de pinautomaat; leeg = niet ingevuld. */
+  card_terminal: number | null
+  deposited: number; kept_in_drawer: number; note: string; created_at: string
+}
 
 export interface Snapshot {
   settings: Settings[]; warehouses: Warehouse[]; suppliers: Supplier[]; customers: Customer[]; salespeople: Salesperson[]; products: Product[]; supplier_showroom_items: SupplierShowroomItem[]; supplier_showroom_details: SupplierShowroomDetail[]
@@ -194,7 +210,7 @@ export interface Snapshot {
   goods_receipts: GoodsReceipt[]; goods_receipt_lines: GoodsReceiptLine[]; stock_movements: StockMovement[]
   deliveries: Delivery[]; delivery_lines: DeliveryLine[]; invoices: Invoice[]; invoice_lines: InvoiceLine[]
   payments: Payment[]; number_series: NumberSeries[]; email_outbox: OutgoingEmail[]
-  purchase_order_dispatches: PurchaseOrderDispatch[]
+  purchase_order_dispatches: PurchaseOrderDispatch[]; cash_closings: CashClosing[]
 }
 export type TableName = keyof Snapshot
 
@@ -203,5 +219,5 @@ export const TABLES: TableName[] = [
   'settings', 'warehouses', 'suppliers', 'customers', 'salespeople', 'products', 'supplier_showroom_items', 'supplier_showroom_details', 'sales_orders', 'sales_order_lines',
   'order_events', 'purchase_orders', 'purchase_order_lines', 'transports', 'inbound_shipments', 'inbound_shipment_lines',
   'goods_receipts', 'goods_receipt_lines', 'stock_movements', 'deliveries', 'delivery_lines', 'invoices',
-  'invoice_lines', 'payments', 'number_series', 'email_outbox', 'purchase_order_dispatches',
+  'invoice_lines', 'payments', 'number_series', 'email_outbox', 'purchase_order_dispatches', 'cash_closings',
 ]

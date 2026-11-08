@@ -12,6 +12,7 @@ import { articleNumberFromScan } from './scan'
 import { INVOICE_MAIL } from './noteText'
 import { isStaffRole } from './staff'
 import { ISSUER_SERIES, type Issuer } from './issuers'
+import { cashCount, closingOn, closingsOf, countedTotal, DENOMINATIONS, denomKey, kassaDay, openingFloat, type CashCounts } from './cashClosing'
 import { DUMMY_SKU, missingCustomerData, POS_CUSTOMER_NOTE, posShortfalls, posTotals, posWarehouse, SIMPLIFIED_LIMIT, type PosLine } from './pos'
 import { isSendable, PURCHASE_MAIL, purchaseJsonFileName, purchaseOrdersJson, toBase64 } from './purchaseExport'
 import { articleSources, categoryName, priceWithSurcharge, finishArticleSync, missingSupplierCodes, planArticleSync } from './articles'
@@ -1244,4 +1245,59 @@ export async function sendPurchaseOrders(db: Driver, input: { date: string; ids:
     results.push({ supplierId: f.supplierId, ids: f.ids, to, status })
   }
   return results
+}
+
+// Dagafsluiting en kasopmaak ------------------------------------------------------
+
+export interface CashCloseInput {
+  issuer: Issuer; date: string; salesperson_id: string; counts: CashCounts
+  /** Naar de bank of de kluis; de rest blijft als wisselgeld in de kas. */
+  deposited: number
+  /** Pintotaal volgens de pinautomaat; null = niet ingevuld. */
+  card_terminal: number | null
+  note: string
+  /** Vandaag, voor de controle op een dag in de toekomst (tests). */
+  today?: string
+}
+
+/**
+ * Sluit de kassadag af voor één bedrijf: legt vast wat het systeem van die dag weet, de telling per coupure,
+ * het verschil, wat is afgestort en wat als wisselgeld in de kas blijft. Daarna niet meer te wijzigen.
+ */
+export async function closeCashDay(db: Driver, input: CashCloseInput) {
+  const s = await loadSnapshot(db)
+  const today = input.today ?? todayISO()
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(input.date)) fail(tx("Kies een dag."))
+  if (input.date > today) fail(tx("Een dag in de toekomst kun je niet afsluiten."))
+  const staff = s.salespeople.find((p) => p.id === input.salesperson_id && p.is_active)
+  if (!staff) fail(tx("Kies wie de kas heeft opgemaakt."))
+  if (closingOn(s, input.issuer, input.date)) fail(tx("Deze dag is voor dit bedrijf al afgesloten."))
+  const later = closingsOf(s, input.issuer).find((c) => c.business_date > input.date)
+  if (later) fail(tx("Er is al een latere dag afgesloten ({0}). Een eerdere dag kan daarna niet meer worden afgesloten.", later.business_date))
+  const counts: CashCounts = {}
+  for (const d of DENOMINATIONS) {
+    const n = input.counts[denomKey(d)] ?? 0
+    if (!Number.isFinite(n) || n < 0 || Math.floor(n) !== n) fail(tx("Vul per coupure een heel aantal van 0 of meer in."))
+    if (n > 0) counts[denomKey(d)] = n
+  }
+  const counted = countedTotal(counts)
+  const deposited = round2(input.deposited || 0)
+  if (deposited < 0) fail(tx("Het afgestorte bedrag kan niet negatief zijn."))
+  if (deposited > counted) fail(tx("Je kunt niet meer afstorten dan er geteld is."))
+  if (input.card_terminal !== null && (!Number.isFinite(input.card_terminal) || input.card_terminal < 0)) fail(tx("Het pintotaal kan niet negatief zijn."))
+  const day = kassaDay(s, input.issuer, input.date)
+  const opening = openingFloat(s, input.issuer, input.date)
+  const calc = cashCount({ opening, cash: day.cash, counted, deposited, card: day.card, cardTerminal: input.card_terminal === null ? null : round2(input.card_terminal) })
+  const note = input.note.trim()
+  if ((calc.difference !== 0 || (calc.cardDifference ?? 0) !== 0) && !note) fail(tx("Er is een verschil. Licht het toe voordat je afsluit."))
+  const id = newId()
+  await db.insert('cash_closings', [{
+    id, issuer: input.issuer, business_date: input.date, salesperson_id: staff!.id, opening_float: opening,
+    cash_sales: day.cash, card_sales: day.card, other_sales: day.other,
+    invoice_count: day.count, first_invoice: day.first, last_invoice: day.last, base_amount: day.base, vat_amount: day.vat, total: day.total,
+    counts, expected_cash: calc.expected, counted_cash: counted, difference: calc.difference,
+    card_terminal: input.card_terminal === null ? null : round2(input.card_terminal),
+    deposited, kept_in_drawer: calc.kept, note, created_at: new Date().toISOString(),
+  }])
+  return id
 }

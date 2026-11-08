@@ -844,3 +844,27 @@ tr.focus-flash td { animation: focus-flash-cell 2.6s ease-out; }
   .report-top > :first-child { flex: 1 1 40%; min-width: 0; }
   .report-top > :last-child { flex: 0 1 60%; }
 }
+
+/* Beheer > Kassa > Dagafsluiting (8 november 2026): kasopmaak per bedrijf en de dagstaat op A4. */
+.close-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; align-items: start; }
+.close-grid > .panel { margin: 0; }
+.close-lines { display: grid; gap: 6px; }
+.close-line { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.close-line.strong { font-weight: 700; }
+.close-line input, .close-line select { width: 150px; max-width: 55%; text-align: right; }
+.close-line select { text-align: left; width: 200px; }
+.cash-count { display: grid; gap: 4px; }
+.cash-row { display: grid; grid-template-columns: 1fr 90px 110px; align-items: center; gap: 10px; }
+.cash-row input { text-align: right; }
+.cash-row.note-row .cash-denom { font-weight: 600; }
+.cash-row.cash-sum { border-top: 2px solid var(--fg); padding-top: 6px; margin-top: 4px; font-weight: 700; }
+.diff-ok { color: var(--good); font-weight: 700; }
+.diff-bad { color: var(--bad); font-weight: 700; }
+tr.close-hist { cursor: pointer; }
+tr.close-hist:hover td { background: var(--sell); }
+tr.close-hist.on td { background: var(--selected); color: var(--on-selected); }
+.daystate-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+.daystate h3 { margin: 16px 0 6px; font-size: 10.5pt; }
+.daystate-denoms { break-inside: avoid; }
+.daystate-sign { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-top: 40px; font-size: 9pt; break-inside: avoid; }
+.sign-line { border-bottom: 1px solid #40444E; height: 36px; margin-bottom: 4px; }
