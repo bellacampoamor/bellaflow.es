@@ -432,10 +432,13 @@ body.route-dragging, body.route-dragging * { cursor: grabbing !important; user-s
 .convert-line td:first-child { padding-left: 44px; }
 
 /* Schermtaal */
-.lang-pick { display: inline-flex; align-items: center; gap: 4px; padding: 0 0 0 10px; border-radius: 8px; color: var(--muted); }
-.lang-pick:hover { background: var(--surface-2); color: var(--fg); }
-.lang-pick select { width: auto; min-height: 34px; padding: 4px 4px; border: 0; background: transparent; color: inherit; font: 500 .9rem var(--body); cursor: pointer; }
-.lang-pick select option { background: var(--surface); color: var(--fg); }
+.lang-flags { display: inline-flex; align-items: center; gap: 2px; padding: 0 4px; }
+.lang-flag { display: inline-flex; padding: 4px; border: 0; border-radius: 6px; background: transparent; cursor: pointer; opacity: .45; filter: saturate(.6); transition: opacity .15s, filter .15s; }
+.lang-flag svg { display: block; width: 18px; height: 12px; border-radius: 2px; box-shadow: 0 0 0 1px var(--line-strong); }
+.lang-flag:hover { opacity: .85; filter: none; background: var(--surface-2); }
+.lang-flag.on { opacity: 1; filter: none; }
+.lang-flag.on svg { box-shadow: 0 0 0 1.5px var(--brand-line); }
+.lang-flag:focus-visible { outline: 2px solid var(--brand-line); outline-offset: 1px; }
 
 /* Rapportage */
 .report-filter { display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: flex-end; justify-content: space-between; }

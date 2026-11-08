@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { BookOpen, Calculator, ChevronDown, FileBarChart, Headset, Languages, Moon, Store, Sun, Boxes, ClipboardList, FileText, LayoutDashboard, PackageCheck, Settings2, ShoppingCart, Truck, Warehouse as WarehouseIcon } from 'lucide-react'
+import { BookOpen, Calculator, ChevronDown, FileBarChart, Headset, Moon, Store, Sun, Boxes, ClipboardList, FileText, LayoutDashboard, PackageCheck, Settings2, ShoppingCart, Truck, Warehouse as WarehouseIcon } from 'lucide-react'
 import { parseOrdersParam } from './domain/orderFlow'
 import { parsePurchasesParam } from './domain/purchaseFlow'
 import { useApp, useHash } from './ui/app-context'
@@ -25,6 +25,7 @@ import { Reports } from './screens/Reports'
 import { Catalogs } from './screens/Catalogs'
 import { Pos } from './screens/Pos'
 import { getLanguage, setLanguage, tx, type UiLanguage } from './i18n'
+import { LangFlags } from './ui/LangFlags'
 
 // Twee gescheiden processen, elk met eigen menu-optie. Er is geen stappenbalk meer: het spoor per
 // verkooporder en inkooporder toont de flow in detail, met de fasekoppen vast bij scrollen (besluit Rick 7 november 2026).
@@ -105,7 +106,7 @@ export function App({ onResetDemo, onSignOut }: { onResetDemo?: () => Promise<vo
               return <a key={k} href={`#${F.home}`} className={flow === k ? 'on flow-link' : 'flow-link'}><Icon size={16} />{tx(F.label)}</a>
             })}
             <a href="#voorraad" className={screen === 'voorraad' ? 'on' : ''}><Boxes size={16} />{tx("Voorraad")}</a>
-            <label className="lang-pick"><Languages size={16} /><select aria-label={tx("Taal")} value={language} onChange={(e) => switchLanguage(e.target.value as UiLanguage)}><option value="nl">Nederlands</option><option value="en">English</option><option value="es">Español</option></select></label>
+            <LangFlags value={language} onChange={switchLanguage} label={tx("Taal")} />
             <button className="btn-toggle" onClick={toggleTheme}>{theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}{theme === 'dark' ? tx("Dagstand") : tx("Nachtstand")}</button>
             <button className="btn-toggle" aria-label={tx("Contact en support")} title={tx("Contact en support")} onClick={() => setSupport(true)}><Headset size={18} /></button>
             <AdminMenu screen={screen} />
