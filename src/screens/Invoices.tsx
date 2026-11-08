@@ -121,6 +121,7 @@ export function InvoiceDetail({ id, autoPrint = false }: { id: string; autoPrint
   const t = INVOICE_TEXT[language]
   const issuer = inv.simplified ? issuerInfo(co, issuerOf(inv)) : null
   const nif = issuer ? issuer.tax_id : co.tax_id
+  const bellaLogo = issuerInfo(co, 'bella').logo
   const base = import.meta.env.BASE_URL
   // Facturen van voor het artikelnummer op de factuurregel
   const articleOf = (dl: string | null) => articleNo(s, s.sales_order_lines.find((x) => x.id === s.delivery_lines.find((y) => y.id === dl)?.sales_order_line_id)?.product_id)
@@ -158,8 +159,9 @@ export function InvoiceDetail({ id, autoPrint = false }: { id: string; autoPrint
               {(issuer.phone || issuer.email) && <div className="small muted">{[issuer.phone, issuer.email].filter(Boolean).join(', ')}</div>}
             </div>
           ) : (
-          <div>
-            <h2 style={{ fontSize: '1.3rem' }}>{co.company_name}</h2>
+          <div className="issuer-head">
+            {/* Gewone factuur van Bella: het logo van Bella linksboven (besluit Rick 8 november 2026), daaronder adres en CIF. */}
+            {bellaLogo ? <img className="issuer-logo" src={imageSrc(bellaLogo, base)} alt={co.company_name} /> : <h2 style={{ fontSize: '1.3rem' }}>{co.company_name}</h2>}
             <div className="small muted">{[co.address, `${co.postal_code} ${co.city}`.trim(), co.province, co.phone, co.email].filter(Boolean).join(', ')}<br />{t.tax}: {co.tax_id}</div>
           </div>
           )}

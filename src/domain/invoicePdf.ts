@@ -76,7 +76,13 @@ export async function invoicePdf(s: Snapshot, invoiceId: string) {
     } else block(issuer.name, MARGIN, 200, { font: bold, size: 14 })
     if (issuer.phone || issuer.email) block([issuer.phone, issuer.email].filter(Boolean).join(', '), MARGIN, 200, { color: MUTED, size: 8.5 })
   } else {
-    block(co?.company_name ?? '', MARGIN, 200, { font: bold, size: 14 })
+    // Gewone factuur van Bella: logo linksboven, daaronder adres en CIF.
+    const bellaLogo = await loadImage(doc, issuerInfo(co, 'bella').logo)
+    if (bellaLogo) {
+      const h = Math.min(52, (bellaLogo.height / bellaLogo.width) * 180), w = (bellaLogo.width / bellaLogo.height) * h
+      page.drawImage(bellaLogo, { x: MARGIN, y: y - h, width: w, height: h })
+      y -= h + 6
+    } else block(co?.company_name ?? '', MARGIN, 200, { font: bold, size: 14 })
     block([co?.address, `${co?.postal_code ?? ''} ${co?.city ?? ''}`.trim(), co?.province, co?.phone, co?.email].filter(Boolean).join(', '), MARGIN, 200, { color: MUTED, size: 8.5 })
     block(`${t.tax}: ${co?.tax_id ?? ''}`, MARGIN, 200, { color: MUTED, size: 8.5 })
   }
