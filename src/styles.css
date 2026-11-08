@@ -790,3 +790,22 @@ tr.focus-flash td { animation: focus-flash-cell 2.6s ease-out; }
 .admin-pop a { display: flex; gap: 9px; align-items: center; padding: 8px 11px; border-radius: 7px; color: var(--fg); text-decoration: none; font-weight: 500; font-size: .92rem; }
 .admin-pop a:hover { background: var(--surface-2); }
 .admin-pop a.on { background: var(--surface-2); color: var(--heading); font-weight: 600; }
+
+/* Rapportage: op het scherm een lijst in de stijl van de site; het A4-document alleen bij afdrukken. */
+.print-only { display: none; }
+.report-screen-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 14px; margin-bottom: 12px; }
+.report-screen-head h2 { font-size: 1.15rem; margin: 0; }
+.report-methods { margin: 18px 0 0 auto; width: min(320px, 100%); display: grid; gap: 4px; break-inside: avoid; }
+.report-methods > div { display: flex; justify-content: space-between; gap: 16px; }
+.report-methods > div:not(:first-child) { border-bottom: 1px solid var(--line); padding-bottom: 4px; }
+@media print {
+  .print-only { display: block; }
+  /* Past altijd op A4 staand: vaste breedte, klant en kolomkoppen lopen door op een volgende regel. */
+  .report-doc { width: 100%; font-size: 8pt; }
+  .report-doc th, .report-doc td { padding: 4px 4px; }
+  .report-doc td { white-space: nowrap; }
+  .report-doc td.report-customer { white-space: normal; min-width: 30mm; }
+  .report-top { flex-wrap: nowrap; }
+  .report-top > :first-child { flex: 1 1 40%; min-width: 0; }
+  .report-top > :last-child { flex: 0 1 60%; }
+}

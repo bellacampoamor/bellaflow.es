@@ -14,7 +14,7 @@ export interface Settings {
   /** Tweede bedrijf aan de kassa: Handmade Bali Treasures SL (HomeDecoBali), buiten de boekhouding van Bella. */
   hdb_company_name?: string; hdb_trade_name?: string; hdb_tax_id?: string; hdb_address?: string; hdb_postal_code?: string; hdb_city?: string
   hdb_province?: string; hdb_country?: string; hdb_phone?: string; hdb_email?: string
-  delivery_note_mode: 'papier' | 'digitaal'; shop_email: string; language_purchase_order: Language; language_reports: Language; language_sales_order: DocumentLanguage; language_delivery_note: DocumentLanguage; language_invoice: DocumentLanguage
+  delivery_note_mode: 'papier' | 'digitaal'; shop_email: string; language_purchase_order: Language; language_lists: ListLanguage; language_sales_order: DocumentLanguage; language_delivery_note: DocumentLanguage; language_invoice: DocumentLanguage
 }
 export interface Warehouse {
   id: string; code: string; name: string; kind: 'winkel' | 'magazijn' | 'extern'
@@ -33,6 +33,8 @@ export interface Supplier {
 }
 export type Language = 'es' | 'nl' | 'en'
 export type DocumentLanguage = Language | 'klant'
+/** Taal van lijsten (Rapportage): standaard de schermtaal, tenzij onder Instellingen een vaste taal gekozen is. */
+export type ListLanguage = Language | 'scherm'
 export interface Customer {
   id: string; kind: 'particulier' | 'zakelijk'; name: string; company: string; tax_id: string
   email: string; phone: string; language: Language; address: string; postal_code: string

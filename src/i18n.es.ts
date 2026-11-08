@@ -1480,4 +1480,7 @@ export const es: Record<string, string> = {
   "Uploaden": "Subir",
   "Wordt bewaard met Opslaan.": "Se guarda con Guardar.",
   "Een voorvoegsel bestaat uit maximaal 12 letters of cijfers, zonder spaties; een streepje mag ertussen (zoals FS-BELLA).": "Un prefijo tiene como máximo 12 letras o cifras, sin espacios; se permite un guion en medio (como FS-BELLA).",
+  "Schermtaal": "Idioma de la pantalla",
+  "Kies een periode. Afdrukken of PDF maakt er een A4-document van.": "Elija un periodo. Imprimir o PDF lo convierte en un documento A4.",
+  "Facturas simplificadas van de kassa, met de betaalwijze. Afdrukken of PDF maakt er een A4-document van.": "Facturas simplificadas del TPV, con la forma de pago. Imprimir o PDF lo convierte en un documento A4.",
 }

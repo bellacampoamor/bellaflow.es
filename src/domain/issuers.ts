@@ -1,6 +1,6 @@
 // Kassa met twee bedrijven: een factura simplificada komt van Bella Outdoor and Furnishing of van
 // Handmade Bali Treasures SL (HomeDecoBali, HDB). HDB valt buiten de boekhouding van Bella.
-import type { Invoice, Settings } from '../data/types'
+import type { Invoice, Language, ListLanguage, Settings } from '../data/types'
 
 export type Issuer = 'bella' | 'hdb'
 export const ISSUERS: Issuer[] = ['bella', 'hdb']
@@ -73,8 +73,13 @@ export function settingsUpgrade(co: Partial<Settings>): Partial<Settings> {
   if (!co.prefix_invoice_simplified || co.prefix_invoice_simplified === 'FS') patch.prefix_invoice_simplified = 'FS-BELLA'
   if (co.prefix_invoice_simplified_hdb === undefined) patch.prefix_invoice_simplified_hdb = 'FS-HDB'
   if (co.language_invoice_simplified === undefined) patch.language_invoice_simplified = 'es'
+  // Lijsten volgen voortaan de schermtaal, tenzij er bewust een vaste taal gekozen wordt (besluit Rick 8 november 2026).
+  if (co.language_lists === undefined) patch.language_lists = 'scherm'
   // Nog nooit een logo voor Bella ingesteld: de aangeleverde logo's. Bewust verwijderd (leeg) blijft leeg.
   for (const [k, v] of Object.entries(BELLA_DEFAULTS)) if ((co as Record<string, unknown>)[k] === undefined) (patch as Record<string, unknown>)[k] = v
   for (const [k, v] of Object.entries(HDB_DEFAULTS)) if ((co as Record<string, unknown>)[k] === undefined) (patch as Record<string, unknown>)[k] = v
   return patch
 }
+
+/** Taal van een lijst: met 'scherm' (of niets ingesteld) de schermtaal, anders de vaste taal uit Instellingen. */
+export const listLanguage = (setting: ListLanguage | undefined | null, screen: Language): Language => (!setting || setting === 'scherm' ? screen : setting)

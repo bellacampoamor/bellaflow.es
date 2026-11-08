@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react'
 import { Plus } from 'lucide-react'
-import type { Customer, DocumentLanguage, Language, Salesperson, Settings, Supplier, Warehouse } from '../data/types'
+import type { Customer, DocumentLanguage, Language, ListLanguage, Salesperson, Settings, Supplier, Warehouse } from '../data/types'
 import { saveRecord, saveSettings, saveStaff, saveSupplier, saveSupplierSurcharge, type PrefixField } from '../domain/services'
 import { priceWithSurcharge } from '../domain/articles'
 import { useApp } from '../ui/app-context'
@@ -104,7 +104,7 @@ export function Admin() {
         <p className="small muted">{tx("Kies per document in welke taal het wordt afgedrukt. Productnamen blijven zoals ze zijn ingevoerd.")}</p>
         <div className="form-grid">
           <SelectField label={tx("Inkooporder")} value={co.language_purchase_order ?? 'nl'} onChange={(v: Language) => setCo({ ...co, language_purchase_order: v })} options={[{ value: 'nl', label: tx("Nederlands") }, { value: 'en', label: tx("Engels") }, { value: 'es', label: tx("Spaans") }]} />
-          <SelectField label={tx("Lijsten (factuuroverzicht)")} value={co.language_reports ?? 'nl'} onChange={(v: Language) => setCo({ ...co, language_reports: v })} options={[{ value: 'nl', label: tx("Nederlands") }, { value: 'en', label: tx("Engels") }, { value: 'es', label: tx("Spaans") }]} />
+          <SelectField label={tx("Lijsten (factuuroverzicht)")} value={co.language_lists ?? 'scherm'} onChange={(v: ListLanguage) => setCo({ ...co, language_lists: v })} options={[{ value: 'scherm', label: tx("Schermtaal") }, { value: 'nl', label: tx("Nederlands") }, { value: 'en', label: tx("Engels") }, { value: 'es', label: tx("Spaans") }]} />
           {([['language_sales_order', tx("Verkooporder")], ['language_delivery_note', tx("Afleverbon")], ['language_invoice', tx("Factuur")], ['language_invoice_simplified', tx("Eenvoudige factuur (kassa)")]] as const).map(([field, label]) => (
             <SelectField key={field} label={label} value={co[field] ?? (field === 'language_invoice_simplified' ? 'es' : 'klant')} onChange={(v: DocumentLanguage) => setCo({ ...co, [field]: v })} options={[{ value: 'klant', label: tx("Taal van de klant") }, { value: 'es', label: tx("Spaans") }, { value: 'en', label: tx("Engels") }, { value: 'nl', label: tx("Nederlands") }]} />
           ))}

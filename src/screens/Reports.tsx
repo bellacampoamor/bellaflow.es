@@ -2,9 +2,9 @@ import { useState } from 'react'
 import { Printer } from 'lucide-react'
 import { invoiceReport, periodRange, round2, todayISO, type ReportPeriod } from '../domain/calc'
 import { POS_CUSTOMER_NOTE } from '../domain/pos'
-import { issuerInfo, type Issuer } from '../domain/issuers'
+import { issuerInfo, listLanguage, type Issuer } from '../domain/issuers'
 import type { Language } from '../data/types'
-import { tx } from '../i18n'
+import { getLanguage, tx } from '../i18n'
 import { go, useApp } from '../ui/app-context'
 import { DocPaper, Empty, eur, fmtDate, Head, Tabs, TextField } from '../ui/kit'
 import { Archive } from './Archive'
@@ -24,7 +24,7 @@ const T: Record<Language, ListText> = {
 export function Reports({ tab }: { tab: ReportTab }) {
   return (
     <>
-      <Head title={tx("Rapportage")} sub={tab === 'archief' ? tx("Alle afgeleverde leveringen met hun afleverbonnen en facturen.") : tab === 'leverbaar' ? tx("Welke verkooporders kunnen worden afgeleverd met wat er binnen is.") : tab === 'kassa' ? tx("Facturas simplificadas van de kassa, met de betaalwijze. Kies een periode en druk de lijst af.") : tx("Kies een periode en druk de lijst af.")}>
+      <Head title={tx("Rapportage")} sub={tab === 'archief' ? tx("Alle afgeleverde leveringen met hun afleverbonnen en facturen.") : tab === 'leverbaar' ? tx("Welke verkooporders kunnen worden afgeleverd met wat er binnen is.") : tab === 'kassa' ? tx("Facturas simplificadas van de kassa, met de betaalwijze. Afdrukken of PDF maakt er een A4-document van.") : tx("Kies een periode. Afdrukken of PDF maakt er een A4-document van.")}>
         {(tab === 'facturen' || tab === 'kassa') && <button className="btn primary" onClick={() => window.print()}><Printer size={16} />{tx("Afdrukken of PDF")}</button>}
       </Head>
       <div className="no-print">
@@ -48,8 +48,9 @@ function InvoiceList({ kassa = false }: { kassa?: boolean }) {
   const report = invoiceReport(s, from, to, kassa, kassa ? issuer : undefined)
   const options: [ReportPeriod, string][] = [['maand', tx("Deze maand")], ['kwartaal', tx("Laatste 3 maanden")], ['jaar', tx("Dit jaar (YTD)")], ['vrij', tx("Van t/m")]]
   const company = s.settings[0]
-  const language = company?.language_reports ?? 'nl'
-  const t = T[language]
+  // Op het scherm altijd de schermtaal; het afgedrukte document de taal uit Instellingen (standaard ook de schermtaal).
+  const screen = getLanguage()
+  const docLanguage = listLanguage(company?.language_lists, screen)
   const posCustomers = new Set(s.customers.filter((c) => c.notes === POS_CUSTOMER_NOTE).map((c) => c.id))
   const isPosCustomer = (id: string) => posCustomers.has(id)
   // Betaalwijze per factuur; niet (volledig) betaald telt als Open.
@@ -65,6 +66,44 @@ function InvoiceList({ kassa = false }: { kassa?: boolean }) {
     if (open > 0) sums.set('open', round2((sums.get('open') ?? 0) + open))
   }
   const byMethod = [...sums.entries()]
+  const name = kassa ? issuerInfo(company, issuer).name : company?.company_name
+  const taxId = kassa ? issuerInfo(company, issuer).tax_id : ''
+
+  /** De tabel zelf, in de taal t; met paper als A4-document, anders in de stijl van de site. */
+  const table = (t: ListText, paper: boolean) => (
+    <>
+      {report.rows.length === 0 && <Empty>{t.empty}</Empty>}
+      {report.rows.length > 0 && <div className={paper ? 'table-wrap flush' : 'table-wrap'}><table className={paper ? 'report-table report-doc' : 'report-table'}>
+        <thead><tr><th>{t.number}</th><th>{t.date}</th><th>{t.order}</th><th>{t.customer}</th>{kassa && <th>{t.method}</th>}<th className="num">{t.base}</th><th className="num">{t.vat}</th><th className="num">{t.total}</th></tr></thead>
+        <tbody>
+          {report.rows.map(({ invoice: i, order, customer }) => (
+          <tr key={i.id}>
+            <td>{paper ? i.number : <a className="rowlink" href={`#facturatie-${i.id}`}>{i.number}</a>}</td>
+            <td>{fmtDate(i.invoice_date)}</td>
+            <td>{order?.number}</td>
+            <td className="report-customer">{kassa && isPosCustomer(i.customer_id) ? t.noCustomer : customer}</td>
+            {kassa && <td>{methodOf(i.id).map((m) => t.methods[m] ?? m).join(', ')}</td>}
+            <td className="num">{eur(i.base_amount)}</td>
+            <td className="num">{eur(i.vat_amount)}</td>
+            <td className="num">{eur(i.total)}</td>
+          </tr>
+          ))}
+          <tr className="report-total">
+            <td colSpan={kassa ? 5 : 4}>{t.sum(report.rows.length)}</td>
+            <td className="num">{eur(report.base)}</td>
+            <td className="num">{eur(report.vat)}</td>
+            <td className="num">{eur(report.total)}</td>
+          </tr>
+        </tbody>
+      </table></div>}
+      {kassa && report.rows.length > 0 && <div className="report-methods">
+        <div className="small muted">{t.perMethod}</div>
+        {byMethod.map(([m, n]) => <div key={m}><span>{t.methods[m] ?? m}</span><span className="num">{eur(n)}</span></div>)}
+      </div>}
+    </>
+  )
+  const ts = T[screen]
+  const td = T[docLanguage]
   return (
     <div className="stack">
       <section className="panel no-print report-filter">
@@ -79,44 +118,27 @@ function InvoiceList({ kassa = false }: { kassa?: boolean }) {
           <TextField label={tx("T/m")} type="date" value={customTo} onChange={setCustomTo} />
         </div>}
       </section>
-      <DocPaper language={language}>
-        <div className="paper-top">
-          <div><h2>{kassa ? issuerInfo(company, issuer).name : company?.company_name}</h2>{kassa && <div className="small muted">CIF: {issuerInfo(company, issuer).tax_id}</div>}</div>
-          <div style={{ textAlign: 'right' }}>
-            <h1>{kassa ? t.titleKassa : t.title}</h1>
-            <div className="small muted">{t.period(from ? fmtDate(from) : '–', to ? fmtDate(to) : '–')}</div>
-          </div>
+      {/* Op het scherm: een gewone lijst in de stijl van de site, in de schermtaal. */}
+      <section className="panel no-print">
+        <div className="report-screen-head">
+          <h2>{kassa ? ts.titleKassa : ts.title}</h2>
+          <span className="small muted">{name}{taxId ? ` · CIF ${taxId}` : ''} · {ts.period(from ? fmtDate(from) : '–', to ? fmtDate(to) : '–')}</span>
         </div>
-        {report.rows.length === 0 && <Empty>{t.empty}</Empty>}
-        {report.rows.length > 0 && <div className="table-wrap flush"><table className="report-table">
-          <thead><tr><th>{t.number}</th><th>{t.date}</th><th>{t.order}</th><th>{t.customer}</th>{kassa && <th>{t.method}</th>}<th className="num">{t.base}</th><th className="num">{t.vat}</th><th className="num">{t.total}</th></tr></thead>
-          <tbody>
-            {report.rows.map(({ invoice: i, order, customer }) => (
-            <tr key={i.id}>
-              <td><a className="rowlink" href={`#facturatie-${i.id}`}>{i.number}</a></td>
-              <td>{fmtDate(i.invoice_date)}</td>
-              <td>{order?.number}</td>
-              <td>{kassa && isPosCustomer(i.customer_id) ? t.noCustomer : customer}</td>
-              {kassa && <td>{methodOf(i.id).map((m) => t.methods[m] ?? m).join(', ')}</td>}
-              <td className="num">{eur(i.base_amount)}</td>
-              <td className="num">{eur(i.vat_amount)}</td>
-              <td className="num">{eur(i.total)}</td>
-            </tr>
-            ))}
-            <tr className="report-total">
-              <td colSpan={kassa ? 5 : 4}>{t.sum(report.rows.length)}</td>
-              <td className="num">{eur(report.base)}</td>
-              <td className="num">{eur(report.vat)}</td>
-              <td className="num">{eur(report.total)}</td>
-            </tr>
-          </tbody>
-
-        </table></div>}
-        {kassa && report.rows.length > 0 && <div className="totals" style={{ marginTop: 18 }}>
-          <div className="small muted"><span>{t.perMethod}</span><span /></div>
-          {byMethod.map(([m, n]) => <div key={m}><span>{t.methods[m] ?? m}</span><span>{eur(n)}</span></div>)}
-        </div>}
-      </DocPaper>
+        {table(ts, false)}
+      </section>
+      {/* Alleen bij afdrukken: het A4-document, in de taal uit Instellingen. */}
+      <div className="print-only">
+        <DocPaper language={docLanguage}>
+          <div className="paper-top report-top">
+            <div><h2>{name}</h2>{kassa && <div className="small muted">CIF: {taxId}</div>}</div>
+            <div style={{ textAlign: 'right' }}>
+              <h1>{kassa ? td.titleKassa : td.title}</h1>
+              <div className="small muted">{td.period(from ? fmtDate(from) : '–', to ? fmtDate(to) : '–')}</div>
+            </div>
+          </div>
+          {table(td, true)}
+        </DocPaper>
+      </div>
     </div>
   )
 }

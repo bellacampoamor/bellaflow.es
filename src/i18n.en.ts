@@ -1480,4 +1480,7 @@ export const en: Record<string, string> = {
   "Uploaden": "Upload",
   "Wordt bewaard met Opslaan.": "Saved with Save.",
   "Een voorvoegsel bestaat uit maximaal 12 letters of cijfers, zonder spaties; een streepje mag ertussen (zoals FS-BELLA).": "A prefix has at most 12 letters or digits, without spaces; a hyphen in between is allowed (like FS-BELLA).",
+  "Schermtaal": "Screen language",
+  "Kies een periode. Afdrukken of PDF maakt er een A4-document van.": "Choose a period. Print or PDF turns it into an A4 document.",
+  "Facturas simplificadas van de kassa, met de betaalwijze. Afdrukken of PDF maakt er een A4-document van.": "Simplified invoices from the POS, with the payment method. Print or PDF turns it into an A4 document.",
 }
