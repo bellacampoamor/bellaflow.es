@@ -21,8 +21,8 @@ export function TaxQr({ url }: { url: string }) {
 
 /** Documentblad: bij afdrukken staat het merkje op elke pagina midden onderaan. De ruimte daarvoor zit op elke pagina in .doc-body. */
 /** Document op papier. Onderaan elke pagina het Bella Flow-merkje, of (met `foot`) een eigen voet in plaats daarvan. */
-export const DocPaper = ({ language, children, foot }: { language: Language; children: ReactNode; foot?: ReactNode }) => (
-  <div className={foot ? 'paper has-foot' : 'paper'}>
+export const DocPaper = ({ language, children, foot, tallFoot }: { language: Language; children: ReactNode; foot?: ReactNode; tallFoot?: boolean }) => (
+  <div className={foot ? `paper has-foot${tallFoot ? ' tall-foot' : ''}` : 'paper'}>
     <div className="doc-body">{children}</div>
     {foot ? <div className="doc-foot">{foot}</div> : <div className="doc-mark"><img src={brandFile('bellaflow-logo-small.png')} alt="Bella Flow" /><span>{DOC_MARK[language]}</span></div>}
   </div>
@@ -39,7 +39,10 @@ export const Logo = () => (
 )
 export const LogoFull = () => <img className="logo-full" src={brandFile('bellaflow-logo-full-tagline.png')} width={2400} height={502} alt="Bella Flow" />
 
-export const eur = (n: number) => new Intl.NumberFormat(locale(), { style: 'currency', currency: 'EUR' }).format(n || 0)
+/** Bedragen staan in elke schermtaal en op elk document in Nederlandse opmaak: € 1.460,00 (besluit Rick 8 november 2026). */
+export const NUMBER_LOCALE = 'nl-NL'
+const EUR = new Intl.NumberFormat(NUMBER_LOCALE, { style: 'currency', currency: 'EUR' })
+export const eur = (n: number) => EUR.format(n || 0)
 export const fmtDate = (iso?: string | null) => {
   if (!iso) return '–'
   const [y, m, d] = iso.slice(0, 10).split('-')

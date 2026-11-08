@@ -1,5 +1,4 @@
 import { useEffect, useState, type InputHTMLAttributes } from 'react'
-import { locale } from '../i18n'
 
 /** Leest een getal zoals een gebruiker het typt: komma of punt als decimaalteken, spaties genegeerd. Leeg of ongeldig geeft null. */
 export function parseNum(text: string): number | null {
@@ -13,7 +12,8 @@ export function parseNum(text: string): number | null {
 export function showNum(v: number | null | undefined, decimals?: number): string {
   if (v == null || !Number.isFinite(v)) return ''
   const s = decimals === undefined ? String(v) : v.toFixed(decimals)
-  return (1.5).toLocaleString(locale()).includes(',') ? s.replace('.', ',') : s
+  // Altijd een komma als decimaalteken, in elke schermtaal (Nederlandse opmaak, besluit Rick 8 november 2026).
+  return s.replace('.', ',')
 }
 
 /**

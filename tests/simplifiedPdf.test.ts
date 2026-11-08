@@ -7,6 +7,9 @@ import { invoicePdf } from '../src/domain/invoicePdf'
 import { DUMMY_SKU, type PosLine } from '../src/domain/pos'
 import { posCheckout } from '../src/domain/services'
 import { DOC_MARK } from '../src/domain/noteText'
+import { setLanguage } from '../src/i18n'
+import { eur } from '../src/ui/kit'
+import { showNum } from '../src/ui/NumInput'
 
 const TODAY = '2026-11-08'
 let db: LocalDriver
@@ -37,10 +40,33 @@ describe('Eenvoudige factuur als pdf', () => {
     expect(text).toContain('bellaflow.es')
   })
 
-  it('de gewone factuur houdt de QR en de Bella Flow-vermelding', async () => {
+  it('de gewone factuur: QR in de voet, juridische regel van Bella, bellaflow.es en geen Bella Flow-zin', async () => {
     const inv = db.data.invoices.find((i) => !i.simplified)!
     const text = pdfText((await invoicePdf(db.data, inv.id)).base64)
     expect(text).toContain('QR tributario')
-    expect(Object.values(DOC_MARK).some((m) => text.includes(m))).toBe(true)
+    expect(text).toContain('bellaflow.es')
+    expect(text).toContain(db.data.settings[0].company_name)
+    expect(Object.values(DOC_MARK).some((m) => text.includes(m))).toBe(false)
+  })
+
+  it('bedragen altijd in Nederlandse opmaak, ook op een Spaanse factuur', async () => {
+    const inv = db.data.invoices.find((i) => !i.simplified)!
+    await db.update('settings', db.data.settings[0].id, { language_invoice: 'es' })
+    const text = pdfText((await invoicePdf(db.data, inv.id)).base64)
+    // In de pdf is € het WinAnsi-teken 0x80; het staat vóór het bedrag, met punt voor duizendtallen.
+    expect(text).toMatch(/[€\x80][\s\xa0]\d{1,3}\.\d{3},\d{2}/)
+    expect(text).not.toMatch(/\d,\d{2}[\s\xa0]?[€\x80]/)
+  })
+})
+
+describe('Getallen op het scherm', () => {
+  it('eur en getalvelden volgen in elke schermtaal de Nederlandse opmaak', () => {
+    for (const lang of ['nl', 'en', 'es'] as const) {
+      setLanguage(lang)
+      expect(eur(1460).replace(/\s/g, ' ')).toBe('€ 1.460,00')
+      expect(eur(9.95).replace(/\s/g, ' ')).toBe('€ 9,95')
+      expect(showNum(187.4, 2)).toBe('187,40')
+    }
+    setLanguage('nl')
   })
 })

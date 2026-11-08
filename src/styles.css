@@ -767,13 +767,18 @@ tr.focus-flash td { animation: focus-flash-cell 2.6s ease-out; }
 .issuer-foot { display: flex; flex-direction: column; align-items: center; gap: 4px; color: var(--muted); font-size: 8pt; text-align: center; }
 /* Eigen voet (eenvoudige factuur): op het scherm onderaan het papier, afgedrukt helemaal onderaan elke pagina. */
 .doc-foot { margin-top: 40px; }
-.issuer-foot { position: relative; padding: 0 90px; }
-/* Klein Bella Flow-beeldmerk met bellaflow.es, helemaal rechtsonder (eenvoudige factuur). */
-.doc-credit { position: absolute; right: 0; bottom: 0; display: flex; align-items: center; gap: 4px; font-size: 7pt; color: var(--muted); }
-.issuer-foot .doc-credit img { height: 12px; width: auto; }
+/* Voet van de factuur: links de QR (34 mm kolom), midden beeldmerk met juridische regel, rechts Bella Flow met bellaflow.es. */
+.invoice-foot { display: grid; grid-template-columns: 34mm minmax(0, 1fr) 34mm; align-items: end; gap: 4mm; }
+.invoice-foot-qr { justify-self: start; }
+/* Minimaal 2 mm vrije ruimte rond de QR. */
+.invoice-foot .tax-qr { gap: 2mm; }
+.doc-credit { justify-self: end; display: flex; align-items: center; gap: 4px; font-size: 7pt; color: var(--muted); white-space: nowrap; }
+.doc-credit img { height: 12px; width: auto; }
 @media print {
   .paper.has-foot .doc-body { padding-bottom: 32mm; }
-  .doc-foot { position: fixed; left: 15mm; right: 15mm; bottom: 6mm; margin: 0; }
+  .paper.has-foot.tall-foot .doc-body { padding-bottom: 46mm; }
+  /* Zelfde linker- en rechterkant als de tekst: 15 mm van .paper plus 16 px van .wrap. */
+  .doc-foot { position: fixed; left: calc(15mm + 16px); right: calc(15mm + 16px); bottom: 6mm; margin: 0; }
 }
 .issuer-foot img { height: 34px; width: auto; }
 .logo-upload { display: flex; flex-direction: column; gap: 6px; }

@@ -121,6 +121,9 @@ export function InvoiceDetail({ id, autoPrint = false }: { id: string; autoPrint
   const t = INVOICE_TEXT[language]
   const issuer = inv.simplified ? issuerInfo(co, issuerOf(inv)) : null
   const nif = issuer ? issuer.tax_id : co.tax_id
+  // Voet van elke factuur (besluit Rick 8 november 2026): linksonder de QR (alleen gewone factuur, 30 x 30 mm),
+  // midden het beeldmerk met de juridische regel van het uitgevende bedrijf, rechtsonder Bella Flow met bellaflow.es.
+  const footIssuer = issuer ?? issuerInfo(co, 'bella')
   const bellaLogo = issuerInfo(co, 'bella').logo
   const base = import.meta.env.BASE_URL
   // Facturen van voor het artikelnummer op de factuurregel
@@ -147,11 +150,14 @@ export function InvoiceDetail({ id, autoPrint = false }: { id: string; autoPrint
       </Head>
       {mail && <div className="no-print" style={{ marginBottom: 12 }}><Pill tone={MAIL_STATE[mail.status][1]}>{tx(MAIL_STATE[mail.status][0], mail.to_email)}</Pill>{mail.status === 'failed' && mail.error && <span className="small muted"> {mail.error}</span>}</div>}
       {!inv.simplified && !hasTaxId(nif) && <div className="note warn no-print" style={{ marginBottom: 12 }}>{tx("De QR-code op deze factuur klopt pas als het CIF is ingevuld onder Instellingen.")}</div>}
-      <DocPaper language={language} foot={issuer ? <div className="issuer-foot">
-          {issuer.mark && <img src={imageSrc(issuer.mark, base)} alt="" />}
-          <span>{legalLine(issuer)}</span>
+      <DocPaper language={language} tallFoot={!inv.simplified} foot={<div className="invoice-foot">
+          <div className="invoice-foot-qr">{!inv.simplified && <TaxQr url={invoiceQrUrl({ nif, number: inv.number, date: inv.invoice_date, total: inv.total }, IS_PRODUCTION)} />}</div>
+          <div className="issuer-foot">
+            {footIssuer.mark && <img src={imageSrc(footIssuer.mark, base)} alt="" />}
+            <span>{legalLine(footIssuer)}</span>
+          </div>
           <div className="doc-credit"><img src={brandFile('bellaflow-beeldmerk-small.png')} alt="Bella Flow" /><span>bellaflow.es</span></div>
-        </div> : undefined}>
+        </div>}>
         <div className="paper-top invoice-top">
           {issuer ? (
             <div className="issuer-head">
@@ -165,7 +171,6 @@ export function InvoiceDetail({ id, autoPrint = false }: { id: string; autoPrint
             <div className="small muted">{[co.address, `${co.postal_code} ${co.city}`.trim(), co.province, co.phone, co.email].filter(Boolean).join(', ')}<br />{t.tax}: {co.tax_id}</div>
           </div>
           )}
-          {!inv.simplified && <TaxQr url={invoiceQrUrl({ nif, number: inv.number, date: inv.invoice_date, total: inv.total }, IS_PRODUCTION)} />}
           <div style={{ textAlign: 'right' }}>
             <h1 style={{ fontSize: '1.45rem' }}>{invoiceTitle(t, inv)}</h1>
             <div className="strong">{inv.number}</div>

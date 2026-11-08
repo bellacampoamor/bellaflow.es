@@ -7,7 +7,7 @@ import { onHandMap, reservedMap, stockKey } from '../domain/calc'
 import { catalogArticleCounts, catalogArticleElements, catalogArticlesBySku, searchCatalogArticles } from '../domain/services'
 import { useApp } from './app-context'
 import { CatalogPhoto, Empty, eur, Modal, Pill } from './kit'
-import { locale, tx } from '../i18n'
+import { tx } from '../i18n'
 
 export type ArticlePick = { kind: 'product'; product: Product } | { kind: 'article'; article: CatalogArticle }
 
@@ -49,7 +49,7 @@ export function SearchSourceChips({ value, onChange }: { value: SearchSources; o
         const on = !value.off.includes(c.supplier_id)
         return (
           <button key={c.supplier_id} type="button" className={`chip src-chip ${on ? 'on' : ''}`} aria-pressed={on} onClick={() => toggle(c.supplier_id)} title={`${c.supplier.name}: ${on ? tx("wordt doorzocht") : tx("wordt niet doorzocht")}`}>
-            <span className="src-tick" aria-hidden>{on && <Check size={13} strokeWidth={3} />}</span>{short(c.supplier)}<span className="src-count">{c.n.toLocaleString(locale())}</span>
+            <span className="src-tick" aria-hidden>{on && <Check size={13} strokeWidth={3} />}</span>{short(c.supplier)}<span className="src-count">{c.n.toLocaleString('nl-NL')}</span>
           </button>
         )
       })())}
