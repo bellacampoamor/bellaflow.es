@@ -278,7 +278,7 @@ export function openLinesOnTransport(s: Snapshot, transportId: string) {
   return s.inbound_shipment_lines.filter((l) => shipments.has(l.shipment_id) && shipmentLineOpen(s, l.id) > 0)
 }
 
-/** Taal van een afgedrukt document: de keuze onder Beheer, of anders de taal van de klant. */
+/** Taal van een afgedrukt document: de keuze onder Instellingen, of anders de taal van de klant. */
 export const documentLanguage = (setting: DocumentLanguage | undefined, customer: Language): Language =>
   !setting || setting === 'klant' ? customer : setting
 

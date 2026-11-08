@@ -23,7 +23,7 @@ export function useSearchSources() {
   return [v, set] as const
 }
 
-/** Korte naam op de knop: de afkorting van drie letters uit Beheer; zonder afkorting de naam. */
+/** Korte naam op de knop: de afkorting van drie letters uit Instellingen; zonder afkorting de naam. */
 const short = (x: { name: string; code?: string | null }) => x.code?.trim() || x.name
 
 /** Knoppen boven de productregels: in welke catalogi gezocht wordt. */
@@ -207,7 +207,7 @@ export function useArticleNumbers(supplierId: string | undefined, skus: string[]
     return () => { live = false }
   }, [db, supplierId, key]) // eslint-disable-line
   const article = (sku: string) => m.get(sku.trim().toLowerCase())
-  /** Het product onder Beheer dat uit dit catalogusartikel komt. */
+  /** Het product onder Instellingen dat uit dit catalogusartikel komt. */
   const product = (sku: string) => { const a = article(sku); return a ? s.products.find((p) => p.catalog_article_number === a.article_number) : undefined }
   return { article, product }
 }

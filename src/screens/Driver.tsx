@@ -17,7 +17,7 @@ export function Driver({ param }: { param: string }) {
   const { s } = useApp()
   const [day, setDay] = useState(todayISO())
   if (s.settings[0]?.delivery_note_mode !== 'digitaal') {
-    return <div className="drv"><section className="panel"><h2>{tx("Chauffeursapp")}</h2><p>{tx("De digitale afleverbon staat uit. Zet hem aan onder Beheer, op het tabblad met de bedrijfsgegevens.")}</p><a className="btn" href="#levering">{tx("Naar Levering")}</a></section></div>
+    return <div className="drv"><section className="panel"><h2>{tx("Chauffeursapp")}</h2><p>{tx("De digitale afleverbon staat uit. Zet hem aan onder Instellingen, op het tabblad met de bedrijfsgegevens.")}</p><a className="btn" href="#levering">{tx("Naar Levering")}</a></section></div>
   }
   return <div className="drv">{param ? <DriverStop key={param} id={param} /> : <DriverRoute day={day} setDay={setDay} />}</div>
 }

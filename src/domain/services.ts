@@ -73,7 +73,7 @@ export async function createPurchaseOrder(db: Driver, input: PurchaseInput) {
   const label: PurchaseLabel = input.lines.some((l) => l.sales_order_line_id) ? 'verkoop' : input.label ?? (given?.kind === 'winkel' ? 'showroom' : 'magazijn')
   // Voorgestelde locatie bij ontvangst: de showroom voor label Showroom, anders het magazijn waar de route start. Bij inboeken te wijzigen.
   const warehouseId = input.warehouse_id ?? defaultReceiptWarehouse(warehouses, label)?.id
-  if (!warehouseId) fail(tx("Stel onder Beheer een actief magazijn in waar de route start."))
+  if (!warehouseId) fail(tx("Stel onder Instellingen een actief magazijn in waar de route start."))
   // Regels voor een verkooporder: nooit meer inkopen dan nog nodig is, en alleen bij de leverancier van het artikel.
   const snap = await loadSnapshot(db)
   const open = linesToPurchase(snap)
@@ -281,7 +281,7 @@ export async function receiveGoods(db: Driver, input: ReceiptInput) {
   const rows = input.rows.filter((r) => r.qty_received > 0 || r.qty_damaged > 0).map((r) => ({ ...r, warehouse_id: r.warehouse_id || planned(r.shipment_line_id) || inboundWarehouse(s.warehouses)?.id as string }))
   if (rows.some((r) => !s.warehouses.some((w) => w.id === r.warehouse_id && w.is_active))) fail(tx("Kies bij elke regel een actieve locatie."))
   if (!rows.length) fail(tx("Vul bij minimaal één regel een ontvangen aantal in."))
-  if (rows.some((r) => !r.warehouse_id)) fail(tx("Stel onder Beheer een actief magazijn in waar de route start."))
+  if (rows.some((r) => !r.warehouse_id)) fail(tx("Stel onder Instellingen een actief magazijn in waar de route start."))
   const perLine = new Map<string, number>()
   for (const r of rows) perLine.set(r.shipment_line_id, (perLine.get(r.shipment_line_id) ?? 0) + r.qty_received)
   for (const [lineId, n] of perLine) {
@@ -349,7 +349,7 @@ export async function correctStock(db: Driver, input: { product_id: string; ware
 // Verkooporders ----------------------------------------------------------------
 
 export type OrderHeader = Omit<SalesOrder, 'id' | 'number' | 'status'>
-/** Een regel met article is een catalogusartikel dat nog geen product onder Beheer heeft; dat product ontstaat pas als de verkooporder klopt. */
+/** Een regel met article is een catalogusartikel dat nog geen product onder Instellingen heeft; dat product ontstaat pas als de verkooporder klopt. */
 export type OrderLineInput = Omit<SalesOrderLine, 'id' | 'sales_order_id'> & { id?: string; article?: CatalogArticle }
 
 const withPlaceholders = (input: OrderInput): OrderInput => ({ ...input, lines: input.lines.map((l) => (!l.product_id && l.article ? { ...l, product_id: `artikel:${l.article.article_number}` } : l)) })
@@ -498,7 +498,7 @@ export async function posCheckout(db: Driver, input: PosInput) {
   }
   checkInvoiceEmail(input)
   const s0 = await loadSnapshot(db)
-  const shop = posWarehouse(s0.warehouses) ?? (fail(tx("Er is geen actieve winkel of magazijn onder Beheer.")) as never)
+  const shop = posWarehouse(s0.warehouses) ?? (fail(tx("Er is geen actieve winkel of magazijn onder Instellingen.")) as never)
   const chosen = input.customer_id ? s0.customers.find((c) => c.id === input.customer_id) ?? (fail(tx("Klant niet gevonden.")) as never) : null
   // Factura simplificada: boven de grens zijn naam, adres, woonplaats en NIE of paspoort van de klant verplicht.
   if (posTotals(input.lines).total > SIMPLIFIED_LIMIT) {
@@ -1009,7 +1009,7 @@ export async function importShowroom(db: Driver, csv: string) {
   if (missing.length) fail(tx("Het bestand mist de kolom {0}. Gebruik een export van supplier_showroom_items.", missing.join(', ')))
   const suppliers = await db.list('suppliers')
   const unknown = [...new Set(rows.map((r) => r.supplier_name.trim()))].filter((n) => !suppliers.some((x) => sameName(x.name, n)))
-  if (unknown.length) fail(tx("Leverancier {0} staat niet onder Beheer. Voeg die eerst toe met precies deze naam.", unknown.join(', ')))
+  if (unknown.length) fail(tx("Leverancier {0} staat niet onder Instellingen. Voeg die eerst toe met precies deze naam.", unknown.join(', ')))
   const current = await db.list('supplier_showroom_items')
   const key = (name: string, sku: string) => `${name.toLowerCase()}|${sku.toLowerCase()}`
   const byKey = new Map(current.map((x) => [key(x.supplier_name, x.supplier_sku), x.id]))
@@ -1068,7 +1068,7 @@ export async function importSupplierFile(db: Driver, csv: string) {
 
 /**
  * Werkt de artikelen met eigen artikelnummer bij uit alle ingelezen catalogi. Nieuwe artikelen en elementen krijgen een
- * nummer, bestaande houden het hunne. Een leverancier zonder afkorting krijgt er een voorgesteld (aan te passen onder Beheer).
+ * nummer, bestaande houden het hunne. Een leverancier zonder afkorting krijgt er een voorgesteld (aan te passen onder Instellingen).
  */
 export async function syncCatalogArticles(db: Driver, now = new Date().toISOString()) {
   const s = await loadSnapshot(db)
@@ -1118,7 +1118,7 @@ export const catalogArticleParents = (db: Driver, elementId: string) => db.artic
 export const catalogArticleCounts = (db: Driver) => db.articleCounts()
 
 /**
- * Het product onder Beheer voor een catalogusartikel. Bestaat het nog niet, dan wordt het aangemaakt met het eigen
+ * Het product onder Instellingen voor een catalogusartikel. Bestaat het nog niet, dan wordt het aangemaakt met het eigen
  * artikelnummer, de leverancier en de prijs van de leverancier als voorstel voor de verkoopprijs.
  */
 export async function productForArticle(db: Driver, a: CatalogArticle) {
@@ -1136,7 +1136,7 @@ export async function productForArticle(db: Driver, a: CatalogArticle) {
 
 // Stamgegevens -----------------------------------------------------------------
 
-/** Medewerker opslaan (Beheer > Medewerkers): naam en een geldige rol zijn verplicht. */
+/** Medewerker opslaan (Instellingen > Medewerkers): naam en een geldige rol zijn verplicht. */
 export async function saveStaff(db: Driver, row: Omit<Salesperson, 'id'> & { id?: string }) {
   const name = row.name.trim()
   if (!name) fail(tx("Vul de naam in."))

@@ -61,7 +61,7 @@ export function Purchases({ tab = 'opvolgen', phase: initialPhase = null }: { ta
             {missing.map((l, i) => {
               const o = s.sales_orders.find((x) => x.id === l.sales_order_id)
               return <span key={l.id}>{i > 0 && ', '}<a className="rowlink" href={`#orders-${l.sales_order_id}`}>{o?.number}</a> {l.description}</span>
-            })}. <a href="#beheer">{tx("Vul de leverancier in onder Beheer.")}</a>
+            })}. <a href="#instellingen">{tx("Vul de leverancier in onder Instellingen.")}</a>
           </div>
         )}
         <p className="small muted" style={{ marginTop: 0 }}>

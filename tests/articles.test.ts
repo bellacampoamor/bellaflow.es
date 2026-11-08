@@ -141,7 +141,7 @@ describe('catalogusartikelen', () => {
     expect((await db.searchArticles({ q: 'T-SET' }))[0]).toMatchObject({ supplier_sku: 'T-SET', element_count: 0 })
   })
 
-  it('maakt bij een verkooporder het product onder Beheer met het eigen artikelnummer, één keer', async () => {
+  it('maakt bij een verkooporder het product onder Instellingen met het eigen artikelnummer, één keer', async () => {
     await importShowroom(db, SHOWROOM)
     await syncCatalogArticles(db)
     const [hit] = await db.searchArticles({ q: 'T-KUS' })

@@ -125,7 +125,7 @@ const dummy = (price: number): PosLine => ({ key: newId(), dummy: true, code: DU
 const person = (p: Partial<Customer> = {}) => saveRecord(db, 'customers', { kind: 'particulier', name: 'Verzonnen Klant', company: '', tax_id: 'X0000000T', email: '', phone: '', language: 'es', address: 'Calle Inventada 1', postal_code: '03189', city: 'Orihuela Costa', province: 'Alicante', country: 'España', notes: '', ...p } as Customer)
 
 describe('Factura simplificada (kassa)', () => {
-  it('kassafacturen krijgen een eigen nummerreeks met het voorvoegsel uit Beheer', async () => {
+  it('kassafacturen krijgen een eigen nummerreeks met het voorvoegsel uit Instellingen', async () => {
     const r = await checkout([dummy(50)])
     const inv = db.data.invoices.find((i) => i.id === r.invoiceId)!
     expect(inv.simplified).toBe(true)

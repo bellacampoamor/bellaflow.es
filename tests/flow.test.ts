@@ -317,7 +317,7 @@ describe('artikel zonder leverancier', () => {
 })
 
 describe('taal van documenten', () => {
-  it('volgt de keuze onder Beheer en anders de klant', () => {
+  it('volgt de keuze onder Instellingen en anders de klant', () => {
     expect(documentLanguage('klant', 'es')).toBe('es')
     expect(documentLanguage(undefined, 'nl')).toBe('nl')
     expect(documentLanguage('en', 'es')).toBe('en')
@@ -768,7 +768,7 @@ describe('factuur-QR', () => {
     expect(invoiceQrUrl({ nif: 'B12345678', number: 'F-1', date: '2026-01-02', total: 10 }, false)).toContain('https://prewww2.aeat.es/')
   })
   it('herkent een ontbrekend CIF', () => {
-    expect(hasTaxId('(CIF invullen in Beheer)')).toBe(false)
+    expect(hasTaxId('(CIF invullen in Instellingen)')).toBe(false)
     expect(hasTaxId('B12345678')).toBe(true)
   })
 })

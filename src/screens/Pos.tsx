@@ -190,7 +190,7 @@ export function Pos() {
       <Head title={tx("Kassa")} sub={tx("Snelle verkoop in de winkel: scannen, afrekenen en meegeven.")} />
       <section className="panel pos-who">
         <h2>{tx("Wie staat er achter de kassa?")}</h2>
-        {people.length === 0 && <div className="note warn">{tx("Er zijn nog geen medewerkers. Voeg ze toe onder Beheer.")}</div>}
+        {people.length === 0 && <div className="note warn">{tx("Er zijn nog geen medewerkers. Voeg ze toe onder Instellingen.")}</div>}
         <div className="scan-people">{people.map((p) => <button key={p.id} className="scan-person" onClick={() => pickUser(p.id)}>{p.name}</button>)}</div>
       </section>
     </>

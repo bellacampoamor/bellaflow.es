@@ -48,7 +48,7 @@ export function Deliveries({ focus }: { focus?: string }) {
   const { begin, rowState } = useRouteDrag((_day, ids) => run((db) => saveRouteOrder(db, ids)))
 
   const calculate = async (day: string) => {
-    if (!originPoint) return toast(tx("Stel onder Beheer een magazijn met coördinaten in als vertrekpunt."), true)
+    if (!originPoint) return toast(tx("Stel onder Instellingen een magazijn met coördinaten in als vertrekpunt."), true)
     setBusy(day)
     try {
       const stops = dayStops(day)

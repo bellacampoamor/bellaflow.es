@@ -21,7 +21,7 @@ export const HDB_DEFAULTS = {
   mark_hdb: 'assets/brand/hdb-beeldmerk.png',
 } as const
 
-/** Nummerreeks per bedrijf: eigen teller en eigen voorvoegsel onder Beheer. */
+/** Nummerreeks per bedrijf: eigen teller en eigen voorvoegsel onder Instellingen. */
 export const ISSUER_SERIES = {
   bella: { series: 'FS', field: 'prefix_invoice_simplified', fallback: 'FS-BELLA' },
   hdb: { series: 'FSH', field: 'prefix_invoice_simplified_hdb', fallback: 'FS-HDB' },

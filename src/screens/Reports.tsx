@@ -12,7 +12,7 @@ import { Deliverable } from './Deliverable'
 
 export type ReportTab = 'facturen' | 'kassa' | 'leverbaar' | 'archief'
 
-// Vaste teksten van de afgedrukte lijst, in de taal uit Beheer.
+// Vaste teksten van de afgedrukte lijst, in de taal uit Instellingen.
 type ListText = { title: string; titleKassa: string; period: (from: string, to: string) => string; empty: string; number: string; date: string; order: string; customer: string; base: string; vat: string; total: string; sum: (n: number) => string; method: string; noCustomer: string; methods: Record<string, string>; perMethod: string }
 const T: Record<Language, ListText> = {
   nl: { title: 'Factuuroverzicht', titleKassa: 'Factuuroverzicht kassa (facturas simplificadas)', period: (a, b) => `Periode ${a} t/m ${b}`, empty: 'Geen facturen in deze periode.', number: 'Factuurnummer', date: 'Datum', order: 'Verkooporder', customer: 'Klant', base: 'Totaal excl. IVA', vat: 'IVA', total: 'Totaal incl. IVA', sum: (n) => `Totaal (${n} ${n === 1 ? 'factuur' : 'facturen'})`, method: 'Betaalwijze', noCustomer: 'Zonder klantgegevens', methods: { pin: 'Pin', contant: 'Contant', overboeking: 'Overboeking', online: 'Online', open: 'Open' }, perMethod: 'Per betaalwijze' },

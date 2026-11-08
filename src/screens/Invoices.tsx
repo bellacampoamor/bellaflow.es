@@ -145,7 +145,7 @@ export function InvoiceDetail({ id, autoPrint = false }: { id: string; autoPrint
         {balance > 0 && <button className="btn primary" onClick={() => { setAmount(balance); setPay(true) }}>{tx("Betaling registreren")}</button>}
       </Head>
       {mail && <div className="no-print" style={{ marginBottom: 12 }}><Pill tone={MAIL_STATE[mail.status][1]}>{tx(MAIL_STATE[mail.status][0], mail.to_email)}</Pill>{mail.status === 'failed' && mail.error && <span className="small muted"> {mail.error}</span>}</div>}
-      {!hasTaxId(nif) && <div className="note warn no-print" style={{ marginBottom: 12 }}>{tx("De QR-code op deze factuur klopt pas als het CIF is ingevuld onder Beheer.")}</div>}
+      {!hasTaxId(nif) && <div className="note warn no-print" style={{ marginBottom: 12 }}>{tx("De QR-code op deze factuur klopt pas als het CIF is ingevuld onder Instellingen.")}</div>}
       <DocPaper language={language}>
         <div className="paper-top invoice-top">
           {issuer ? (

@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
-import { BookOpen, Calculator, FileBarChart, Headset, Languages, Moon, Store, Sun, Boxes, ClipboardList, FileText, LayoutDashboard, PackageCheck, Settings2, ShoppingCart, Truck, Warehouse as WarehouseIcon } from 'lucide-react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { BookOpen, Calculator, ChevronDown, FileBarChart, Headset, Languages, Moon, Store, Sun, Boxes, ClipboardList, FileText, LayoutDashboard, PackageCheck, Settings2, ShoppingCart, Truck, Warehouse as WarehouseIcon } from 'lucide-react'
 import { parseOrdersParam } from './domain/orderFlow'
 import { parsePurchasesParam } from './domain/purchaseFlow'
 import { useApp, useHash } from './ui/app-context'
@@ -104,13 +104,11 @@ export function App({ onResetDemo, onSignOut }: { onResetDemo?: () => Promise<vo
               const F = FLOWS[k], Icon = F.icon
               return <a key={k} href={`#${F.home}`} className={flow === k ? 'on flow-link' : 'flow-link'}><Icon size={16} />{tx(F.label)}</a>
             })}
-            <a href="#rapportage" className={screen === 'rapportage' || screen === 'archief' ? 'on' : ''}><FileBarChart size={16} />{tx("Rapportage")}</a>
             <a href="#voorraad" className={screen === 'voorraad' ? 'on' : ''}><Boxes size={16} />{tx("Voorraad")}</a>
-            <a href="#beheer" className={screen === 'beheer' ? 'on' : ''}><Settings2 size={16} />{tx("Beheer")}</a>
-            <a href="#catalogi" className={screen === 'catalogi' ? 'on' : ''}><BookOpen size={16} />{tx("Catalogi")}</a>
             <label className="lang-pick"><Languages size={16} /><select aria-label={tx("Taal")} value={language} onChange={(e) => switchLanguage(e.target.value as UiLanguage)}><option value="nl">Nederlands</option><option value="en">English</option><option value="es">Español</option></select></label>
             <button className="btn-toggle" onClick={toggleTheme}>{theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}{theme === 'dark' ? tx("Dagstand") : tx("Nachtstand")}</button>
             <button className="btn-toggle" aria-label={tx("Contact en support")} title={tx("Contact en support")} onClick={() => setSupport(true)}><Headset size={18} /></button>
+            <AdminMenu screen={screen} />
             {onSignOut && <a href="#overzicht" onClick={onSignOut}>{tx("Uitloggen")}</a>}
           </nav>
         </div>
@@ -138,6 +136,60 @@ export function App({ onResetDemo, onSignOut }: { onResetDemo?: () => Promise<vo
   )
 }
 
+// Klein, bescheiden menu Beheer (besluit Rick 8 november 2026): Rapportage, Catalogi en Instellingen
+// (het vroegere Beheer). Het uitklapvlak staat vast in beeld, zodat het op een telefoon niet wordt afgesneden
+// door het zijwaarts scrollende menu.
+const ADMIN_SCREENS = ['rapportage', 'archief', 'catalogi', 'instellingen', 'beheer']
+function AdminMenu({ screen }: { screen: string }) {
+  const [open, setOpen] = useState(false)
+  const [pos, setPos] = useState({ top: 0, right: 0 })
+  const btn = useRef<HTMLButtonElement>(null)
+  const box = useRef<HTMLDivElement>(null)
+  useEffect(() => { setOpen(false) }, [screen])
+  useEffect(() => {
+    if (!open) return
+    const close = (e: Event) => {
+      const t = e.target as Node
+      if (btn.current?.contains(t) || box.current?.contains(t)) return
+      setOpen(false)
+    }
+    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') { setOpen(false); btn.current?.focus() } }
+    // Bij scrollen (ook het zijwaarts scrollende menu op de telefoon) schuift het vlak mee met de knop.
+    document.addEventListener('pointerdown', close)
+    document.addEventListener('keydown', esc)
+    window.addEventListener('resize', place)
+    window.addEventListener('scroll', place, true)
+    return () => {
+      document.removeEventListener('pointerdown', close)
+      document.removeEventListener('keydown', esc)
+      window.removeEventListener('resize', place)
+      window.removeEventListener('scroll', place, true)
+    }
+  }, [open])
+  function place() {
+    const r = btn.current?.getBoundingClientRect()
+    if (r) setPos({ top: r.bottom + 4, right: Math.max(8, window.innerWidth - r.right) })
+  }
+  const toggle = () => { place(); setOpen((v) => !v) }
+  const item = (href: string, on: boolean, icon: ReactNode, label: string) =>
+    <a role="menuitem" href={href} className={on ? 'on' : ''} onClick={() => setOpen(false)}>{icon}{label}</a>
+  const active = ADMIN_SCREENS.includes(screen)
+  return (
+    <>
+      <button ref={btn} className={active ? 'btn-toggle admin-menu on' : 'btn-toggle admin-menu'} aria-haspopup="menu" aria-expanded={open} onClick={toggle}>
+        {tx("Beheer")}<ChevronDown size={13} />
+      </button>
+      {open && (
+        <div ref={box} className="admin-pop" role="menu" style={{ top: pos.top, right: pos.right }}>
+          {item('#rapportage', screen === 'rapportage' || screen === 'archief', <FileBarChart size={16} />, tx("Rapportage"))}
+          {item('#catalogi', screen === 'catalogi', <BookOpen size={16} />, tx("Catalogi"))}
+          {item('#instellingen', screen === 'instellingen' || screen === 'beheer', <Settings2 size={16} />, tx("Instellingen"))}
+        </div>
+      )}
+    </>
+  )
+}
+
 function Route({ screen, param }: { screen: string; param: string }) {
   switch (screen) {
     case 'overzicht': return <Overview />
@@ -157,6 +209,7 @@ function Route({ screen, param }: { screen: string; param: string }) {
     case 'archief': return <Reports tab="archief" />
     case 'catalogi': return <Catalogs supplierId={param} />
     case 'voorraad': return <Stock />
+    case 'instellingen':
     case 'beheer': return <Admin />
     default: return (
       <div className="panel">

@@ -118,6 +118,6 @@ export function countBy(items: SupplierShowroomItem[], key: (x: SupplierShowroom
   return [...m.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([name, n]) => ({ name, n }))
 }
 
-/** Het eigen product onder Beheer met hetzelfde artikelnummer of dezelfde EAN, als dat er is. */
+/** Het eigen product onder Instellingen met hetzelfde artikelnummer of dezelfde EAN, als dat er is. */
 export const productForShowroom = (s: Snapshot, x: SupplierShowroomItem): Product | undefined =>
   s.products.find((p) => sameName(p.sku, x.supplier_sku) || (!!x.ean && sameName(p.sku, x.ean)))

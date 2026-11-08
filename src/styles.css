@@ -769,3 +769,11 @@ tr.focus-flash td { animation: focus-flash-cell 2.6s ease-out; }
 .logo-upload .actions { gap: 6px; }
 .pos-issuer { display: flex; flex-direction: column; gap: 4px; border-left: 4px solid var(--primary); }
 .pos-issuer.hdb { border-left-color: var(--info); background: var(--info-bg); }
+
+/* Menu Beheer: klein en bescheiden, uitklapvlak met Rapportage, Catalogi en Instellingen */
+.util .btn-toggle.admin-menu { gap: 3px; font-size: .82rem; padding: 7px 8px; }
+.util .btn-toggle.admin-menu.on { background: var(--surface-2); color: var(--heading); }
+.admin-pop { position: fixed; z-index: 60; min-width: 190px; padding: 5px; display: grid; gap: 2px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 8px 24px rgba(11, 24, 42, .16); }
+.admin-pop a { display: flex; gap: 9px; align-items: center; padding: 8px 11px; border-radius: 7px; color: var(--fg); text-decoration: none; font-weight: 500; font-size: .92rem; }
+.admin-pop a:hover { background: var(--surface-2); }
+.admin-pop a.on { background: var(--surface-2); color: var(--heading); font-weight: 600; }

@@ -34,7 +34,7 @@ export function Admin() {
 
   return (
     <>
-      <Head title={tx("Beheer")} sub={tx("De vaste gegevens waar het hele proces op draait.")}>
+      <Head title={tx("Instellingen")} sub={tx("De vaste gegevens waar het hele proces op draait.")}>
         {tab !== 'bedrijf' && tab !== 'toeslagen' && <button className="btn primary" onClick={addButton[tab][1]}><Plus size={16} />{addButton[tab][0]}</button>}
       </Head>
       <Tabs<Tab> value={tab} onChange={setTab} tabs={[
@@ -223,7 +223,7 @@ export function Admin() {
 /** Toeslag per leverancier op de prijs van de leverancier, voor transport en distributie van Nederland naar Spanje. */
 const CUSTOMER_PAGE_SIZE = 50
 
-/** Klantenlijst onder Beheer: 50 regels per pagina, met paginering en een knop naar boven, zoals in Catalogi. */
+/** Klantenlijst onder Instellingen: 50 regels per pagina, met paginering en een knop naar boven, zoals in Catalogi. */
 function CustomerList({ customers, onOpen }: { customers: Customer[]; onOpen: (c: Customer) => void }) {
   const [page, setPage] = useState(1)
   const listTop = useRef<HTMLElement>(null)

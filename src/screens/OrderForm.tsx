@@ -11,7 +11,7 @@ import { go, useApp } from '../ui/app-context'
 import { AreaField, Check, Combo, Empty, eur, Field, Head, Modal, NumberField, SelectField, TextField } from '../ui/kit'
 import { tx } from '../i18n'
 
-/** Een regel kan een catalogusartikel zijn dat nog geen product onder Beheer heeft; dat product ontstaat bij opslaan. */
+/** Een regel kan een catalogusartikel zijn dat nog geen product onder Instellingen heeft; dat product ontstaat bij opslaan. */
 type Line = OrderLineInput & { key: number }
 let k = 1
 
@@ -106,7 +106,7 @@ export function OrderForm({ id }: { id?: string }) {
     const onOrder = !wid
     patch(key, { product_id: pid, article: undefined, description: p.name, unit_price: p.sale_price, vat_rate: p.vat_rate, source: onOrder ? 'bestelling' : 'voorraad', take_now: false, warehouse_id: onOrder ? null : wid })
   }
-  // Een catalogusartikel zonder product onder Beheer staat nergens op voorraad en gaat dus op bestelling.
+  // Een catalogusartikel zonder product onder Instellingen staat nergens op voorraad en gaat dus op bestelling.
   const pickArticle = (key: number, pick: ArticlePick) => {
     if (pick.kind === 'product') return pickProduct(key, pick.product.id)
     const a = pick.article
@@ -215,7 +215,7 @@ export function OrderForm({ id }: { id?: string }) {
               <div className="field" style={{ justifyContent: 'flex-end' }}><button className="btn" type="button" onClick={() => setNewCust({ ...emptyCustomer })}><Plus size={16} />{tx("Nieuwe klant")}</button></div>
               {customer && <div className="span-all small muted">{[customer.phone, customer.email, customer.address, customer.postal_code, customer.city].filter(Boolean).join(', ')}</div>}
               <SelectField label={tx("Verkocht via")} value={h.channel} onChange={(v) => set({ channel: v })} options={[{ value: 'winkel', label: tx("Winkel") }, { value: 'online', label: tx("Online") }, { value: 'telefoon', label: tx("Telefoon of e-mail") }, { value: 'beurs', label: tx("Beurs") }]} />
-              <SelectField label={tx("Verkoper (verplicht)")} value={h.salesperson_id} placeholder={tx("Kies een verkoper")} hint={sellers.length ? undefined : tx("Voeg eerst medewerkers toe onder Beheer.")} onChange={(v) => set({ salesperson_id: v })} options={sellers.map((x) => ({ value: x.id, label: x.name }))} />
+              <SelectField label={tx("Verkoper (verplicht)")} value={h.salesperson_id} placeholder={tx("Kies een verkoper")} hint={sellers.length ? undefined : tx("Voeg eerst medewerkers toe onder Instellingen.")} onChange={(v) => set({ salesperson_id: v })} options={sellers.map((x) => ({ value: x.id, label: x.name }))} />
               <TextField label={tx("Verkoopdatum")} type="date" value={h.order_date} onChange={(v) => set({ order_date: v })} />
               <TextField label={tx("Referentie klant")} value={h.customer_reference} onChange={(v) => set({ customer_reference: v })} />
             </div>
