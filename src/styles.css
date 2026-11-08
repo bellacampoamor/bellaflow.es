@@ -801,10 +801,19 @@ tr.focus-flash td { animation: focus-flash-cell 2.6s ease-out; }
 @media print {
   .print-only { display: block; }
   /* Past altijd op A4 staand: vaste breedte, klant en kolomkoppen lopen door op een volgende regel. */
-  .report-doc { width: 100%; font-size: 8pt; }
-  .report-doc th, .report-doc td { padding: 4px 4px; }
-  .report-doc td { white-space: nowrap; }
-  .report-doc td.report-customer { white-space: normal; min-width: 30mm; }
+  /* Specifieker dan `.paper table` (11pt voor facturen), anders wordt de lijst breder dan de A4. */
+  .paper table.report-doc { width: 100%; font-size: 8pt; }
+  .paper table.report-doc th, .paper table.report-doc td { padding: 4px 4px; }
+  .paper table.report-doc th:first-child, .paper table.report-doc td:first-child { padding-left: 0; }
+  .paper table.report-doc th:last-child, .paper table.report-doc td:last-child { padding-right: 0; }
+  /* Alleen datum en bedragen blijven op één regel; nummers en tekst mogen afbreken, zodat de tabel binnen de marges blijft
+     en de bedragen rechts gelijk lopen met Per betaalwijze. */
+  .paper table.report-doc td { white-space: normal; overflow-wrap: normal; }
+  .paper table.report-doc td.num, .paper table.report-doc tr:not(.report-total) td:nth-child(-n+3) { white-space: nowrap; }
+  .paper table.report-doc th { font-size: 7.5pt; }
+  .paper .report-methods { font-size: 8.5pt; }
+  .paper .report-methods .small { font-size: 7.5pt; }
+  .paper table.report-doc td.report-customer { min-width: 0; }
   .report-top { flex-wrap: nowrap; }
   .report-top > :first-child { flex: 1 1 40%; min-width: 0; }
   .report-top > :last-child { flex: 0 1 60%; }
