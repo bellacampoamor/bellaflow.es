@@ -1539,4 +1539,5 @@ export const es: Record<string, string> = {
   "te veel": "de más",
   "te weinig": "de menos",
   "{0}, {1}. Na afsluiten kun je de kasopmaak niet meer wijzigen.": "{0}, {1}. Después de cerrar, el arqueo ya no se puede modificar.",
+  "{0} t/m {1}": "{0} a {1}",
 }

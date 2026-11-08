@@ -848,9 +848,13 @@ tr.focus-flash td { animation: focus-flash-cell 2.6s ease-out; }
 /* Beheer > Kassa > Dagafsluiting (8 november 2026): kasopmaak per bedrijf en de dagstaat op A4. */
 .close-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; align-items: start; }
 .close-grid > .panel { margin: 0; }
+.close-grid > * { min-width: 0; }
 .close-lines { display: grid; gap: 6px; }
 .close-line { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
 .close-line.strong { font-weight: 700; }
+.close-line > span { min-width: 0; }
+.close-line > span.num { white-space: nowrap; }
+.close-range { margin-top: 2px; overflow-wrap: anywhere; }
 .close-line input, .close-line select { width: 150px; max-width: 55%; text-align: right; }
 .close-line select { text-align: left; width: 200px; }
 .cash-count { display: grid; gap: 4px; }

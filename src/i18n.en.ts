@@ -1539,4 +1539,5 @@ export const en: Record<string, string> = {
   "te veel": "too much",
   "te weinig": "too little",
   "{0}, {1}. Na afsluiten kun je de kasopmaak niet meer wijzigen.": "{0}, {1}. After closing, the cash count can no longer be changed.",
+  "{0} t/m {1}": "{0} to {1}",
 }

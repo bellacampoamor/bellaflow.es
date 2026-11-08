@@ -206,10 +206,18 @@ const Diff = ({ label, value }: { label: string; value: number }) => (
   </div>
 )
 
+/** Aantal eenvoudige facturen, met de nummers van/t/m op een eigen regel eronder: blijft passen, ook bij lange nummers. */
+const InvoiceCount = ({ n, first, last }: { n: number; first: string; last: string }) => (
+  <div className="close-count">
+    <div className="close-line"><span>{tx("Eenvoudige facturen")}</span><span className="num">{n}</span></div>
+    {n > 0 && <div className="close-range small muted">{first === last ? first : tx("{0} t/m {1}", first, last)}</div>}
+  </div>
+)
+
 function SystemFigures({ day }: { day: KassaDay }) {
   return (
     <div className="close-lines">
-      <div className="close-line"><span>{tx("Eenvoudige facturen")}</span><span className="num">{day.count}{day.count ? ` (${day.first}${day.last !== day.first ? ` – ${day.last}` : ''})` : ''}</span></div>
+      <InvoiceCount n={day.count} first={day.first} last={day.last} />
       <Line label={tx("Omzet incl. IVA")} value={day.total} strong />
       <Line label={tx("Contant")} value={day.cash} />
       <Line label={tx("Pin")} value={day.card} />
@@ -236,7 +244,7 @@ function ClosedDay({ closing: c, day }: { closing: CashClosing; day: KassaDay })
         {drift && <div className="note warn" style={{ margin: '8px 0 12px' }}>{tx("Na de afsluiting is er voor deze dag nog iets op de kassa geboekt. De dagstaat toont de stand bij afsluiten; nu: contant {0}, pin {1}, {2} eenvoudige facturen.", eur(day.cash), eur(day.card), day.count)}</div>}
         <div className="close-grid">
           <div className="close-lines">
-            <div className="close-line"><span>{tx("Eenvoudige facturen")}</span><span className="num">{c.invoice_count}{c.invoice_count ? ` (${c.first_invoice}${c.last_invoice !== c.first_invoice ? ` – ${c.last_invoice}` : ''})` : ''}</span></div>
+            <InvoiceCount n={c.invoice_count} first={c.first_invoice} last={c.last_invoice} />
             <Line label={tx("Omzet incl. IVA")} value={c.total} strong />
             <Line label={tx("Contant")} value={c.cash_sales} />
             <Line label={tx("Pin")} value={c.card_sales} />
