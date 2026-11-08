@@ -1,3 +1,4 @@
+/// <reference types="vitest/config" />
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { viteSingleFile } from 'vite-plugin-singlefile'
@@ -6,4 +7,6 @@ import { viteSingleFile } from 'vite-plugin-singlefile'
 export default defineConfig({
   base: './',
   plugins: [react(), ...(process.env.VITE_PREVIEW ? [viteSingleFile()] : [])],
+  // Migratietests draaien alle migraties in Postgres (PGlite); op de GitHub-server duurt dat langer dan 5 seconden.
+  test: { testTimeout: 60000 },
 })
