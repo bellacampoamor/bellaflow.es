@@ -4,7 +4,7 @@ import type { Payment } from '../data/types'
 import { IS_PRODUCTION, articleNo, deliveryValue, depositAvailable, documentLanguage, hasTaxId, invoiceBalance, invoiceQrUrl, invoiceState, todayISO, uninvoicedDeliveries, vatBreakdown } from '../domain/calc'
 import { ensureProformas, invoiceProformas, mailInvoice, payInvoice } from '../domain/services'
 import { go, useApp, useAutoPrint } from '../ui/app-context'
-import { Empty, eur, fmtDate, Head, Modal, NumberField, Pill, SelectField, Tabs, TextField, DocPaper, pickRow, PickMark, TaxQr, useScrollToFocus } from '../ui/kit'
+import { Empty, eur, fmtDate, Head, Modal, NumberField, Pill, SelectField, Tabs, TextField, DocPaper, pickRow, PickMark, TaxQr, useScrollToFocus, brandFile } from '../ui/kit'
 import { tx } from '../i18n'
 import { INVOICE_TEXT, invoiceTitle } from '../domain/noteText'
 import { POS_CUSTOMER_NOTE } from '../domain/pos'
@@ -145,8 +145,12 @@ export function InvoiceDetail({ id, autoPrint = false }: { id: string; autoPrint
         {balance > 0 && <button className="btn primary" onClick={() => { setAmount(balance); setPay(true) }}>{tx("Betaling registreren")}</button>}
       </Head>
       {mail && <div className="no-print" style={{ marginBottom: 12 }}><Pill tone={MAIL_STATE[mail.status][1]}>{tx(MAIL_STATE[mail.status][0], mail.to_email)}</Pill>{mail.status === 'failed' && mail.error && <span className="small muted"> {mail.error}</span>}</div>}
-      {!hasTaxId(nif) && <div className="note warn no-print" style={{ marginBottom: 12 }}>{tx("De QR-code op deze factuur klopt pas als het CIF is ingevuld onder Instellingen.")}</div>}
-      <DocPaper language={language}>
+      {!inv.simplified && !hasTaxId(nif) && <div className="note warn no-print" style={{ marginBottom: 12 }}>{tx("De QR-code op deze factuur klopt pas als het CIF is ingevuld onder Instellingen.")}</div>}
+      <DocPaper language={language} foot={issuer ? <div className="issuer-foot">
+          {issuer.mark && <img src={imageSrc(issuer.mark, base)} alt="" />}
+          <span>{legalLine(issuer)}</span>
+          <div className="doc-credit"><img src={brandFile('bellaflow-beeldmerk-small.png')} alt="Bella Flow" /><span>bellaflow.es</span></div>
+        </div> : undefined}>
         <div className="paper-top invoice-top">
           {issuer ? (
             <div className="issuer-head">
@@ -159,7 +163,7 @@ export function InvoiceDetail({ id, autoPrint = false }: { id: string; autoPrint
             <div className="small muted">{[co.address, `${co.postal_code} ${co.city}`.trim(), co.province, co.phone, co.email].filter(Boolean).join(', ')}<br />{t.tax}: {co.tax_id}</div>
           </div>
           )}
-          <TaxQr url={invoiceQrUrl({ nif, number: inv.number, date: inv.invoice_date, total: inv.total }, IS_PRODUCTION)} />
+          {!inv.simplified && <TaxQr url={invoiceQrUrl({ nif, number: inv.number, date: inv.invoice_date, total: inv.total }, IS_PRODUCTION)} />}
           <div style={{ textAlign: 'right' }}>
             <h1 style={{ fontSize: '1.45rem' }}>{invoiceTitle(t, inv)}</h1>
             <div className="strong">{inv.number}</div>
@@ -185,10 +189,6 @@ export function InvoiceDetail({ id, autoPrint = false }: { id: string; autoPrint
         </div>
         {!inv.simplified && <p className="small muted" style={{ marginTop: 26, marginBottom: 0 }}>{t.pay}: {co.iban}{co.invoice_footer ? <><br />{co.invoice_footer}</> : ''}</p>}
         {issuer?.key === 'bella' && co.invoice_footer && <p className="small muted" style={{ marginTop: 26, marginBottom: 0 }}>{co.invoice_footer}</p>}
-        {issuer && <div className="issuer-foot">
-          {issuer.mark && <img src={imageSrc(issuer.mark, base)} alt="" />}
-          <span>{legalLine(issuer)}</span>
-        </div>}
       </DocPaper>
       {mailTo !== null && (
         <Modal title={tx("Factuur mailen")} onClose={() => setMailTo(null)} footer={<>

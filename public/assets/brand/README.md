@@ -14,3 +14,4 @@ Alle bestanden zijn PNG met transparante achtergrond. In de app bereikbaar via `
 | `bellaflow-favicon-{16,32,48,180,192,512}.png` | vierkant | Favicon, app-icoon (180 = Apple, 192/512 = PWA) |
 
 De logo's zijn ontworpen voor een lichte achtergrond; de donkerblauwe tekst valt weg op donker.
+| `bellaflow-beeldmerk-small.png` | max. 160 px | Beeldmerk klein, rechtsonder op de eenvoudige factuur |

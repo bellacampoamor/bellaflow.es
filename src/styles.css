@@ -761,7 +761,17 @@ tr.focus-flash td { animation: focus-flash-cell 2.6s ease-out; }
 /* Eenvoudige factuur (kassa): logo van het uitgevende bedrijf linksboven, beeldmerk met juridische gegevens onderaan. */
 .issuer-head { display: flex; flex-direction: column; gap: 6px; }
 .issuer-logo { display: block; max-width: 240px; max-height: 72px; width: auto; height: auto; object-fit: contain; object-position: left center; }
-.issuer-foot { display: flex; flex-direction: column; align-items: center; gap: 4px; margin-top: 30px; color: var(--muted); font-size: 8pt; text-align: center; }
+.issuer-foot { display: flex; flex-direction: column; align-items: center; gap: 4px; color: var(--muted); font-size: 8pt; text-align: center; }
+/* Eigen voet (eenvoudige factuur): op het scherm onderaan het papier, afgedrukt helemaal onderaan elke pagina. */
+.doc-foot { margin-top: 40px; }
+.issuer-foot { position: relative; padding: 0 90px; }
+/* Klein Bella Flow-beeldmerk met bellaflow.es, helemaal rechtsonder (eenvoudige factuur). */
+.doc-credit { position: absolute; right: 0; bottom: 0; display: flex; align-items: center; gap: 4px; font-size: 7pt; color: var(--muted); }
+.issuer-foot .doc-credit img { height: 12px; width: auto; }
+@media print {
+  .paper.has-foot .doc-body { padding-bottom: 32mm; }
+  .doc-foot { position: fixed; left: 15mm; right: 15mm; bottom: 6mm; margin: 0; }
+}
 .issuer-foot img { height: 34px; width: auto; }
 .logo-upload { display: flex; flex-direction: column; gap: 6px; }
 .logo-upload .logo-preview { display: flex; align-items: center; justify-content: center; min-height: 84px; padding: 10px; background: #fff; border: 1px dashed var(--line-strong); border-radius: 8px; }

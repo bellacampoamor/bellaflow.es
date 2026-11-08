@@ -8,6 +8,7 @@ import { imageSrc, issuerInfo, issuerOf, legalLine } from './issuers'
 import { A4, drawDocMark, INK, MARGIN, MUTED, safe, wrap, ymd } from './signedNotePdf'
 
 const LOCALE: Record<Language, string> = { es: 'es-ES', nl: 'nl-NL', en: 'en-GB' }
+const CREDIT = 'bellaflow.es'
 const QR_SIZE = 85.04 // 30 mm, de kleinste toegestane maat (Orden HAC/1177/2024, art. 21)
 
 /** Logo of beeldmerk uit Beheer in de pdf: een upload (data-URL) of een standaardbestand. Lukt het niet, dan zonder afbeelding. */
@@ -27,7 +28,7 @@ async function loadImage(doc: PDFDocument, src: string): Promise<PDFImage | null
   } catch { return null }
 }
 
-/** Bouwt de factuur als pdf (zelfde inhoud als de afgedrukte factuur, met de QR van 30 x 30 mm) en geeft die terug als base64. */
+/** Bouwt de factuur als pdf (zelfde inhoud als de afgedrukte factuur; de gewone factuur met de QR van 30 x 30 mm) en geeft die terug als base64. */
 export async function invoicePdf(s: Snapshot, invoiceId: string) {
   const inv = s.invoices.find((x) => x.id === invoiceId)!
   const o = s.sales_orders.find((x) => x.id === inv.sales_order_id)!
@@ -51,7 +52,7 @@ export async function invoicePdf(s: Snapshot, invoiceId: string) {
   const width = A4[0] - MARGIN * 2
   let y = A4[1] - MARGIN
   // Ruimte onderaan voor het beeldmerk met de juridische gegevens van het uitgevende bedrijf.
-  const foot = issuer ? 95 : 30
+  const foot = issuer ? 70 : 30
   const room = (need: number) => { if (y - need < MARGIN + foot) { page = doc.addPage(A4); y = A4[1] - MARGIN } }
   const text = (s0: string, x: number, yy: number, o0: { font?: PDFFont; size?: number; color?: typeof INK; right?: boolean } = {}) => {
     const font = o0.font ?? regular, size = o0.size ?? 9, str = safe(s0)
@@ -66,6 +67,7 @@ export async function invoicePdf(s: Snapshot, invoiceId: string) {
   const top = y
   const logo = issuer ? await loadImage(doc, issuer.logo) : null
   const mark = issuer ? await loadImage(doc, issuer.mark) : null
+  const credit = issuer ? await loadImage(doc, 'assets/brand/bellaflow-beeldmerk-small.png') : null
   if (issuer) {
     if (logo) {
       const h = Math.min(52, (logo.height / logo.width) * 180), w = (logo.width / logo.height) * h
@@ -80,13 +82,18 @@ export async function invoicePdf(s: Snapshot, invoiceId: string) {
   }
   const leftEnd = y
 
-  const qr = qrcode(0, 'M')
-  qr.addData(invoiceQrUrl({ nif, number: inv.number, date: inv.invoice_date, total: inv.total }, IS_PRODUCTION), 'Byte')
-  qr.make()
-  const n = qr.getModuleCount(), cell = QR_SIZE / n, qx = MARGIN + 215, qy = top - 12 - QR_SIZE
-  text('QR tributario:', qx, top - 8, { size: 7.5, color: MUTED })
-  for (let r = 0; r < n; r++) for (let k = 0; k < n; k++) {
-    if (qr.isDark(r, k)) page.drawRectangle({ x: qx + k * cell, y: qy + (n - 1 - r) * cell, width: cell + 0.05, height: cell + 0.05, color: INK })
+  // QR alleen op de gewone factuur; de eenvoudige factuur (kassa) heeft geen QR (besluit Rick 8 november 2026).
+  let qy = top
+  if (!inv.simplified) {
+    const qr = qrcode(0, 'M')
+    qr.addData(invoiceQrUrl({ nif, number: inv.number, date: inv.invoice_date, total: inv.total }, IS_PRODUCTION), 'Byte')
+    qr.make()
+    const n = qr.getModuleCount(), cell = QR_SIZE / n, qx = MARGIN + 215
+    qy = top - 12 - QR_SIZE
+    text('QR tributario:', qx, top - 8, { size: 7.5, color: MUTED })
+    for (let r = 0; r < n; r++) for (let k = 0; k < n; k++) {
+      if (qr.isDark(r, k)) page.drawRectangle({ x: qx + k * cell, y: qy + (n - 1 - r) * cell, width: cell + 0.05, height: cell + 0.05, color: INK })
+    }
   }
 
   const right = MARGIN + width
@@ -156,19 +163,22 @@ export async function invoicePdf(s: Snapshot, invoiceId: string) {
   if (!inv.simplified) block(`${t.pay}: ${co?.iban ?? ''}`, MARGIN, width, { color: MUTED, size: 8.5 })
   if (co?.invoice_footer && issuer?.key !== 'hdb') block(co.invoice_footer, MARGIN, width, { color: MUTED, size: 8.5 })
 
-  // Eenvoudige factuur: klein beeldmerk midden onderaan met de juridische gegevens van het uitgevende bedrijf, op elke pagina.
+  // Eenvoudige factuur: beeldmerk met de juridische gegevens van het uitgevende bedrijf helemaal onderaan elke pagina,
+  // op de plek van de Bella Flow-vermelding, die op de eenvoudige factuur vervalt (besluit Rick 8 november 2026).
   if (issuer) {
-    const lines0 = wrap(safe(legalLine(issuer)), regular, 7.5, width)
+    const lines0 = wrap(safe(legalLine(issuer)), regular, 7.5, width - 160) // ruimte rechts voor bellaflow.es
     for (const pg of doc.getPages()) {
-      let yy = 44 + (lines0.length - 1) * 9
+      let yy = 18 + (lines0.length - 1) * 9
       lines0.forEach((l) => { pg.drawText(l, { x: (A4[0] - regular.widthOfTextAtSize(l, 7.5)) / 2, y: yy, size: 7.5, font: regular, color: MUTED }); yy -= 9 })
       if (mark) {
         const h = 26, w = (mark.width / mark.height) * h
-        pg.drawImage(mark, { x: (A4[0] - w) / 2, y: 56 + (lines0.length - 1) * 9, width: w, height: h })
+        pg.drawImage(mark, { x: (A4[0] - w) / 2, y: 30 + (lines0.length - 1) * 9, width: w, height: h })
       }
+      // Helemaal rechtsonder: klein Bella Flow-beeldmerk met bellaflow.es (besluit Rick 8 november 2026).
+      const cw = regular.widthOfTextAtSize(CREDIT, 6.5), cx = A4[0] - MARGIN - cw
+      pg.drawText(CREDIT, { x: cx, y: 18, size: 6.5, font: regular, color: MUTED })
+      if (credit) { const h = 9, w = (credit.width / credit.height) * h; pg.drawImage(credit, { x: cx - w - 3, y: 16.5, width: w, height: h }) }
     }
-  }
-
-  await drawDocMark(doc, regular, safe(DOC_MARK[language]))
+  } else await drawDocMark(doc, regular, safe(DOC_MARK[language]))
   return { name: `${invoiceTitle(t, inv)} ${inv.number}.pdf`, base64: await doc.saveAsBase64() }
 }

@@ -8,7 +8,7 @@ import { DOC_MARK } from '../domain/noteText'
 import { NumInput } from './NumInput'
 import type { Language } from '../data/types'
 
-const brandFile = (name: string) => `${import.meta.env.BASE_URL}assets/brand/${name}`/** QR als scherpe vector, foutcorrectie M en altijd 30 x 30 mm, de kleinste toegestane maat (Orden HAC/1177/2024, art. 21). */
+export const brandFile = (name: string) => `${import.meta.env.BASE_URL}assets/brand/${name}`/** QR als scherpe vector, foutcorrectie M en altijd 30 x 30 mm, de kleinste toegestane maat (Orden HAC/1177/2024, art. 21). */
 export function TaxQr({ url }: { url: string }) {
   const svg = useMemo(() => {
     const qr = qrcode(0, 'M')
@@ -20,10 +20,11 @@ export function TaxQr({ url }: { url: string }) {
 }
 
 /** Documentblad: bij afdrukken staat het merkje op elke pagina midden onderaan. De ruimte daarvoor zit op elke pagina in .doc-body. */
-export const DocPaper = ({ language, children }: { language: Language; children: ReactNode }) => (
-  <div className="paper">
+/** Document op papier. Onderaan elke pagina het Bella Flow-merkje, of (met `foot`) een eigen voet in plaats daarvan. */
+export const DocPaper = ({ language, children, foot }: { language: Language; children: ReactNode; foot?: ReactNode }) => (
+  <div className={foot ? 'paper has-foot' : 'paper'}>
     <div className="doc-body">{children}</div>
-    <div className="doc-mark"><img src={brandFile('bellaflow-logo-small.png')} alt="Bella Flow" /><span>{DOC_MARK[language]}</span></div>
+    {foot ? <div className="doc-foot">{foot}</div> : <div className="doc-mark"><img src={brandFile('bellaflow-logo-small.png')} alt="Bella Flow" /><span>{DOC_MARK[language]}</span></div>}
   </div>
 )
 
