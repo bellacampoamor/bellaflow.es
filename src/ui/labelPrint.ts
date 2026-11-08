@@ -11,13 +11,13 @@ const FONT = 'Arial, Helvetica, sans-serif'
 
 export const fmtLabelPrice = (n: number) => `€ ${new Intl.NumberFormat('nl-NL', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n)}`
 
-// Beeldmerk rechts op het etiket. Het beeldmerk van Ha-Co volgt nog; tot die tijd een zwart vlak met de naam.
+// Beeldmerk rechts op het etiket: het staande logo van Bella (zwart vlak, witte letters). Ontbreekt het bestand, dan een zwart vlak met BELLA.
 let brand: Promise<HTMLImageElement | null> | null = null
 export const loadBrandMark = () => (brand ??= new Promise((resolve) => {
   const img = new Image()
   img.onload = () => resolve(img)
   img.onerror = () => resolve(null)
-  img.src = `${import.meta.env.BASE_URL}assets/etiket/beeldmerk-haco.png`
+  img.src = `${import.meta.env.BASE_URL}assets/etiket/beeldmerk-bella.png`
 }))
 
 function wrapLines(ctx: CanvasRenderingContext2D, text: string, maxWidth: number, maxLines: number) {
@@ -62,7 +62,7 @@ export function drawLabel(canvas: HTMLCanvasElement, data: LabelData, mark: HTML
     ctx.rotate(Math.PI / 2)
     ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
     ctx.font = `bold ${mm(5.2)}px ${FONT}`
-    ctx.fillText('HA-CO', 0, 0)
+    ctx.fillText('BELLA', 0, 0)
     ctx.restore()
   }
 
