@@ -3,6 +3,7 @@ import { loadSnapshot, type Driver } from '../data/driver'
 import type { Snapshot } from '../data/types'
 import { FlowError } from '../domain/services'
 import { tx } from '../i18n'
+import { goBack } from './nav'
 
 interface Ctx {
   db: Driver
@@ -14,6 +15,8 @@ interface Ctx {
 }
 const AppCtx = createContext<Ctx | null>(null)
 export const useApp = () => useContext(AppCtx)!
+/** Zoals useApp, maar null buiten de AppProvider (bijv. op het laadscherm). */
+export const useAppOptional = () => useContext(AppCtx)
 
 export function AppProvider({ db, children, fallback }: { db: Driver; children: ReactNode; fallback: ReactNode }) {
   const [s, setS] = useState<Snapshot | null>(null)
@@ -67,7 +70,8 @@ export function AppProvider({ db, children, fallback }: { db: Driver; children: 
 export function useAutoPrint(enabled: boolean, ready: boolean, backTo = 'archief') {
   useEffect(() => {
     if (!enabled || !ready) return
-    const back = () => go(backTo)
+    // Na afdrukken terug naar waar je vandaan kwam; anders naar backTo.
+    const back = () => goBack(backTo)
     window.addEventListener('afterprint', back)
     let cancelled = false
     const timer = window.setTimeout(async () => {

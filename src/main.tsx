@@ -9,7 +9,11 @@ import { importShowroom, importShowroomDetails, syncCatalogArticles } from './do
 import { AppProvider } from './ui/app-context'
 import { LogoFull } from './ui/kit'
 import './styles.css'
+import { installNav } from './ui/nav'
 import { tx } from './i18n'
+
+// Onthoudt bij elke stap waar je vandaan kwam, vóór React luistert (terugknop in Head).
+installNav()
 
 const Loading = () => <div className="wrap" style={{ paddingBlock: 40 }}>{tx("Gegevens laden…")}</div>
 

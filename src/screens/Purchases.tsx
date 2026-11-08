@@ -11,6 +11,7 @@ import { go, useApp } from '../ui/app-context'
 import { AreaField, Combo, Empty, eur, fmtDate, Head, Modal, NumInput, Pill, SelectField, Sku, Tabs, TextField, type Tone } from '../ui/kit'
 import { DispatchLog } from './PurchaseDispatch'
 import { ConvertProformaModal, linesWithoutSupplier, proformasInSync, purchaseValue, salesOrdersOf } from './PurchaseQueue'
+import { replaceHash } from '../ui/nav'
 
 type Snap = ReturnType<typeof useApp>['s']
 
@@ -29,7 +30,7 @@ export function Purchases({ tab = 'opvolgen', phase: initialPhase = null }: { ta
   const [filter, setFilterState] = useState<PurchaseFilter>(tab)
   const [phase, setPhaseState] = useState<PurchasePhaseKey | null>(initialPhase)
   const [q, setQ] = useState('')
-  const remember = (f: PurchaseFilter, p: PurchasePhaseKey | null) => history.replaceState(null, '', purchasesHref(f, p ?? undefined))
+  const remember = (f: PurchaseFilter, p: PurchasePhaseKey | null) => replaceHash(purchasesHref(f, p ?? undefined))
   const setFilter = (f: PurchaseFilter) => { setFilterState(f); setPhaseState(null); remember(f, null) }
   const setPhase = (p: PurchasePhaseKey | null) => { setPhaseState(p); remember(filter, p) }
   const missing = linesWithoutSupplier(s)

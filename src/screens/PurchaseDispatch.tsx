@@ -8,6 +8,7 @@ import { tx } from '../i18n'
 import { go, useApp } from '../ui/app-context'
 import { Empty, eur, fmtDate, Head, Modal, pickRow, PickMark, Pill, type Tone } from '../ui/kit'
 import { LabelPill } from './Purchases'
+import { replaceHash } from '../ui/nav'
 
 /** Hoe een verzending op het scherm staat. */
 export const DISPATCH_STATUS: Record<EmailStatus, [string, Tone]> = {
@@ -45,7 +46,7 @@ export function PurchaseDispatch({ date: initialDate }: { date?: string }) {
   const setDate = (d: string) => {
     setDateState(d)
     setPicked(new Set(purchaseOrdersOfDay(s, d).filter((p) => !isDispatched(s, p.id)).map((p) => p.id)))
-    history.replaceState(null, '', `#inkoop-versturen-${d}`)
+    replaceHash(`#inkoop-versturen-${d}`)
   }
   const ids = pos.filter((p) => picked.has(p.id)).map((p) => p.id)
   const toggle = (id: string) => setPicked((v) => { const n = new Set(v); if (n.has(id)) n.delete(id); else n.add(id); return n })

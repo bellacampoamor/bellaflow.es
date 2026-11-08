@@ -9,6 +9,7 @@ import { go, useApp } from '../ui/app-context'
 import { DocPaper, Empty, eur, fmtDate, Head, Tabs, TextField } from '../ui/kit'
 import { Archive } from './Archive'
 import { Deliverable } from './Deliverable'
+import { useNavUi } from '../ui/nav'
 
 export type ReportTab = 'facturen' | 'kassa' | 'leverbaar' | 'archief'
 
@@ -39,12 +40,12 @@ export function Reports({ tab }: { tab: ReportTab }) {
 function InvoiceList({ kassa = false }: { kassa?: boolean }) {
   const { s } = useApp()
   const today = todayISO()
-  const [period, setPeriod] = useState<ReportPeriod>('maand')
-  const [customFrom, setCustomFrom] = useState(`${today.slice(0, 7)}-01`)
-  const [customTo, setCustomTo] = useState(today)
+  const [period, setPeriod] = useNavUi<ReportPeriod>('period', 'maand')
+  const [customFrom, setCustomFrom] = useNavUi('from', `${today.slice(0, 7)}-01`)
+  const [customTo, setCustomTo] = useNavUi('to', today)
   const { from, to } = periodRange(period, today, customFrom, customTo)
   // Kassa: per bedrijf een eigen lijst (HDB valt buiten de boekhouding van Bella).
-  const [issuer, setIssuer] = useState<Issuer>('bella')
+  const [issuer, setIssuer] = useNavUi<Issuer>('issuer', 'bella')
   const report = invoiceReport(s, from, to, kassa, kassa ? issuer : undefined)
   const options: [ReportPeriod, string][] = [['maand', tx("Deze maand")], ['kwartaal', tx("Laatste 3 maanden")], ['jaar', tx("Dit jaar (YTD)")], ['vrij', tx("Van t/m")]]
   const company = s.settings[0]

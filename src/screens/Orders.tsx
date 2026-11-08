@@ -8,6 +8,7 @@ import { Check, Empty, eur, fmtDate, Head, Modal, NumberField, NumInput, Pill, S
 import { tx } from '../i18n'
 import { activeIn, currentPhase, followRank, inOrdersTab, orderFlow, ordersHref, PHASES, PHASE_LABEL, type FollowUp, type OrdersTab, type PhaseKey } from '../domain/orderFlow'
 import { FlowTrack, FOLLOW_LABEL, MiniTrack, NextStep, PhaseCell, PHASE_ICON, phaseText } from '../ui/OrderFlowTrack'
+import { replaceHash } from '../ui/nav'
 
 const FOLLOW_TONE: Record<FollowUp, Tone> = { te_laat: 'bad', actie: 'sell', wacht: 'info', afgerond: 'good', geannuleerd: '' }
 
@@ -18,7 +19,7 @@ export function Orders({ tab = 'opvolgen', phase: initialPhase = null }: { tab?:
   const [filter, setFilterState] = useState<Filter>(tab)
   const [phase, setPhaseState] = useState<PhaseKey | null>(initialPhase)
   // Tabblad en fase staan in de adresbalk, zodat een link (bijv. vanaf Overzicht) en Terug op dezelfde plek uitkomen.
-  const remember = (f: Filter, p: PhaseKey | null) => history.replaceState(null, '', ordersHref(f, p ?? undefined))
+  const remember = (f: Filter, p: PhaseKey | null) => replaceHash(ordersHref(f, p ?? undefined))
   const setFilter = (f: Filter) => { setFilterState(f); setPhaseState(null); remember(f, null) }
   const setPhase = (p: PhaseKey | null) => { setPhaseState(p); remember(filter, p) }
   const [q, setQ] = useState('')

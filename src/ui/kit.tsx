@@ -6,6 +6,9 @@ import { locale, tx } from '../i18n'
 import qrcode from 'qrcode-generator'
 import { DOC_MARK } from '../domain/noteText'
 import { NumInput } from './NumInput'
+import { useAppOptional } from './app-context'
+import { goBack, navState } from './nav'
+import { routeLabel } from './routeLabel'
 import type { Language } from '../data/types'
 
 export const brandFile = (name: string) => `${import.meta.env.BASE_URL}assets/brand/${name}`/** QR als scherpe vector, foutcorrectie M en altijd 30 x 30 mm, de kleinste toegestane maat (Orden HAC/1177/2024, art. 21). */
@@ -57,13 +60,32 @@ export function Head({ title, sub, back, children }: { title: ReactNode; sub?: R
   return (
     <div className="head">
       <div style={{ minWidth: 0 }}>
-        {back && <a className="back" href={back.href}>‹ {back.label}</a>}
+        {back && <BackLink fallback={back} />}
         <h1>{title}</h1>
         {sub && <p>{sub}</p>}
       </div>
       {children && <div className="actions">{children}</div>}
     </div>
   )
+}
+
+/**
+ * Terug naar het scherm waar je vandaan kwam, met de naam van dat scherm (besluit Rick 8 november 2026).
+ * Zonder herkomst (rechtstreeks geopend) het vaste bovenliggende scherm `fallback`.
+ */
+function BackLink({ fallback }: { fallback: { href: string; label: string } }) {
+  const app = useAppOptional()
+  const here = location.hash.replace(/^#/, '') || 'overzicht'
+  const from = navState().from
+  const origin = from && from !== here ? from : null
+  const href = origin ? `#${origin}` : fallback.href
+  const label = origin ? routeLabel(origin, app?.s) : fallback.label
+  const onClick = (e: ReactMouseEvent<HTMLAnchorElement>) => {
+    if (!origin || e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return
+    e.preventDefault()
+    goBack()
+  }
+  return <a className="back" href={href} onClick={onClick}>‹ {label}</a>
 }
 
 export function Field({ label, hint, className = '', children }: { label: string; hint?: string; className?: string; children: (id: string) => ReactNode }) {
