@@ -1,4 +1,5 @@
 import { useMemo, useRef, useState } from 'react'
+import { takeCatalogQuery, useNavUi } from '../ui/nav'
 import { ExternalLink } from 'lucide-react'
 import type { ShowroomSpec, Supplier, SupplierShowroomItem } from '../data/types'
 import { onHandMap, reservedMap, stockKey, todayISO } from '../domain/calc'
@@ -23,10 +24,12 @@ function Available({ x }: { x: SupplierShowroomItem }) {
 
 export function ShowroomList({ supplier }: { supplier: Supplier }) {
   const { s } = useApp()
-  const [q, setQ] = useState('')
-  const [category, setCategory] = useState('')
-  const [series, setSeries] = useState('')
-  const [page, setPage] = useState(1)
+  // Zoekvraag, filters en pagina blijven bewaard bij terugkeren; het zoekveld voor alles kan een zoekvraag meegeven.
+  const k = `cat-${supplier.id}`
+  const [q, setQ] = useNavUi(`${k}-zoek`, takeCatalogQuery(supplier.id))
+  const [category, setCategory] = useNavUi(`${k}-categorie`, '')
+  const [series, setSeries] = useNavUi(`${k}-serie`, '')
+  const [page, setPage] = useNavUi(`${k}-pagina`, 1)
   const [openId, setOpenId] = useState<string | null>(null)
   const listTop = useRef<HTMLElement>(null)
   const { parts, parentOf, detailOf } = useMemo(() => showroomParts(s.supplier_showroom_items, s.supplier_showroom_details), [s])

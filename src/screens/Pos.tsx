@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
-import { AlertTriangle, Banknote, Check as CheckIcon, CreditCard, Minus, PenLine, Plus, Printer, ScanLine, Trash2, UserPlus } from 'lucide-react'
+import { AlertTriangle, Banknote, Check as CheckIcon, CreditCard, Minus, PenLine, Plus, Printer, ScanLine, Trash2, Undo2, UserPlus } from 'lucide-react'
 import type { Customer, Payment } from '../data/types'
 import { freeAt, lineTotal, todayISO } from '../domain/calc'
 import { labelBasePrice } from '../domain/labels'
 import { addPosLine, DUMMY_SKU, isDummyCode, missingCustomerData, POS_CUSTOMER_NOTE, posTotals, posWarehouse, SIMPLIFIED_LIMIT, type PosLine } from '../domain/pos'
-import { findArticleByCode, posCheckout, saveRecord } from '../domain/services'
+import { findArticleByCode, findInvoiceByNumber, posCheckout, saveRecord } from '../domain/services'
+import { canCredit, isCredit } from '../domain/credit'
 import { loadSnapshot } from '../data/driver'
 import { ArticleSearch, type ArticlePick } from '../ui/ArticleSearch'
 import { go, useApp } from '../ui/app-context'
@@ -58,6 +59,7 @@ export function Pos() {
   const people = s.salespeople.filter((p) => p.is_active)
   const [user, setUser] = useState<string>(() => read(USER_KEY, ''))
   const me = people.find((p) => p.id === user)
+  const [returning, setReturning] = useState(false)
   const pickUser = (id: string) => { setUser(id); write(USER_KEY, id) }
 
   const [lines, setLines] = useState<PosLine[]>(() => read(CART_KEY, []))
@@ -205,7 +207,9 @@ export function Pos() {
             {people.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
         </label>
+        <button className="btn" onClick={() => setReturning(true)} title={tx("Retour of correctie op een eerdere kassabon: maakt een creditfactuur")}><Undo2 size={16} />{tx("Retour")}</button>
       </Head>
+      {returning && <ReturnPicker onClose={() => setReturning(false)} />}
       <div className="pos">
         <div className="stack">
           <section className="panel pos-scan">
@@ -330,5 +334,45 @@ export function Pos() {
         </Modal>
       )}
     </>
+  )
+}
+
+/** Retour aan de kassa: zoek de eenvoudige factuur (scan of typ het nummer, of kies een recente) en maak de creditfactuur. */
+function ReturnPicker({ onClose }: { onClose: () => void }) {
+  const { s } = useApp()
+  const [number, setNumber] = useState('')
+  const [error, setError] = useState('')
+  const recent = s.invoices.filter((i) => i.simplified && !isCredit(i)).sort((a, b) => b.number.localeCompare(a.number)).slice(0, 8)
+  const open = (id: string) => go(`facturatie-crediteren-${id}`)
+  const find = (e: FormEvent) => {
+    e.preventDefault()
+    const inv = findInvoiceByNumber(s, number)
+    if (!inv) return setError(tx("Factuur {0} niet gevonden.", number.trim()))
+    if (isCredit(inv)) return setError(tx("Dit is zelf een creditfactuur."))
+    if (!canCredit(s, inv)) return setError(tx("Deze factuur is al volledig gecrediteerd."))
+    open(inv.id)
+  }
+  const customer = (id: string) => { const c = s.customers.find((x) => x.id === id); return c && c.notes !== POS_CUSTOMER_NOTE ? c.company || c.name : tx("Kassaverkoop") }
+  return (
+    <Modal title={tx("Retour of correctie")} onClose={onClose} footer={<button className="btn" onClick={onClose}>{tx("Annuleren")}</button>}>
+      <p className="small muted" style={{ marginTop: 0 }}>{tx("Een kassabon kan niet worden gewijzigd. Een retour wordt een creditfactuur op de oorspronkelijke factuur, van hetzelfde bedrijf.")}</p>
+      <form onSubmit={find} className="pos-scan-row">
+        <ScanLine size={20} aria-hidden />
+        <input autoFocus value={number} onChange={(e) => { setNumber(e.target.value); setError('') }} placeholder={tx("Scan of typ het factuurnummer")} aria-label={tx("Factuurnummer")} autoCapitalize="characters" spellCheck={false} />
+        <button className="btn primary" disabled={!number.trim()}>{tx("Zoeken")}</button>
+      </form>
+      {error && <div className="note bad">{error}</div>}
+      {recent.length > 0 && <>
+        <h3 style={{ margin: '14px 0 6px' }}>{tx("Recente kassabonnen")}</h3>
+        <div className="table-wrap flush"><table>
+          <tbody>{recent.map((i) => (
+            <tr key={i.id} className={canCredit(s, i) ? 'click' : 'muted'} onClick={() => canCredit(s, i) && open(i.id)}>
+              <td className="strong">{i.number}{i.issuer === 'hdb' && ' · HDB'}</td><td>{i.invoice_date.slice(0, 10).split('-').reverse().join('-')}</td><td>{customer(i.customer_id)}</td>
+              <td className="num">{eur(i.total)}</td><td className="small muted">{canCredit(s, i) ? '' : tx("Volledig gecrediteerd")}</td>
+            </tr>
+          ))}</tbody>
+        </table></div>
+      </>}
+    </Modal>
   )
 }

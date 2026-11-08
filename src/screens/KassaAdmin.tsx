@@ -282,9 +282,9 @@ const D: Record<Language, DocText> = {
   es: { title: 'Arqueo de caja diario', date: 'Día', by: 'Realizado por', closedAt: 'Cerrado el', sales: 'Ventas', invoices: 'Facturas simplificadas', numbers: 'Números', rate: 'Tipo de IVA', base: 'Base imponible', vat: 'IVA', total: 'Total con IVA', payments: 'Por forma de pago', cash: 'Efectivo', card: 'Tarjeta', other: 'Transferencia u online', count: 'Arqueo de caja', opening: 'Saldo inicial (cambio)', cashIn: '+ Efectivo cobrado', expected: '= Previsto en caja', counted: 'Efectivo contado', diff: 'Diferencia de efectivo', deposited: 'Retirado (banco o caja fuerte)', kept: 'Queda en caja', cardSys: 'Tarjeta según el sistema', cardTerm: 'Tarjeta según el datáfono', cardDiff: 'Diferencia de tarjeta', denoms: 'Recuento por billetes y monedas', denom: 'Valor', qty: 'Cantidad', amount: 'Importe', note: 'Observaciones', list: 'Facturas simplificadas del día', number: 'Número de factura', customer: 'Cliente', method: 'Forma de pago', noCustomer: 'Sin datos del cliente', signBy: 'Firma de quien realiza el arqueo', signCheck: 'Firma de quien lo comprueba', none: 'No hay facturas simplificadas en este día.', notFilled: 'Sin rellenar' },
 }
 const METHODS: Record<Language, Record<string, string>> = {
-  nl: { pin: 'Pin', contant: 'Contant', overboeking: 'Overboeking', online: 'Online', open: 'Open' },
-  en: { pin: 'Card', contant: 'Cash', overboeking: 'Bank transfer', online: 'Online', open: 'Open' },
-  es: { pin: 'Tarjeta', contant: 'Efectivo', overboeking: 'Transferencia', online: 'Online', open: 'Pendiente' },
+  nl: { pin: 'Pin', contant: 'Contant', overboeking: 'Overboeking', online: 'Online', verrekening: 'Verrekend', open: 'Open' },
+  en: { pin: 'Card', contant: 'Cash', overboeking: 'Bank transfer', online: 'Online', verrekening: 'Offset', open: 'Open' },
+  es: { pin: 'Tarjeta', contant: 'Efectivo', overboeking: 'Transferencia', online: 'Online', verrekening: 'Compensado', open: 'Pendiente' },
 }
 
 /** De dagstaat op A4, per bedrijf: verkopen, betaalwijzen, kasopmaak, telling per coupure en de facturen van de dag. */

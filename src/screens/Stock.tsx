@@ -4,13 +4,14 @@ import { onHandMap, reservedMap, stockKey, todayISO } from '../domain/calc'
 import { correctStock, transferStock } from '../domain/services'
 import { useApp } from '../ui/app-context'
 import { Combo, Empty, Field, fmtDate, Head, Modal, NumberField, Pill, SelectField, Sku, Tabs, TextField } from '../ui/kit'
+import { useNavUi } from '../ui/nav'
 import { isDummyProduct } from '../domain/pos'
 import { tx } from '../i18n'
 
 export function Stock() {
   const { s, run } = useApp()
-  const [tab, setTab] = useState<'stand' | 'moves'>('stand')
-  const [q, setQ] = useState('')
+  const [tab, setTab] = useNavUi<'stand' | 'moves'>('tab', 'stand')
+  const [q, setQ] = useNavUi('zoek', '')
   const [modal, setModal] = useState<'transfer' | 'correct' | null>(null)
   const [productId, setProductId] = useState('')
   const [from, setFrom] = useState('')

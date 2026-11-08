@@ -4,6 +4,7 @@ import type { Snapshot } from '../data/types'
 import { articleNo, documentLanguage, invoiceBalance, invoiceQrUrl, IS_PRODUCTION, vatBreakdown } from './calc'
 import { INVOICE_TEXT, invoiceTitle } from './noteText'
 import { POS_CUSTOMER_NOTE } from './pos'
+import { creditsOf, isCredit } from './credit'
 import { imageSrc, issuerInfo, issuerOf, legalLine } from './issuers'
 import { A4, INK, MARGIN, MUTED, safe, wrap, ymd } from './signedNotePdf'
 
@@ -41,7 +42,12 @@ export async function invoicePdf(s: Snapshot, invoiceId: string) {
   // Bedragen altijd in Nederlandse opmaak (€ 1.460,00), ook op een Spaanse of Engelse factuur.
   const money = (n: number) => new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' }).format(n || 0)
   const lines = s.invoice_lines.filter((l) => l.invoice_id === inv.id)
-  const paid = s.payments.filter((p) => p.invoice_id === inv.id).reduce((n, p) => n + p.amount, 0)
+  // Creditfactuur: verwijzing naar de oorspronkelijke factuur; verrekening staat apart van (terug)betalingen.
+  const isCr = isCredit(inv)
+  const origInv = isCr ? s.invoices.find((x) => x.id === inv.credit_of) ?? null : null
+  const pays = s.payments.filter((p) => p.invoice_id === inv.id)
+  const settled = Math.abs(pays.filter((p) => p.method === 'verrekening').reduce((n, p) => n + p.amount, 0))
+  const paid = Math.abs(pays.filter((p) => p.method !== 'verrekening').reduce((n, p) => n + p.amount, 0))
   const b = vatBreakdown(lines.map((l) => ({ total: l.line_total, vat_rate: l.vat_rate })))
 
   const doc = await PDFDocument.create()
@@ -91,10 +97,10 @@ export async function invoicePdf(s: Snapshot, invoiceId: string) {
 
 
   const right = MARGIN + width
-  text(invoiceTitle(t, inv), right, top - 18, { font: bold, size: 18, right: true })
+  text(invoiceTitle(t, inv), right, top - 18, { font: bold, size: invoiceTitle(t, inv).length > 24 ? 14 : 18, right: true })
   text(inv.number, right, top - 34, { font: bold, size: 11, right: true })
   text(`${t.date}: ${ymd(inv.invoice_date)}`, right, top - 48, { color: MUTED, right: true })
-  if (!inv.simplified) text(`${t.due}: ${ymd(inv.due_date)}`, right, top - 60, { color: MUTED, right: true })
+  if (!inv.simplified && !isCr) text(`${t.due}: ${ymd(inv.due_date)}`, right, top - 60, { color: MUTED, right: true })
   text(`${t.order}: ${o.number}${o.customer_reference ? ` (${o.customer_reference})` : ''}`, right, top - 72, { color: MUTED, right: true })
   y = Math.min(leftEnd, top - 80) - 22
 
@@ -106,6 +112,11 @@ export async function invoicePdf(s: Snapshot, invoiceId: string) {
     block(`${c.postal_code ?? ''} ${c.city ?? ''}${c.country ? `, ${c.country}` : ''}`.trim(), MARGIN, width)
     if (c.tax_id) block(`${t.tax}: ${c.tax_id}`, MARGIN, width)
     y -= 16
+  }
+
+  if (origInv) {
+    block(`${t.corrects} ${origInv.number} ${t.of_date} ${ymd(origInv.invoice_date)}. ${t.reason}: ${inv.credit_reason ?? ''}`, MARGIN, width, { font: bold, size: 9 })
+    y -= 10
   }
 
   // Regels
@@ -144,8 +155,15 @@ export async function invoicePdf(s: Snapshot, invoiceId: string) {
   for (const r of b.rates) rows.push([`${t.vat} ${r.rate}%`, money(r.vat), false])
   rows.push([t.total, money(inv.total), true])
   if (inv.deposit_settled > 0) rows.push([t.deposit, `-${money(inv.deposit_settled)}`, false])
-  if (paid > 0) rows.push([t.paid, `-${money(paid)}`, false])
-  rows.push([t.due_amt, money(invoiceBalance(s, inv)), true])
+  if (isCr) {
+    if (settled > 0) rows.push([`${t.settled} ${origInv?.number ?? ''}`, money(settled), false])
+    if (paid > 0) rows.push([t.refunded, money(paid), false])
+    rows.push([t.to_refund, money(-invoiceBalance(s, inv)), true])
+  } else {
+    if (settled > 0) rows.push([`${t.settled_credit} ${creditsOf(s, inv.id).map((x) => x.number).join(', ')}`, `-${money(settled)}`, false])
+    if (paid > 0) rows.push([t.paid, `-${money(paid)}`, false])
+    rows.push([t.due_amt, money(invoiceBalance(s, inv)), true])
+  }
   room(rows.length * 15 + 10)
   for (const [label, value, strong] of rows) {
     text(label, right - 200, y - 10, { font: strong ? bold : regular, size: strong ? 10 : 9 })
@@ -154,7 +172,7 @@ export async function invoicePdf(s: Snapshot, invoiceId: string) {
   }
   y -= 18
   room(30)
-  if (!inv.simplified) block(`${t.pay}: ${co?.iban ?? ''}`, MARGIN, width, { color: MUTED, size: 8.5 })
+  if (!inv.simplified && !isCr) block(`${t.pay}: ${co?.iban ?? ''}`, MARGIN, width, { color: MUTED, size: 8.5 })
   if (co?.invoice_footer && issuer?.key !== 'hdb') block(co.invoice_footer, MARGIN, width, { color: MUTED, size: 8.5 })
 
   // Voet op elke pagina (besluit Rick 8 november 2026): linksonder de QR van 30 x 30 mm (alleen gewone factuur),

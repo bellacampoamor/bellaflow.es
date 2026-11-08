@@ -29,7 +29,7 @@ export function routeLabel(hash: string, s?: Snapshot | null): string {
     }
     case 'facturatie':
       if (!param || param.startsWith('naar-')) return tx("Facturatie")
-      return num(s?.invoices, param.replace(/^print-/, '')) || tx("Facturatie")
+      return num(s?.invoices, param.replace(/^(print|crediteren)-/, '')) || tx("Facturatie")
     case 'rapportage':
       return param === 'kassa' ? tx("Factuuroverzicht kassa") : param === 'leverbaar' ? tx("Leverbaar") : tx("Factuuroverzicht")
     case 'kassabeheer': return param === 'dagafsluiting' ? tx("Dagafsluiting") : tx("Factuuroverzicht kassa")

@@ -1,9 +1,9 @@
-import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useState, type ReactNode } from 'react'
 import { loadSnapshot, type Driver } from '../data/driver'
 import type { Snapshot } from '../data/types'
 import { FlowError } from '../domain/services'
 import { tx } from '../i18n'
-import { goBack } from './nav'
+import { goBack, navState, restoreScroll, scrollTarget } from './nav'
 
 interface Ctx {
   db: Driver
@@ -85,12 +85,15 @@ export function useAutoPrint(enabled: boolean, ready: boolean, backTo = 'archief
 
 export function useHash() {
   const read = () => location.hash.replace(/^#/, '') || 'overzicht'
-  const [hash, setHash] = useState(read)
+  const [nav, setNav] = useState(() => ({ hash: read(), target: -1 }))
   useEffect(() => {
-    const on = () => { setHash(read()); window.scrollTo(0, 0) }
+    const on = () => setNav({ hash: read(), target: scrollTarget(navState()) })
     window.addEventListener('hashchange', on)
     return () => window.removeEventListener('hashchange', on)
   }, [])
-  return hash
+  // Terug: dezelfde plek in de lijst als toen je wegging; een nieuw scherm begint bovenaan.
+  // Pas nadat het nieuwe scherm er staat, anders scrolt het oude scherm.
+  useLayoutEffect(() => { if (nav.target >= 0) restoreScroll(nav.target) }, [nav])
+  return nav.hash
 }
 export const go = (hash: string) => { location.hash = hash }

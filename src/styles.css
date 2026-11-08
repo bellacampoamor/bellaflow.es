@@ -872,3 +872,14 @@ tr.close-hist.on td { background: var(--selected); color: var(--on-selected); }
 .daystate-denoms { break-inside: avoid; }
 .daystate-sign { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-top: 40px; font-size: 9pt; break-inside: avoid; }
 .sign-line { border-bottom: 1px solid #40444E; height: 36px; margin-bottom: 4px; }
+
+/* Zoeken in alles (Ctrl+K): bestaande tokens, dag- en nachtstand. */
+.gs-input { display: flex; align-items: center; gap: 10px; border: 1px solid var(--line-strong); border-radius: 10px; padding: 4px 12px; background: var(--surface); color: var(--muted); }
+.gs-input:focus-within { border-color: var(--brand-line); }
+.gs-input input { border: 0; outline: 0; box-shadow: none; background: transparent; padding: 8px 0; font-size: 1.02rem; flex: 1; color: var(--fg); }
+.gs-list { max-height: min(60vh, 560px); overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
+.gs-group-head { display: flex; align-items: center; gap: 6px; font: 600 .78rem var(--body); text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin: 0 0 4px 2px; }
+.gs-row { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; width: 100%; text-align: left; background: none; border: 0; border-radius: 8px; padding: 7px 10px; cursor: pointer; color: var(--fg); font: inherit; }
+.gs-row.on { background: var(--surface-2); box-shadow: inset 3px 0 0 var(--brand-line); }
+.gs-title { font-weight: 600; color: var(--heading); }
+.gs-sub { font-size: .84rem; color: var(--muted); }

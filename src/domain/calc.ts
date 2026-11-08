@@ -202,9 +202,12 @@ export function invoiceBalance(s: Snapshot, inv: Invoice) {
   return round2(inv.total - inv.deposit_settled - paid)
 }
 
-export type InvoiceState = 'betaald' | 'open' | 'te_laat'
+export type InvoiceState = 'betaald' | 'open' | 'te_laat' | 'terugbetalen'
 export function invoiceState(s: Snapshot, inv: Invoice, today = todayISO()): InvoiceState {
-  if (invoiceBalance(s, inv) <= 0) return 'betaald'
+  const balance = invoiceBalance(s, inv)
+  // Creditfactuur met een negatief saldo: de klant krijgt nog geld terug.
+  if (balance < 0) return 'terugbetalen'
+  if (balance === 0) return 'betaald'
   return inv.due_date < today ? 'te_laat' : 'open'
 }
 

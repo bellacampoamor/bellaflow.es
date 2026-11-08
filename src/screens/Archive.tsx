@@ -5,6 +5,7 @@ import { archiveRows } from '../domain/calc'
 import { mailSignedNote } from '../domain/services'
 import { useApp } from '../ui/app-context'
 import { Empty, fmtDate, Pill, Tabs, type Tone } from '../ui/kit'
+import { useNavUi } from '../ui/nav'
 import { tx } from '../i18n'
 
 type Tab = 'alles' | 'compleet' | 'factureren'
@@ -16,8 +17,8 @@ const MAIL: Record<EmailStatus, [string, Tone]> = {
 
 export function Archive() {
   const { s, run } = useApp()
-  const [tab, setTab] = useState<Tab>('alles')
-  const [q, setQ] = useState('')
+  const [tab, setTab] = useNavUi<Tab>('tab', 'alles')
+  const [q, setQ] = useNavUi('zoek', '')
   const all = archiveRows(s)
   const customer = (id: string | null) => { const c = s.customers.find((x) => x.id === id); return c?.company || c?.name || '' }
   const t = q.trim().toLowerCase()

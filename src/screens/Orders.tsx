@@ -8,7 +8,7 @@ import { Check, Empty, eur, fmtDate, Head, Modal, NumberField, NumInput, Pill, S
 import { tx } from '../i18n'
 import { activeIn, currentPhase, followRank, inOrdersTab, orderFlow, ordersHref, PHASES, PHASE_LABEL, type FollowUp, type OrdersTab, type PhaseKey } from '../domain/orderFlow'
 import { FlowTrack, FOLLOW_LABEL, MiniTrack, NextStep, PhaseCell, PHASE_ICON, phaseText } from '../ui/OrderFlowTrack'
-import { replaceHash } from '../ui/nav'
+import { replaceHash, useNavUi } from '../ui/nav'
 
 const FOLLOW_TONE: Record<FollowUp, Tone> = { te_laat: 'bad', actie: 'sell', wacht: 'info', afgerond: 'good', geannuleerd: '' }
 
@@ -22,7 +22,7 @@ export function Orders({ tab = 'opvolgen', phase: initialPhase = null }: { tab?:
   const remember = (f: Filter, p: PhaseKey | null) => replaceHash(ordersHref(f, p ?? undefined))
   const setFilter = (f: Filter) => { setFilterState(f); setPhaseState(null); remember(f, null) }
   const setPhase = (p: PhaseKey | null) => { setPhaseState(p); remember(filter, p) }
-  const [q, setQ] = useState('')
+  const [q, setQ] = useNavUi('zoek', '')
   const today = todayISO()
   const rows = useMemo(() => s.sales_orders.map((o) => ({ o, flow: orderFlow(s, o, today), cust: s.customers.find((c) => c.id === o.customer_id) }))
     .sort((a, b) => followRank(a.flow.follow) - followRank(b.flow.follow) || b.o.order_date.localeCompare(a.o.order_date) || b.o.number.localeCompare(a.o.number)), [s, today])

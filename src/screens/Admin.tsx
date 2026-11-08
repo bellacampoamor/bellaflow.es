@@ -4,7 +4,9 @@ import type { Customer, DocumentLanguage, Language, ListLanguage, Salesperson, S
 import { saveRecord, saveSettings, saveStaff, saveSupplier, saveSupplierSurcharge, type PrefixField } from '../domain/services'
 import { priceWithSurcharge } from '../domain/articles'
 import { useApp } from '../ui/app-context'
-import { AreaField, BackToTop, Check, eur, Head, Modal, NumberField, Pager, Pill, SelectField, Tabs, TextField } from '../ui/kit'
+import { useNavUi } from '../ui/nav'
+import { fold } from '../domain/search'
+import { AreaField, BackToTop, Check, Empty, eur, Head, Modal, NumberField, Pager, Pill, SelectField, Tabs, TextField } from '../ui/kit'
 import { CustomerFields } from './OrderForm'
 import { tx } from '../i18n'
 import { isSpanishSupplier } from '../domain/calc'
@@ -20,12 +22,14 @@ const NEW = {
   customer: { kind: 'particulier', name: '', company: '', tax_id: '', email: '', phone: '', language: 'es', address: '', postal_code: '', city: '', province: 'Alicante', country: 'España', notes: '' } as Omit<Customer, 'id'>,
 }
 
-export function Admin() {
+/** param: klant-<id> opent die klant (vanuit het zoekveld voor alles). */
+export function Admin({ param = '' }: { param?: string }) {
   const { s, run, toast } = useApp()
-  const [tab, setTab] = useState<Tab>('magazijnen')
+  const openCustomer = param.startsWith('klant-') ? s.customers.find((c) => c.id === param.slice(6)) ?? null : null
+  const [tab, setTab] = useNavUi<Tab>('admin-tab', openCustomer ? 'klanten' : 'magazijnen')
   const [wh, setWh] = useState<(Omit<Warehouse, 'id'> & { id?: string }) | null>(null)
   const [su, setSu] = useState<(Omit<Supplier, 'id'> & { id?: string }) | null>(null)
-  const [cu, setCu] = useState<(Omit<Customer, 'id'> & { id?: string }) | null>(null)
+  const [cu, setCu] = useState<(Omit<Customer, 'id'> & { id?: string }) | null>(openCustomer)
   const [se, setSe] = useState<(Omit<Salesperson, 'id'> & { id?: string }) | null>(null)
   const [co, setCo] = useState<Settings>(s.settings[0])
 
@@ -142,8 +146,8 @@ export function Admin() {
         <h2>{tx("Documentnummers")}</h2>
         <p className="small muted">{tx("Nummers bestaan uit voorvoegsel, jaar en teller. Een nieuw voorvoegsel geldt voor nieuwe documenten en de teller loopt door. Bestaande documenten houden hun nummer.")}</p>
         <div className="form-grid">
-          {([['prefix_purchase', tx("Inkooporders")], ['prefix_delivery', tx("Afleverbonnen")], ['prefix_proforma', tx("Proforma's")], ['prefix_invoice', tx("Facturen")], ['prefix_invoice_simplified', tx("Eenvoudige fact Bella")], ['prefix_invoice_simplified_hdb', tx("Eenvoudige fact HDB")], ['prefix_sales_order', tx("Verkooporders")], ['prefix_receipt', tx("Goederenontvangsten")], ['prefix_transport', tx("Transporten")]] as [PrefixField, string][]).map(([field, label]) => (
-            <TextField key={field} label={label} value={co[field] ?? ''} onChange={(v) => setCo({ ...co, [field]: v.toUpperCase() })} hint={tx("Bijvoorbeeld {0}", `${co[field] || (field === 'prefix_proforma' ? 'PF' : field === 'prefix_invoice_simplified' ? 'FS-BELLA' : field === 'prefix_invoice_simplified_hdb' ? 'FS-HDB' : '…')}-${new Date().getFullYear()}-0001`)} />
+          {([['prefix_purchase', tx("Inkooporders")], ['prefix_delivery', tx("Afleverbonnen")], ['prefix_proforma', tx("Proforma's")], ['prefix_invoice', tx("Facturen")], ['prefix_invoice_simplified', tx("Eenvoudige fact Bella")], ['prefix_invoice_simplified_hdb', tx("Eenvoudige fact HDB")], ['prefix_invoice_credit', tx("Creditfacturen")], ['prefix_invoice_credit_simplified', tx("Creditfact kassa Bella")], ['prefix_invoice_credit_simplified_hdb', tx("Creditfact kassa HDB")], ['prefix_sales_order', tx("Verkooporders")], ['prefix_receipt', tx("Goederenontvangsten")], ['prefix_transport', tx("Transporten")]] as [PrefixField, string][]).map(([field, label]) => (
+            <TextField key={field} label={label} value={co[field] ?? ''} onChange={(v) => setCo({ ...co, [field]: v.toUpperCase() })} hint={tx("Bijvoorbeeld {0}", `${co[field] || (field === 'prefix_proforma' ? 'PF' : field === 'prefix_invoice_simplified' ? 'FS-BELLA' : field === 'prefix_invoice_simplified_hdb' ? 'FS-HDB' : field === 'prefix_invoice_credit' ? 'FR' : field === 'prefix_invoice_credit_simplified' ? 'FRS-BELLA' : field === 'prefix_invoice_credit_simplified_hdb' ? 'FRS-HDB' : '…')}-${new Date().getFullYear()}-0001`)} />
           ))}
         </div>
         </section>
@@ -224,15 +228,20 @@ export function Admin() {
 const CUSTOMER_PAGE_SIZE = 50
 
 /** Klantenlijst onder Instellingen: 50 regels per pagina, met paginering en een knop naar boven, zoals in Catalogi. */
-function CustomerList({ customers, onOpen }: { customers: Customer[]; onOpen: (c: Customer) => void }) {
-  const [page, setPage] = useState(1)
+function CustomerList({ customers: all, onOpen }: { customers: Customer[]; onOpen: (c: Customer) => void }) {
+  const [page, setPage] = useNavUi('klanten-pagina', 1)
+  const [q, setQ] = useNavUi('klanten-zoek', '')
   const listTop = useRef<HTMLElement>(null)
+  const words = fold(q).split(/\s+/).filter(Boolean)
+  const customers = words.length ? all.filter((c) => { const hay = fold([c.name, c.company, c.city, c.phone, c.email, c.tax_id].join(' ')); return words.every((w) => hay.includes(w)) }) : all
   const pages = Math.max(1, Math.ceil(customers.length / CUSTOMER_PAGE_SIZE))
   const current = Math.min(page, pages)
   const shown = customers.slice((current - 1) * CUSTOMER_PAGE_SIZE, current * CUSTOMER_PAGE_SIZE)
   const goPage = (p: number) => { setPage(p); listTop.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }) }
   return (
     <section className="panel" ref={listTop}>
+      <input style={{ maxWidth: 320, marginBottom: 14 }} aria-label={tx("Klanten zoeken")} placeholder={tx("Zoek op naam, plaats, telefoon, e-mail of NIF")} value={q} onChange={(e) => { setQ(e.target.value); setPage(1) }} />
+      {customers.length === 0 && <Empty>{tx("Geen klanten gevonden.")}</Empty>}
       <div className="table-wrap"><table>
         <thead><tr><th>{tx("Naam")}</th><th>{tx("Soort")}</th><th>{tx("Plaats")}</th><th>{tx("Telefoon")}</th><th>{tx("E-mail")}</th><th>{tx("Factuurtaal")}</th></tr></thead>
         <tbody>{shown.map((c) => <tr key={c.id} className="click" onClick={() => onOpen(c)}><td className="strong">{c.company || c.name}</td><td>{tx(c.kind[0].toUpperCase() + c.kind.slice(1))}</td><td>{c.city}</td><td>{c.phone}</td><td className="muted">{c.email}</td><td>{{ es: tx("Spaans"), nl: tx("Nederlands"), en: tx("Engels") }[c.language]}</td></tr>)}</tbody>

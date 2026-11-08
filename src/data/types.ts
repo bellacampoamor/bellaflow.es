@@ -7,6 +7,8 @@ export interface Settings {
   prefix_sales_order: string; prefix_purchase: string; prefix_receipt: string; prefix_delivery: string; prefix_invoice: string; prefix_transport: string; prefix_proforma: string
   /** Voorvoegsel van de eenvoudige facturen (kassa) van Bella, standaard FS-BELLA, en van HDB, standaard FS-HDB. */
   prefix_invoice_simplified?: string; prefix_invoice_simplified_hdb?: string
+  /** Voorvoegsels van de creditfacturen (facturas rectificativas): gewoon FR, kassa Bella FRS-BELLA, kassa HDB FRS-HDB. Elk een eigen reeks. */
+  prefix_invoice_credit?: string; prefix_invoice_credit_simplified?: string; prefix_invoice_credit_simplified_hdb?: string
   /** Afdruktaal van de eenvoudige factuur (kassa), standaard Spaans. */
   language_invoice_simplified?: DocumentLanguage
   /** Logo (linksboven) en beeldmerk (klein onderaan) op de eenvoudige factuur: data-URL of pad in public/. */
@@ -142,7 +144,7 @@ export interface GoodsReceiptLine {
 }
 export interface StockMovement {
   id: string; product_id: string; warehouse_id: string; qty: number
-  kind: 'ontvangst' | 'levering' | 'overboeking' | 'correctie'; ref_id: string; note: string; moved_at: string
+  kind: 'ontvangst' | 'levering' | 'overboeking' | 'correctie' | 'retour'; ref_id: string; note: string; moved_at: string
 }
 export interface Delivery {
   id: string; number: string; sales_order_id: string; sequence: number
@@ -169,20 +171,25 @@ export interface DeliveryLine {
 }
 export interface Invoice {
   id: string; number: string; sales_order_id: string; customer_id: string
-  kind: 'deelfactuur' | 'eindfactuur' | 'volledig'; invoice_date: string; due_date: string
+  kind: 'deelfactuur' | 'eindfactuur' | 'volledig' | 'creditfactuur'; invoice_date: string; due_date: string
   base_amount: number; vat_amount: number; total: number; deposit_settled: number; language: Language
   /** Factura simplificada (kassa), met een eigen nummerreeks. */
   simplified?: boolean
   /** Uitgevend bedrijf van een eenvoudige factuur: Bella (standaard) of HDB. */
   issuer?: 'bella' | 'hdb'
+  /** Creditfactuur (factura rectificativa): de factuur die gecorrigeerd wordt, en de reden. Bedragen zijn negatief. */
+  credit_of?: string | null; credit_reason?: string
 }
 export interface InvoiceLine {
   id: string; invoice_id: string; delivery_line_id: string | null; article_number: string; description: string; qty: number
   unit_price: number; discount_pct: number; vat_rate: number; line_total: number
+  /** Op een creditfactuur: de regel van de oorspronkelijke factuur die (deels) gecrediteerd wordt. */
+  credits_line_id?: string | null
 }
 export interface Payment {
   id: string; sales_order_id: string; invoice_id: string | null; kind: 'vooruitbetaling' | 'betaling'
-  method: 'pin' | 'contant' | 'overboeking' | 'online'; amount: number; paid_at: string; reference: string
+  /** verrekening: creditfactuur verrekend met wat nog openstond op de oorspronkelijke factuur. Een negatief bedrag is een terugbetaling. */
+  method: 'pin' | 'contant' | 'overboeking' | 'online' | 'verrekening'; amount: number; paid_at: string; reference: string
 }
 export interface NumberSeries { id: string; last_number: number }
 /** Dagafsluiting en kasopmaak van de kassa, per bedrijf en per dag. Na afsluiten niet meer te wijzigen. */

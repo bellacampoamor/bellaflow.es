@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react'
 import { FileText, Mail } from 'lucide-react'
 import type { Payment } from '../data/types'
 import { IS_PRODUCTION, articleNo, deliveryValue, depositAvailable, documentLanguage, hasTaxId, invoiceBalance, invoiceQrUrl, invoiceState, todayISO, uninvoicedDeliveries, vatBreakdown } from '../domain/calc'
-import { ensureProformas, invoiceProformas, mailInvoice, payInvoice } from '../domain/services'
+import { ensureProformas, invoiceProformas, mailInvoice, payInvoice, refundCredit } from '../domain/services'
+import { canCredit, creditsOf, isCredit } from '../domain/credit'
 import { go, useApp, useAutoPrint } from '../ui/app-context'
 import { Empty, eur, fmtDate, Head, Modal, NumberField, Pill, SelectField, Tabs, TextField, DocPaper, pickRow, PickMark, TaxQr, useScrollToFocus, brandFile } from '../ui/kit'
 import { tx } from '../i18n'
@@ -10,7 +11,8 @@ import { INVOICE_TEXT, invoiceTitle } from '../domain/noteText'
 import { POS_CUSTOMER_NOTE } from '../domain/pos'
 import { imageSrc, issuerInfo, issuerOf, legalLine } from '../domain/issuers'
 
-const STATE = { betaald: ['Betaald', 'good'], open: ['Open', 'bill'], te_laat: ['Te laat', 'bad'] } as const
+const KIND = { deelfactuur: 'Deelfactuur', eindfactuur: 'Eindfactuur', volledig: 'Volledig', creditfactuur: 'Creditfactuur' } as const
+const STATE = { betaald: ['Betaald', 'good'], open: ['Open', 'bill'], te_laat: ['Te laat', 'bad'], terugbetalen: ['Terug te betalen', 'warn'] } as const
 
 /** focus: levering (PF) waar het scherm naartoe scrolt; die staat meteen geselecteerd om te factureren. */
 export function Invoices({ focus }: { focus?: string }) {
@@ -23,7 +25,7 @@ export function Invoices({ focus }: { focus?: string }) {
   const chosen = proformas.filter((p) => ticked.has(p.d.id))
   const allTicked = proformas.length > 0 && chosen.length === proformas.length
   const toggle = (id: string, on: boolean) => setTicked((v) => { const n = new Set(v); if (on) n.add(id); else n.delete(id); return n })
-  const rows = [...s.invoices].sort((a, b) => b.number.localeCompare(a.number)).filter((i) => tab === 'all' || invoiceBalance(s, i) > 0)
+  const rows = [...s.invoices].sort((a, b) => b.number.localeCompare(a.number)).filter((i) => tab === 'all' || invoiceBalance(s, i) !== 0)
   const missing = s.deliveries.some((d) => d.status === 'delivered' && !d.proforma_number) && proformas.some((p) => !p.d.proforma_number)
   useEffect(() => { if (missing) void run((db) => ensureProformas(db)) }, [missing, run])
   return (
@@ -54,7 +56,7 @@ export function Invoices({ focus }: { focus?: string }) {
           </table></div>}
         </section>
         <section className="panel">
-          <Tabs value={tab} onChange={setTab} tabs={[{ value: 'open', label: tx("Openstaand"), n: s.invoices.filter((i) => invoiceBalance(s, i) > 0).length }, { value: 'all', label: tx("Alle facturen"), n: s.invoices.length }]} />
+          <Tabs value={tab} onChange={setTab} tabs={[{ value: 'open', label: tx("Openstaand"), n: s.invoices.filter((i) => invoiceBalance(s, i) !== 0).length }, { value: 'all', label: tx("Alle facturen"), n: s.invoices.length }]} />
           {rows.length === 0 && <Empty>{tab === 'open' ? tx("Geen openstaande facturen.") : tx("Nog geen facturen.")}</Empty>}
           {rows.length > 0 && <div className="table-wrap"><table>
             <thead><tr><th aria-label="PDF" /><th>{tx("Factuur")}</th><th>{tx("Datum")}</th><th>{tx("Klant")}</th><th>{tx("Soort")}</th><th className="num">{tx("Totaal")}</th><th className="num">{tx("Verrekend")}</th><th className="num">{tx("Open")}</th><th>{tx("Vervalt")}</th><th>{tx("Status")}</th></tr></thead>
@@ -64,8 +66,8 @@ export function Invoices({ focus }: { focus?: string }) {
               return (
                 <tr key={i.id} className="click" onClick={() => go(`facturatie-${i.id}`)}>
                   <td><a className="pdf-ic" href={`#facturatie-${i.id}`} title={tx("Factuur {0} openen als PDF", i.number)} aria-label={tx("Factuur {0} openen als PDF", i.number)}><FileText size={18} /><span>PDF</span></a></td>
-                  <td><a className="rowlink" href={`#facturatie-${i.id}`}>{i.number}</a>{i.issuer === 'hdb' && <> <Pill tone="info">HDB</Pill></>}</td><td>{fmtDate(i.invoice_date)}</td><td>{c.company || c.name}</td>
-                  <td>{tx(i.kind[0].toUpperCase() + i.kind.slice(1))}</td><td className="num">{eur(i.total)}</td><td className="num">{i.deposit_settled ? eur(i.deposit_settled) : <span className="zero">–</span>}</td>
+                  <td><a className="rowlink" href={`#facturatie-${i.id}`}>{i.number}</a>{i.issuer === 'hdb' && <> <Pill tone="info">HDB</Pill></>}{isCredit(i) && <> <Pill tone="warn">{tx("Credit")}</Pill></>}</td><td>{fmtDate(i.invoice_date)}</td><td>{c.company || c.name}</td>
+                  <td>{tx(KIND[i.kind])}</td><td className="num">{eur(i.total)}</td><td className="num">{i.deposit_settled ? eur(i.deposit_settled) : <span className="zero">–</span>}</td>
                   <td className="num">{eur(invoiceBalance(s, i))}</td><td>{fmtDate(i.due_date)}</td><td><Pill tone={tone}>{tx(label)}</Pill></td>
                 </tr>
               )
@@ -129,7 +131,13 @@ export function InvoiceDetail({ id, autoPrint = false }: { id: string; autoPrint
   // Facturen van voor het artikelnummer op de factuurregel
   const articleOf = (dl: string | null) => articleNo(s, s.sales_order_lines.find((x) => x.id === s.delivery_lines.find((y) => y.id === dl)?.sales_order_line_id)?.product_id)
   const b = vatBreakdown(lines.map((l) => ({ total: l.line_total, vat_rate: l.vat_rate })))
-  const paid = s.payments.filter((p) => p.invoice_id === id).reduce((n, p) => n + p.amount, 0)
+  const credit = isCredit(inv)
+  const original = credit ? s.invoices.find((x) => x.id === inv.credit_of) ?? null : null
+  const credits = creditsOf(s, id)
+  const pays = s.payments.filter((p) => p.invoice_id === id)
+  // Verrekening tussen factuur en creditfactuur staat apart van echte betalingen en terugbetalingen.
+  const settled = Math.abs(pays.filter((p) => p.method === 'verrekening').reduce((n, p) => n + p.amount, 0))
+  const paid = Math.abs(pays.filter((p) => p.method !== 'verrekening').reduce((n, p) => n + p.amount, 0))
   const balance = invoiceBalance(s, inv)
   const [label, tone] = STATE[invoiceState(s, inv)]
   const canPrint = !import.meta.env.VITE_PREVIEW
@@ -146,9 +154,13 @@ export function InvoiceDetail({ id, autoPrint = false }: { id: string; autoPrint
         <a className="btn" href={`#orders-${o.id}`}>{tx("Naar")} {o.number}</a>
         {canPrint && <button className="btn" onClick={() => window.print()}>{tx("Afdrukken of PDF")}</button>}
         <button className="btn" onClick={() => setMailTo(mail?.to_email || c.email || '')}><Mail size={15} style={{ verticalAlign: -2, marginRight: 4 }} />{mail ? tx("Opnieuw mailen") : tx("Mailen")}</button>
-        {balance > 0 && <button className="btn primary" onClick={() => { setAmount(balance); setPay(true) }}>{tx("Betaling registreren")}</button>}
+        {!credit && canCredit(s, inv) && <a className="btn" href={`#facturatie-crediteren-${inv.id}`}>{tx("Crediteren of retour")}</a>}
+        {!credit && balance > 0 && <button className="btn primary" onClick={() => { setAmount(balance); setPay(true) }}>{tx("Betaling registreren")}</button>}
+        {credit && balance < 0 && <button className="btn primary" onClick={() => { setAmount(-balance); setMethod(inv.simplified ? 'contant' : 'overboeking'); setPay(true) }}>{tx("Terugbetaling registreren")}</button>}
       </Head>
       {mail && <div className="no-print" style={{ marginBottom: 12 }}><Pill tone={MAIL_STATE[mail.status][1]}>{tx(MAIL_STATE[mail.status][0], mail.to_email)}</Pill>{mail.status === 'failed' && mail.error && <span className="small muted"> {mail.error}</span>}</div>}
+      {original && <div className="note no-print" style={{ marginBottom: 12 }}>{tx("Creditfactuur op factuur")} <a href={`#facturatie-${original.id}`}>{original.number}</a>. {tx("Reden")}: {inv.credit_reason}</div>}
+      {credits.length > 0 && <div className="note no-print" style={{ marginBottom: 12 }}>{tx("Gecrediteerd met")} {credits.map((c, n) => <span key={c.id}>{n > 0 && ', '}<a href={`#facturatie-${c.id}`}>{c.number}</a> ({eur(c.total)})</span>)}</div>}
       {!inv.simplified && !hasTaxId(nif) && <div className="note warn no-print" style={{ marginBottom: 12 }}>{tx("De QR-code op deze factuur klopt pas als het CIF is ingevuld onder Instellingen.")}</div>}
       <DocPaper language={language} tallFoot={!inv.simplified} foot={<div className="invoice-foot">
           <div className="invoice-foot-qr">{!inv.simplified && <TaxQr url={invoiceQrUrl({ nif, number: inv.number, date: inv.invoice_date, total: inv.total }, IS_PRODUCTION)} />}</div>
@@ -177,6 +189,7 @@ export function InvoiceDetail({ id, autoPrint = false }: { id: string; autoPrint
             <div className="small muted">{t.date}: {fmtDate(inv.invoice_date)}<br />{!inv.simplified && <>{t.due}: {fmtDate(inv.due_date)}<br /></>}{t.order}: {o.number}{o.customer_reference ? ` (${o.customer_reference})` : ''}</div>
           </div>
         </div>
+        {original && <p className="small" style={{ margin: '0 0 18px' }}><strong>{t.corrects} {original.number}</strong> {t.of_date} {fmtDate(original.invoice_date)}. {t.reason}: {inv.credit_reason}</p>}
         {c.notes !== POS_CUSTOMER_NOTE && <div style={{ marginBottom: 22 }}>
           <div className="small muted">{t.to}</div>
           <div className="strong">{c.company || c.name}</div>
@@ -191,10 +204,17 @@ export function InvoiceDetail({ id, autoPrint = false }: { id: string; autoPrint
           {b.rates.map((r) => <div key={r.rate}><span>{t.vat} {r.rate}%</span><span>{eur(r.vat)}</span></div>)}
           <div className="strong"><span>{t.total}</span><span>{eur(inv.total)}</span></div>
           {inv.deposit_settled > 0 && <div><span>{t.deposit}</span><span>−{eur(inv.deposit_settled)}</span></div>}
-          {paid > 0 && <div><span>{t.paid}</span><span>−{eur(paid)}</span></div>}
-          <div className="grand"><span>{t.due_amt}</span><span>{eur(balance)}</span></div>
+          {credit ? <>
+            {settled > 0 && <div><span>{t.settled} {original?.number}</span><span>{eur(settled)}</span></div>}
+            {paid > 0 && <div><span>{t.refunded}</span><span>{eur(paid)}</span></div>}
+            <div className="grand"><span>{t.to_refund}</span><span>{eur(-balance)}</span></div>
+          </> : <>
+            {settled > 0 && <div><span>{t.settled_credit} {credits.map((x) => x.number).join(', ')}</span><span>−{eur(settled)}</span></div>}
+            {paid > 0 && <div><span>{t.paid}</span><span>−{eur(paid)}</span></div>}
+            <div className="grand"><span>{t.due_amt}</span><span>{eur(balance)}</span></div>
+          </>}
         </div>
-        {!inv.simplified && <p className="small muted" style={{ marginTop: 26, marginBottom: 0 }}>{t.pay}: {co.iban}{co.invoice_footer ? <><br />{co.invoice_footer}</> : ''}</p>}
+        {!inv.simplified && !credit && <p className="small muted" style={{ marginTop: 26, marginBottom: 0 }}>{t.pay}: {co.iban}{co.invoice_footer ? <><br />{co.invoice_footer}</> : ''}</p>}
         {issuer?.key === 'bella' && co.invoice_footer && <p className="small muted" style={{ marginTop: 26, marginBottom: 0 }}>{co.invoice_footer}</p>}
       </DocPaper>
       {mailTo !== null && (
@@ -206,12 +226,18 @@ export function InvoiceDetail({ id, autoPrint = false }: { id: string; autoPrint
         </Modal>
       )}
       {pay && (
-        <Modal title={tx("Betaling registreren")} onClose={() => setPay(false)} footer={<>
+        <Modal title={credit ? tx("Terugbetaling registreren") : tx("Betaling registreren")} onClose={() => setPay(false)} footer={<>
           <button className="btn" onClick={() => setPay(false)}>{tx("Annuleren")}</button>
-          <button className="btn primary" onClick={async () => { if (await run((db) => payInvoice(db, { invoice_id: id, amount, method, paid_at: date, reference: ref }), tx("Betaling geregistreerd"))) setPay(false) }}>{tx("Betaling registreren")}</button>
+          <button className="btn primary" onClick={async () => {
+            const m = method === 'verrekening' ? 'overboeking' : method
+            const ok = credit
+              ? await run((db) => refundCredit(db, { invoice_id: id, amount, method: m, paid_at: date, reference: ref }), tx("Terugbetaling geregistreerd"))
+              : await run((db) => payInvoice(db, { invoice_id: id, amount, method, paid_at: date, reference: ref }), tx("Betaling geregistreerd"))
+            if (ok) setPay(false)
+          }}>{credit ? tx("Terugbetaling registreren") : tx("Betaling registreren")}</button>
         </>}>
           <div className="form-grid">
-            <NumberField label={tx("Bedrag")} value={amount} step="0.01" min={0} onChange={setAmount} hint={tx("Open: {0}", eur(balance))} />
+            <NumberField label={tx("Bedrag")} value={amount} step="0.01" min={0} onChange={setAmount} hint={credit ? tx("Terug te betalen: {0}", eur(-balance)) : tx("Open: {0}", eur(balance))} />
             <SelectField label={tx("Betaalwijze")} value={method} onChange={setMethod} options={[{ value: 'overboeking', label: tx("Overboeking") }, { value: 'pin', label: tx("Pin") }, { value: 'contant', label: tx("Contant") }, { value: 'online', label: tx("Online") }]} />
             <TextField label={tx("Datum")} type="date" value={date} onChange={setDate} />
             <TextField label={tx("Referentie")} value={ref} onChange={setRef} />

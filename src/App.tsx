@@ -12,6 +12,8 @@ import { OrderDetail, Orders } from './screens/Orders'
 import { OrderForm } from './screens/OrderForm'
 import { Deliveries } from './screens/Deliveries'
 import { DeliveryNote } from './screens/DeliveryNote'
+import { CreditForm } from './screens/CreditForm'
+import { GlobalSearch } from './ui/GlobalSearch'
 import { InvoiceDetail, Invoices } from './screens/Invoices'
 import { Stock } from './screens/Stock'
 import { Admin } from './screens/Admin'
@@ -120,6 +122,7 @@ export function App({ onResetDemo, onSignOut }: { onResetDemo?: () => Promise<vo
               return <a key={k} href={`#${F.home}`} className={flow === k ? 'on flow-link' : 'flow-link'}><Icon size={16} />{tx(F.label)}</a>
             })}
             <a href="#voorraad" className={screen === 'voorraad' ? 'on' : ''}><Boxes size={16} />{tx("Voorraad")}</a>
+            <GlobalSearch />
             <LangFlags value={language} onChange={switchLanguage} label={tx("Taal")} />
             <button className="btn-toggle" onClick={toggleTheme}>{theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}{theme === 'dark' ? tx("Dagstand") : tx("Nachtstand")}</button>
             <button className="btn-toggle" aria-label={tx("Contact en support")} title={tx("Contact en support")} onClick={() => setSupport(true)}><Headset size={18} /></button>
@@ -220,7 +223,7 @@ function Route({ screen, param }: { screen: string; param: string }) {
       if (!param || param.startsWith('lijst-')) { const l = parseOrdersParam(param); return <Orders key={param} tab={l.tab} phase={l.phase} /> }
       return <OrderDetail id={param} />
     case 'levering': return param.startsWith('print-') ? <DeliveryNote key={param} id={param.slice(6)} autoPrint /> : param.startsWith('archief-') ? <DeliveryNote key={param} id={param.slice(8)} fromArchive /> : param.startsWith('naar-') ? <Deliveries key={param} focus={param.slice(5)} /> : param ? <DeliveryNote key={param} id={param} /> : <Deliveries />
-    case 'facturatie': return param.startsWith('print-') ? <InvoiceDetail key={param} id={param.slice(6)} autoPrint /> : param.startsWith('naar-') ? <Invoices key={param} focus={param.slice(5)} /> : param ? <InvoiceDetail key={param} id={param} /> : <Invoices />
+    case 'facturatie': return param.startsWith('crediteren-') ? <CreditForm key={param} invoiceId={param.slice(11)} /> : param.startsWith('print-') ? <InvoiceDetail key={param} id={param.slice(6)} autoPrint /> : param.startsWith('naar-') ? <Invoices key={param} focus={param.slice(5)} /> : param ? <InvoiceDetail key={param} id={param} /> : <Invoices />
     // Het factuuroverzicht van de kassa staat sinds 8 november 2026 onder Beheer > Kassa; de oude link werkt nog.
     case 'rapportage': return param === 'kassa' ? <KassaAdmin key={param} tab="overzicht" /> : <Reports key={param} tab={param === 'leverbaar' ? 'leverbaar' : 'facturen'} />
     case 'kassabeheer': return <KassaAdmin key={param} tab={param === 'dagafsluiting' ? 'dagafsluiting' : 'overzicht'} />
@@ -228,7 +231,7 @@ function Route({ screen, param }: { screen: string; param: string }) {
     case 'catalogi': return <Catalogs supplierId={param} />
     case 'voorraad': return <Stock />
     case 'instellingen':
-    case 'beheer': return <Admin />
+    case 'beheer': return <Admin key={param} param={param} />
     default: return (
       <div className="panel">
         <WarehouseIcon size={20} />

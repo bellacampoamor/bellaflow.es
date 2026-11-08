@@ -19,12 +19,14 @@ export interface NavState {
   direct?: boolean
   /** Filters en keuzes van het scherm zelf (periode, bedrijf), zodat ze er bij terugkeren nog staan. */
   ui?: Record<string, unknown>
+  /** Hoe ver het scherm naar beneden gescrold was, zodat Terug op dezelfde plek in een lange lijst uitkomt. */
+  scroll?: number
 }
 
 const TRANSIENT: RegExp[] = [
   /^orders-nieuw$/, /^orders-wijzig-/, /^orders-print-/,
   /^inkoop-nieuw/, /^inkoop-print-/, /^inkoop-afdrukken-/, /^inkoop-omzetten-/,
-  /^levering-print-/, /^facturatie-print-/,
+  /^levering-print-/, /^facturatie-print-/, /^facturatie-crediteren-/,
 ]
 /** Formulieren en afdrukschermen: je komt er doorheen, het is geen plek om naar terug te keren. */
 export const isTransient = (hash: string) => TRANSIENT.some((r) => r.test(hash))
@@ -48,11 +50,48 @@ export function originFor(oldHash: string, newHash: string, previous: NavState):
 
 let last: NavState = {}
 let installed = false
+
+/** Bewaart de scrollpositie in de huidige stap. Pas als het scrollen stilstaat en vlak voor een klik, niet bij elke pixel. */
+function saveScroll() {
+  const y = Math.round(window.scrollY)
+  const st = navState()
+  if (st.scroll === y) return
+  const next: NavState = { ...st, scroll: y }
+  try { history.replaceState(next, '') } catch { return }
+  last = next
+}
+
+/** Waar het scherm na het openen moet staan: bij Terug (de stap kent zijn positie) daar, anders bovenaan. */
+export const scrollTarget = (st: NavState | null | undefined) => (st && typeof st.scroll === 'number' && st.scroll > 0 ? st.scroll : 0)
+
+/**
+ * Zet het scherm op de bewaarde plek. Een lange lijst is er soms nog niet helemaal (pagina's, foto's),
+ * dus proberen we het een korte tijd opnieuw tot de pagina lang genoeg is.
+ */
+export function restoreScroll(y: number) {
+  if (typeof window === 'undefined') return
+  if (!y) { window.scrollTo(0, 0); return }
+  let tries = 0
+  const step = () => {
+    window.scrollTo(0, y)
+    if (Math.abs(window.scrollY - y) < 2 || ++tries > 30) return
+    requestAnimationFrame(step)
+  }
+  requestAnimationFrame(step)
+}
+
 /** Eén keer aanroepen bij het starten, vóór React (main.tsx). */
 export function installNav() {
   if (installed || typeof window === 'undefined') return
   installed = true
   last = navState()
+  // De browser zet de positie bij Terug zelf vaak verkeerd, omdat het scherm opnieuw wordt opgebouwd. Dat doen we zelf.
+  try { history.scrollRestoration = 'manual' } catch { /* oudere browser */ }
+  let timer: ReturnType<typeof setTimeout> | undefined
+  window.addEventListener('scroll', () => { clearTimeout(timer); timer = setTimeout(saveScroll, 250) }, { passive: true })
+  // Vlak voor een klik (link of knop naar een ander scherm) de positie meteen vastleggen.
+  window.addEventListener('pointerdown', () => { clearTimeout(timer); saveScroll() }, { capture: true, passive: true })
+  window.addEventListener('keydown', (e) => { if (e.key === 'Enter') { clearTimeout(timer); saveScroll() } }, { capture: true })
   window.addEventListener('hashchange', (e) => {
     const st = history.state as NavState | null
     if (st && typeof st === 'object') {
@@ -100,4 +139,21 @@ export function useNavUi<T>(key: string, initial: T): [T, (v: T) => void] {
   const [value, setValue] = useState<T>(() => recallUi(key, initial))
   const set = useCallback((v: T) => { setValue(v); rememberUi(key, v) }, [key])
   return [value, set]
+}
+
+// Zoekvraag die het zoekveld voor alles meegeeft aan een catalogus (een artikel openen in Catalogi).
+const CATALOG_Q = 'bella-flow-catalog-q'
+export function setCatalogQuery(supplierId: string, q: string) {
+  try { sessionStorage.setItem(CATALOG_Q, JSON.stringify({ supplierId, q })) } catch { /* alleen zonder voorinvulling */ }
+}
+/** Leest de meegegeven zoekvraag één keer uit (daarna is hij weg). */
+export function takeCatalogQuery(supplierId: string): string {
+  try {
+    const raw = sessionStorage.getItem(CATALOG_Q)
+    if (!raw) return ''
+    const v = JSON.parse(raw) as { supplierId: string; q: string }
+    if (v.supplierId !== supplierId) return ''
+    sessionStorage.removeItem(CATALOG_Q)
+    return v.q
+  } catch { return '' }
 }

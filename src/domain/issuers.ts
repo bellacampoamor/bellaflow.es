@@ -72,6 +72,10 @@ export function settingsUpgrade(co: Partial<Settings>): Partial<Settings> {
   // Het eerste voorvoegsel van vanochtend (FS) wordt FS-BELLA (besluit Rick 8 november 2026).
   if (!co.prefix_invoice_simplified || co.prefix_invoice_simplified === 'FS') patch.prefix_invoice_simplified = 'FS-BELLA'
   if (co.prefix_invoice_simplified_hdb === undefined) patch.prefix_invoice_simplified_hdb = 'FS-HDB'
+  // Creditfacturen (facturas rectificativas): elk een eigen reeks (8 november 2026).
+  if (co.prefix_invoice_credit === undefined) patch.prefix_invoice_credit = 'FR'
+  if (co.prefix_invoice_credit_simplified === undefined) patch.prefix_invoice_credit_simplified = 'FRS-BELLA'
+  if (co.prefix_invoice_credit_simplified_hdb === undefined) patch.prefix_invoice_credit_simplified_hdb = 'FRS-HDB'
   if (co.language_invoice_simplified === undefined) patch.language_invoice_simplified = 'es'
   // Lijsten volgen voortaan de schermtaal, tenzij er bewust een vaste taal gekozen wordt (besluit Rick 8 november 2026).
   if (co.language_lists === undefined) patch.language_lists = 'scherm'

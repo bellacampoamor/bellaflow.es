@@ -11,14 +11,15 @@ import { parseCsv, sameName } from './catalog'
 import { articleNumberFromScan } from './scan'
 import { INVOICE_MAIL } from './noteText'
 import { isStaffRole } from './staff'
-import { ISSUER_SERIES, type Issuer } from './issuers'
+import { ISSUER_SERIES, issuerOf, type Issuer } from './issuers'
+import { creditableAmount, creditableLines, creditSeries, creditSettlement, isCredit } from './credit'
 import { cashCount, closingOn, closingsOf, countedTotal, DENOMINATIONS, denomKey, kassaDay, openingFloat, type CashCounts } from './cashClosing'
 import { DUMMY_SKU, missingCustomerData, POS_CUSTOMER_NOTE, posShortfalls, posTotals, posWarehouse, SIMPLIFIED_LIMIT, type PosLine } from './pos'
 import { isSendable, PURCHASE_MAIL, purchaseJsonFileName, purchaseOrdersJson, toBase64 } from './purchaseExport'
 import { articleSources, categoryName, priceWithSurcharge, finishArticleSync, missingSupplierCodes, planArticleSync } from './articles'
 import { DETAIL_COLUMNS, SHOWROOM_COLUMNS, showroomDetailFromCsv, showroomItemFromCsv } from './showroom'
 import {
-  addDays, depositAvailable, freeAt, linesToPurchase, invoicedDeliveryLineIds, lineTotal, onHandMap, orderLines, plannedQty, round2,
+  addDays, depositAvailable, freeAt, invoiceBalance, linesToPurchase, invoicedDeliveryLineIds, lineTotal, onHandMap, orderLines, plannedQty, round2,
   shipmentLineOpen, shippedQty, stockKey, todayISO, vatBreakdown,
   inboundWarehouse, scanWarehouse, shipmentIsOpen, defaultReceiptWarehouse, isDomesticShipment,
 } from './calc'
@@ -34,7 +35,8 @@ const event = (sales_order_id: string, kind: string, message: string, extra: Par
 // Nummering ----------------------------------------------------------------------
 
 export type PrefixField = 'prefix_sales_order' | 'prefix_purchase' | 'prefix_receipt' | 'prefix_delivery' | 'prefix_invoice' | 'prefix_transport' | 'prefix_proforma' | 'prefix_invoice_simplified' | 'prefix_invoice_simplified_hdb'
-export const PREFIX_FIELDS: PrefixField[] = ['prefix_sales_order', 'prefix_purchase', 'prefix_receipt', 'prefix_delivery', 'prefix_invoice', 'prefix_transport', 'prefix_proforma', 'prefix_invoice_simplified', 'prefix_invoice_simplified_hdb']
+  | 'prefix_invoice_credit' | 'prefix_invoice_credit_simplified' | 'prefix_invoice_credit_simplified_hdb'
+export const PREFIX_FIELDS: PrefixField[] = ['prefix_sales_order', 'prefix_purchase', 'prefix_receipt', 'prefix_delivery', 'prefix_invoice', 'prefix_transport', 'prefix_proforma', 'prefix_invoice_simplified', 'prefix_invoice_simplified_hdb', 'prefix_invoice_credit', 'prefix_invoice_credit_simplified', 'prefix_invoice_credit_simplified_hdb']
 
 /** De teller hoort bij de soort document, dus een ander voorvoegsel laat de nummers gewoon doorlopen. */
 async function nextDocumentNumber(db: Driver, series: string, field: PrefixField, year: number, fallback = series) {
@@ -995,7 +997,130 @@ export async function payInvoice(db: Driver, input: { invoice_id: string; amount
   if (input.amount <= 0) fail(tx("Vul een bedrag in."))
   const s = await loadSnapshot(db)
   const inv = s.invoices.find((i) => i.id === input.invoice_id)!
+  if (isCredit(inv)) fail(tx("Op een creditfactuur registreer je een terugbetaling, geen betaling."))
   await db.insert('payments', [{ id: newId(), sales_order_id: inv.sales_order_id, kind: 'betaling', ...input }])
+}
+
+// Creditfacturen en retouren -----------------------------------------------------
+// Een factuur wijzigt nooit. Een retour, een fout of een korting achteraf wordt een creditfactuur
+// (factura rectificativa) met negatieve bedragen en een verwijzing naar de oorspronkelijke factuur.
+
+export interface CreditLineInput {
+  /** Regel van de oorspronkelijke factuur. */
+  invoice_line_id: string
+  /** Aantal dat gecrediteerd wordt (positief, hele stuks). */
+  qty: number
+  /** Retour: het artikel komt terug in deze locatie. Leeg = geen retour (bijvoorbeeld een fout in de factuur). */
+  return_warehouse_id: string | null
+}
+export interface CreditInput {
+  invoice_id: string
+  date: string
+  reason: string
+  lines: CreditLineInput[]
+  /** Een bedrag zonder artikel, zoals een korting achteraf of een vergoeding voor schade (incl. IVA, positief). */
+  extra?: { description: string; amount: number; vat_rate: number } | null
+  /** Hoe het geld terug gaat dat niet met de oorspronkelijke factuur wordt verrekend. 'later' = staat open als terug te betalen. */
+  refund: { method: Exclude<Payment['method'], 'verrekening'> | 'later'; reference: string }
+}
+
+/**
+ * Maakt de creditfactuur: eigen nummerreeks, negatieve regels, eerst verrekend met wat op de oorspronkelijke
+ * factuur nog openstaat, de rest terugbetaald. Retourregels komen terug in voorraad (mutatie Retour).
+ */
+export async function createCreditInvoice(db: Driver, input: CreditInput) {
+  const s = await loadSnapshot(db)
+  const original = s.invoices.find((i) => i.id === input.invoice_id) ?? (fail(tx("Factuur niet gevonden.")) as never)
+  if (isCredit(original)) fail(tx("Een creditfactuur kan zelf niet gecrediteerd worden."))
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(input.date)) fail(tx("Kies een datum."))
+  if (input.date < original.invoice_date.slice(0, 10)) fail(tx("De creditfactuur kan niet voor de factuur zelf liggen."))
+  const last = latestInvoiceDate(s)
+  if (last && input.date < last) fail(tx("De factuurdatum mag niet voor de laatste factuur liggen ({0}).", last.split('-').reverse().join('-')))
+  const reason = input.reason.trim()
+  if (!reason) fail(tx("Vul de reden van de creditfactuur in."))
+
+  const avail = new Map(creditableLines(s, original.id).map((c) => [c.line.id, c]))
+  const warehouses = new Set(s.warehouses.filter((w) => w.is_active).map((w) => w.id))
+  const chosen = input.lines.filter((l) => l.qty !== 0)
+  for (const l of chosen) {
+    const c = avail.get(l.invoice_line_id) ?? (fail(tx("Deze regel hoort niet bij de factuur.")) as never)
+    if (l.qty < 0 || !Number.isInteger(l.qty)) fail(tx("Vul bij {0} een heel aantal in.", c.line.description))
+    if (l.qty > c.remaining) fail(tx("Bij {0} kan nog maar {1} gecrediteerd worden.", c.line.description, c.remaining))
+    if (l.return_warehouse_id) {
+      if (!c.stockable || !c.product_id) fail(tx("{0} heeft geen voorraad en kan niet retour in voorraad.", c.line.description))
+      if (!warehouses.has(l.return_warehouse_id)) fail(tx("Kies een locatie voor de retour."))
+    }
+  }
+  const extra = input.extra && round2(input.extra.amount) !== 0 ? input.extra : null
+  if (extra) {
+    if (extra.amount < 0) fail(tx("Het bedrag van de correctie kan niet negatief zijn."))
+    if (!extra.description.trim()) fail(tx("Vul een omschrijving in bij het bedrag."))
+    if (![0, 4, 10, 21].includes(extra.vat_rate)) fail(tx("Kies een IVA-tarief."))
+  }
+  if (!chosen.length && !extra) fail(tx("Kies minimaal één regel of vul een bedrag in om te crediteren."))
+
+  const id = newId()
+  const lines: InvoiceLine[] = chosen.map((l) => {
+    const o = avail.get(l.invoice_line_id)!.line
+    return {
+      id: newId(), invoice_id: id, delivery_line_id: null, credits_line_id: o.id, article_number: o.article_number, description: o.description,
+      qty: -l.qty, unit_price: o.unit_price, discount_pct: o.discount_pct, vat_rate: o.vat_rate,
+      line_total: lineTotal({ qty: -l.qty, unit_price: o.unit_price, discount_pct: o.discount_pct }),
+    }
+  })
+  if (extra) lines.push({ id: newId(), invoice_id: id, delivery_line_id: null, credits_line_id: null, article_number: '', description: extra.description.trim(), qty: -1, unit_price: round2(extra.amount), discount_pct: 0, vat_rate: extra.vat_rate, line_total: -round2(extra.amount) })
+  const b = vatBreakdown(lines.map((l) => ({ total: l.line_total, vat_rate: l.vat_rate })))
+  const amount = round2(-b.total)
+  const room = creditableAmount(s, original)
+  if (amount > room + 0.005) fail(tx("Er kan van deze factuur nog maar {0} gecrediteerd worden.", room.toFixed(2).replace('.', ',')))
+
+  const series = creditSeries(original)
+  const number = await nextDocumentNumber(db, series.series, series.field, yearOf(input.date), series.fallback)
+  const { settle, refund } = creditSettlement(s, original, amount)
+  await db.insert('invoices', [{
+    id, number, sales_order_id: original.sales_order_id, customer_id: original.customer_id, kind: 'creditfactuur', invoice_date: input.date, due_date: input.date,
+    base_amount: b.base, vat_amount: b.vat, total: b.total, deposit_settled: 0, language: original.language,
+    ...(original.simplified ? { simplified: true, issuer: issuerOf(original) } : {}), credit_of: original.id, credit_reason: reason,
+  }])
+  await db.insert('invoice_lines', lines)
+
+  // Verrekenen: wat nog openstond op de factuur gaat af, op beide facturen als verrekening.
+  const pays: Payment[] = []
+  const base = { sales_order_id: original.sales_order_id, kind: 'betaling' as const, paid_at: input.date }
+  if (settle > 0) {
+    pays.push({ id: newId(), ...base, invoice_id: original.id, method: 'verrekening', amount: settle, reference: number })
+    pays.push({ id: newId(), ...base, invoice_id: id, method: 'verrekening', amount: -settle, reference: original.number })
+  }
+  if (refund > 0 && input.refund.method !== 'later') pays.push({ id: newId(), ...base, invoice_id: id, method: input.refund.method, amount: -refund, reference: input.refund.reference.trim() })
+  if (pays.length) await db.insert('payments', pays)
+
+  // Retour: het artikel komt terug in de gekozen locatie.
+  const moves: StockMovement[] = chosen.filter((l) => l.return_warehouse_id).map((l) => ({
+    id: newId(), product_id: avail.get(l.invoice_line_id)!.product_id!, warehouse_id: l.return_warehouse_id!, qty: l.qty, kind: 'retour',
+    ref_id: number, note: `Retour ${number} (${original.number})`, moved_at: input.date,
+  }))
+  if (moves.length) await db.insert('stock_movements', moves)
+  const back = moves.length ? `, ${moves.reduce((n, m) => n + m.qty, 0)} st. retour in voorraad` : ''
+  await db.insert('order_events', [event(original.sales_order_id, 'factuur', `Creditfactuur ${number} gemaakt op factuur ${original.number}${back}. Reden: ${reason}`)])
+  return id
+}
+
+/** Een creditfactuur die nog open staat (terug te betalen) alsnog terugbetalen. */
+export async function refundCredit(db: Driver, input: { invoice_id: string; amount: number; method: Exclude<Payment['method'], 'verrekening'>; paid_at: string; reference: string }) {
+  const s = await loadSnapshot(db)
+  const inv = s.invoices.find((i) => i.id === input.invoice_id) ?? (fail(tx("Factuur niet gevonden.")) as never)
+  if (!isCredit(inv)) fail(tx("Alleen een creditfactuur kan worden terugbetaald."))
+  const owed = round2(-invoiceBalance(s, inv))
+  if (input.amount <= 0) fail(tx("Vul een bedrag in."))
+  if (input.amount > owed + 0.005) fail(tx("Er staat nog maar {0} terug te betalen.", owed.toFixed(2).replace('.', ',')))
+  await db.insert('payments', [{ id: newId(), sales_order_id: inv.sales_order_id, invoice_id: inv.id, kind: 'betaling', method: input.method, amount: -round2(input.amount), paid_at: input.paid_at, reference: input.reference }])
+}
+
+/** Factuur zoeken op nummer (kassa: retour van een eenvoudige factuur). Hoofdletters en spaties maken niet uit. */
+export function findInvoiceByNumber(s: Snapshot, raw: string) {
+  const q = raw.trim().toUpperCase().replace(/\s+/g, '')
+  if (!q) return null
+  return s.invoices.find((i) => i.number.toUpperCase() === q) ?? null
 }
 
 // Catalogi -----------------------------------------------------------------------
