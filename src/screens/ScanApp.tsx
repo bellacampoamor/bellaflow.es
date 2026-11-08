@@ -102,7 +102,7 @@ export function ScanApp() {
         <main className="scan-body">
           <h1 className="scan-h">{tx("Wie ben je?")}</h1>
           <p className="muted">{tx("Kies jezelf. De gescande verkooporder komt op jouw naam.")}</p>
-          {people.length === 0 && <div className="note warn">{tx("Er zijn nog geen verkopers. Voeg ze toe onder Beheer in Bella Flow.")}</div>}
+          {people.length === 0 && <div className="note warn">{tx("Er zijn nog geen medewerkers. Voeg ze toe onder Beheer in Bella Flow.")}</div>}
           <div className="scan-people">
             {people.map((p) => <button key={p.id} className="scan-person" onClick={() => pickUser(p.id)}><UserRound size={22} />{p.name}</button>)}
           </div>

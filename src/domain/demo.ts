@@ -152,9 +152,11 @@ export async function seedDemo(db: Driver, today = todayISO()) {
   s = await loadSnapshot(db)
   for (const x of s.inbound_shipments.filter((y) => y.transport_id === trSecond && y.status === 'partial')) await closeShipment(db, x.id, 'Gecrediteerd door leverancier')
 
-  const sellerA: Salesperson = { id: newId(), name: 'Voorbeeldverkoper Showroom', email: '', phone: '', is_active: true }
-  const sellerB: Salesperson = { id: newId(), name: 'Voorbeeldverkoper Online', email: '', phone: '', is_active: true }
-  await db.insert('salespeople', [sellerA, sellerB])
+  const sellerA: Salesperson = { id: newId(), name: 'Voorbeeldverkoper Showroom', email: '', phone: '', is_active: true, role: 'verkoper' }
+  const sellerB: Salesperson = { id: newId(), name: 'Voorbeeldverkoper Online', email: '', phone: '', is_active: true, role: 'verkoper' }
+  const office: Salesperson = { id: newId(), name: 'Voorbeeldmedewerker Administratie', email: '', phone: '', is_active: true, role: 'administratie' }
+  const admin: Salesperson = { id: newId(), name: 'Voorbeeldbeheerder', email: '', phone: '', is_active: true, role: 'beheerder' }
+  await db.insert('salespeople', [sellerA, sellerB, office, admin])
 
   const header = (c: Customer, date: string, type: OrderHeader['order_type'], fulfilment: OrderHeader['fulfilment'], over: Partial<OrderHeader> = {}): OrderHeader => ({
     customer_id: c.id, order_date: date, channel: 'winkel', salesperson_id: sellerA.id, customer_reference: '', order_type: type, fulfilment,

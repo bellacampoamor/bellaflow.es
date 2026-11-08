@@ -5,11 +5,12 @@ import { loadSnapshot, newId, type Driver } from '../data/driver'
 import type {
   EmailStatus, Language,
   Delivery, Fulfilment, InboundShipment, InvoiceLine, OrderType, Payment, Product, PurchaseLabel, SalesOrder, Settings,
-  SalesOrderLine, Snapshot, StockMovement, CatalogArticle, Supplier, ArticleQuery, SupplierShowroomDetail, SupplierShowroomItem, TableName,
+  SalesOrderLine, Salesperson, Snapshot, StockMovement, CatalogArticle, Supplier, ArticleQuery, SupplierShowroomDetail, SupplierShowroomItem, TableName,
 } from '../data/types'
 import { parseCsv, sameName } from './catalog'
 import { articleNumberFromScan } from './scan'
 import { INVOICE_MAIL } from './noteText'
+import { isStaffRole } from './staff'
 import { isSendable, PURCHASE_MAIL, purchaseJsonFileName, purchaseOrdersJson, toBase64 } from './purchaseExport'
 import { articleSources, categoryName, priceWithSurcharge, finishArticleSync, missingSupplierCodes, planArticleSync } from './articles'
 import { DETAIL_COLUMNS, SHOWROOM_COLUMNS, showroomDetailFromCsv, showroomItemFromCsv } from './showroom'
@@ -1020,6 +1021,14 @@ export async function productForArticle(db: Driver, a: CatalogArticle) {
 }
 
 // Stamgegevens -----------------------------------------------------------------
+
+/** Medewerker opslaan (Beheer > Medewerkers): naam en een geldige rol zijn verplicht. */
+export async function saveStaff(db: Driver, row: Omit<Salesperson, 'id'> & { id?: string }) {
+  const name = row.name.trim()
+  if (!name) fail(tx("Vul de naam in."))
+  if (!isStaffRole(row.role)) fail(tx("Kies een rol: Verkoper, Administratie of Beheerder."))
+  return saveRecord(db, 'salespeople', { ...row, name, email: row.email.trim(), phone: row.phone.trim() } as Salesperson)
+}
 
 export async function saveRecord<T extends TableName>(db: Driver, table: T, row: Snapshot[T][number] & { id?: string }) {
   if (row.id) {

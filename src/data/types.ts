@@ -29,7 +29,9 @@ export interface Customer {
   email: string; phone: string; language: Language; address: string; postal_code: string
   city: string; province: string; country: string; notes: string
 }
-export interface Salesperson { id: string; name: string; email: string; phone: string; is_active: boolean }
+// Medewerker (tabel salespeople). Rol: verkoper, administratie of beheerder. Database-toegang volgt later.
+export type StaffRole = 'verkoper' | 'administratie' | 'beheerder'
+export interface Salesperson { id: string; name: string; email: string; phone: string; is_active: boolean; role?: StaffRole }
 export interface Product {
   id: string; sku: string; name: string; collection: string; category: string; material: string
   color: string; dimensions: string; weight_kg: number; colli: number; purchase_price: number

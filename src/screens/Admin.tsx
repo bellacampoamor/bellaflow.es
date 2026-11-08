@@ -1,16 +1,17 @@
 import { useRef, useState } from 'react'
 import { Plus } from 'lucide-react'
 import type { Customer, DocumentLanguage, Language, Salesperson, Settings, Supplier, Warehouse } from '../data/types'
-import { saveRecord, saveSettings, saveSupplier, saveSupplierSurcharge, type PrefixField } from '../domain/services'
+import { saveRecord, saveSettings, saveStaff, saveSupplier, saveSupplierSurcharge, type PrefixField } from '../domain/services'
 import { priceWithSurcharge } from '../domain/articles'
 import { useApp } from '../ui/app-context'
 import { AreaField, BackToTop, Check, eur, Head, Modal, NumberField, Pager, Pill, SelectField, Tabs, TextField } from '../ui/kit'
 import { CustomerFields } from './OrderForm'
 import { tx } from '../i18n'
 import { isSpanishSupplier } from '../domain/calc'
+import { ROLE_LABEL, roleOf, STAFF_ROLES } from '../domain/staff'
 
 // Geen tabblad Producten: de producten zijn de artikelen uit de catalogi van de leveranciers, met een eigen artikelnummer.
-type Tab = 'magazijnen' | 'leveranciers' | 'toeslagen' | 'klanten' | 'verkopers' | 'bedrijf'
+type Tab = 'magazijnen' | 'leveranciers' | 'toeslagen' | 'klanten' | 'medewerkers' | 'bedrijf'
 
 const NEW = {
   warehouse: { code: '', name: '', kind: 'magazijn', address: '', postal_code: '', city: '', phone: '', contact_name: '', receives_goods: true, ships_goods: true, is_active: true, latitude: null, longitude: null, is_route_origin: false } as Omit<Warehouse, 'id'>,
@@ -27,7 +28,7 @@ export function Admin() {
   const [se, setSe] = useState<(Omit<Salesperson, 'id'> & { id?: string }) | null>(null)
   const [co, setCo] = useState<Settings>(s.settings[0])
 
-  const addButton = { magazijnen: [tx("Magazijn toevoegen"), () => setWh({ ...NEW.warehouse })], leveranciers: [tx("Leverancier toevoegen"), () => setSu({ ...NEW.supplier })], klanten: [tx("Klant toevoegen"), () => setCu({ ...NEW.customer })], verkopers: [tx("Verkoper toevoegen"), () => setSe({ name: '', email: '', phone: '', is_active: true })] } as Record<string, [string, () => void]>
+  const addButton = { magazijnen: [tx("Magazijn toevoegen"), () => setWh({ ...NEW.warehouse })], leveranciers: [tx("Leverancier toevoegen"), () => setSu({ ...NEW.supplier })], klanten: [tx("Klant toevoegen"), () => setCu({ ...NEW.customer })], medewerkers: [tx("Medewerker toevoegen"), () => setSe({ name: '', email: '', phone: '', is_active: true, role: 'verkoper' })] } as Record<string, [string, () => void]>
   const need = (ok: unknown, msg: string) => { if (!ok) toast(msg, true); return !!ok }
 
   return (
@@ -37,7 +38,7 @@ export function Admin() {
       </Head>
       <Tabs<Tab> value={tab} onChange={setTab} tabs={[
         { value: 'magazijnen', label: tx("Magazijnen"), n: s.warehouses.length },
-        { value: 'leveranciers', label: tx("Leveranciers"), n: s.suppliers.length }, { value: 'toeslagen', label: tx("Toeslagen") }, { value: 'klanten', label: tx("Klanten"), n: s.customers.length }, { value: 'verkopers', label: tx("Verkopers"), n: s.salespeople.length }, { value: 'bedrijf', label: tx("Bedrijf en factuur") },
+        { value: 'leveranciers', label: tx("Leveranciers"), n: s.suppliers.length }, { value: 'toeslagen', label: tx("Toeslagen") }, { value: 'klanten', label: tx("Klanten"), n: s.customers.length }, { value: 'medewerkers', label: tx("Medewerkers"), n: s.salespeople.length }, { value: 'bedrijf', label: tx("Bedrijf en factuur") },
       ]} />
 
       {tab === 'magazijnen' && <section className="panel"><div className="table-wrap"><table>
@@ -55,9 +56,11 @@ export function Admin() {
 
       {tab === 'klanten' && <CustomerList customers={s.customers} onOpen={setCu} />}
 
-      {tab === 'verkopers' && <section className="panel"><div className="table-wrap"><table>
-        <thead><tr><th>{tx("Naam")}</th><th>{tx("E-mail")}</th><th>{tx("Telefoon")}</th><th>{tx("Status")}</th></tr></thead>
-        <tbody>{s.salespeople.map((x) => <tr key={x.id} className="click" onClick={() => setSe(x)}><td className="strong">{x.name}</td><td className="muted">{x.email || '–'}</td><td className="muted">{x.phone || '–'}</td><td>{x.is_active ? <Pill tone="good">{tx("Actief")}</Pill> : <Pill>{tx("Inactief")}</Pill>}</td></tr>)}</tbody>
+      {tab === 'medewerkers' && <section className="panel">
+        <p className="small muted" style={{ margin: '0 0 10px' }}>{tx("Iedere medewerker heeft een rol: Verkoper, Administratie of Beheerder. Elke actieve medewerker kan als verkoper op een verkooporder staan en zich kiezen in de scan-app en bij de etiketten. De toegang per rol wordt later aan de database gekoppeld.")}</p>
+        <div className="table-wrap"><table>
+        <thead><tr><th>{tx("Naam")}</th><th>{tx("Rol")}</th><th>{tx("E-mail")}</th><th>{tx("Telefoon")}</th><th>{tx("Status")}</th></tr></thead>
+        <tbody>{s.salespeople.map((x) => <tr key={x.id} className="click" onClick={() => setSe({ ...x, role: roleOf(x) })}><td className="strong">{x.name}</td><td><Pill tone={roleOf(x) === 'beheerder' ? 'info' : ''}>{tx(ROLE_LABEL[roleOf(x)])}</Pill></td><td className="muted">{x.email || '–'}</td><td className="muted">{x.phone || '–'}</td><td>{x.is_active ? <Pill tone="good">{tx("Actief")}</Pill> : <Pill>{tx("Inactief")}</Pill>}</td></tr>)}</tbody>
       </table></div></section>}
 
       {tab === 'toeslagen' && <Surcharges />}
@@ -119,17 +122,18 @@ export function Admin() {
         <div className="sticky-save"><button className="btn primary" onClick={() => { const { id: _i, ...patch } = co; run((db) => saveSettings(db, patch), tx("Bedrijfsgegevens opgeslagen")) }}>{tx("Opslaan")}</button></div>
       </div>}
 
-      {se && <Modal title={se.id ? se.name : tx("Verkoper toevoegen")} onClose={() => setSe(null)} footer={<>
+      {se && <Modal title={se.id ? se.name : tx("Medewerker toevoegen")} onClose={() => setSe(null)} footer={<>
         <button className="btn" onClick={() => setSe(null)}>{tx("Annuleren")}</button>
-        <button className="btn primary" onClick={async () => { if (need(se.name.trim(), tx("Vul de naam in.")) && await run((db) => saveRecord(db, 'salespeople', se as Salesperson), tx("Verkoper opgeslagen"))) setSe(null) }}>{tx("Opslaan")}</button>
+        <button className="btn primary" onClick={async () => { if (need(se.name.trim(), tx("Vul de naam in.")) && await run((db) => saveStaff(db, se), tx("Medewerker opgeslagen"))) setSe(null) }}>{tx("Opslaan")}</button>
       </>}>
         <div className="form-grid">
-          <TextField className="span-2" label={tx("Naam")} value={se.name} onChange={(v) => setSe({ ...se, name: v })} />
+          <TextField label={tx("Naam")} value={se.name} onChange={(v) => setSe({ ...se, name: v })} />
+          <SelectField label={tx("Rol")} value={roleOf(se)} onChange={(v) => setSe({ ...se, role: v })} options={STAFF_ROLES.map((r) => ({ value: r, label: tx(ROLE_LABEL[r]) }))} />
           <TextField label={tx("E-mail")} value={se.email} onChange={(v) => setSe({ ...se, email: v })} />
           <TextField label={tx("Telefoon")} value={se.phone} onChange={(v) => setSe({ ...se, phone: v })} />
         </div>
         <Check label={tx("Actief")} checked={se.is_active} onChange={(v) => setSe({ ...se, is_active: v })} />
-        <p className="small muted" style={{ margin: 0 }}>{tx("Een inactieve verkoper staat niet meer in de keuzelijst. Bestaande verkooporders blijven aan hem gekoppeld.")}</p>
+        <p className="small muted" style={{ margin: 0 }}>{tx("Een inactieve medewerker staat niet meer in de keuzelijsten. Bestaande verkooporders blijven aan hem gekoppeld.")}</p>
       </Modal>}
 
       {wh && <Modal wide title={wh.id ? wh.name : tx("Magazijn toevoegen")} onClose={() => setWh(null)} footer={<>

@@ -215,7 +215,7 @@ export function OrderForm({ id }: { id?: string }) {
               <div className="field" style={{ justifyContent: 'flex-end' }}><button className="btn" type="button" onClick={() => setNewCust({ ...emptyCustomer })}><Plus size={16} />{tx("Nieuwe klant")}</button></div>
               {customer && <div className="span-all small muted">{[customer.phone, customer.email, customer.address, customer.postal_code, customer.city].filter(Boolean).join(', ')}</div>}
               <SelectField label={tx("Verkocht via")} value={h.channel} onChange={(v) => set({ channel: v })} options={[{ value: 'winkel', label: tx("Winkel") }, { value: 'online', label: tx("Online") }, { value: 'telefoon', label: tx("Telefoon of e-mail") }, { value: 'beurs', label: tx("Beurs") }]} />
-              <SelectField label={tx("Verkoper (verplicht)")} value={h.salesperson_id} placeholder={tx("Kies een verkoper")} hint={sellers.length ? undefined : tx("Voeg eerst verkopers toe onder Beheer.")} onChange={(v) => set({ salesperson_id: v })} options={sellers.map((x) => ({ value: x.id, label: x.name }))} />
+              <SelectField label={tx("Verkoper (verplicht)")} value={h.salesperson_id} placeholder={tx("Kies een verkoper")} hint={sellers.length ? undefined : tx("Voeg eerst medewerkers toe onder Beheer.")} onChange={(v) => set({ salesperson_id: v })} options={sellers.map((x) => ({ value: x.id, label: x.name }))} />
               <TextField label={tx("Verkoopdatum")} type="date" value={h.order_date} onChange={(v) => set({ order_date: v })} />
               <TextField label={tx("Referentie klant")} value={h.customer_reference} onChange={(v) => set({ customer_reference: v })} />
             </div>
