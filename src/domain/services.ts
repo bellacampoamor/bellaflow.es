@@ -11,6 +11,7 @@ import { parseCsv, sameName } from './catalog'
 import { articleNumberFromScan } from './scan'
 import { INVOICE_MAIL } from './noteText'
 import { isStaffRole } from './staff'
+import { DUMMY_SKU, POS_CUSTOMER_NOTE, posShortfalls, posWarehouse, type PosLine } from './pos'
 import { isSendable, PURCHASE_MAIL, purchaseJsonFileName, purchaseOrdersJson, toBase64 } from './purchaseExport'
 import { articleSources, categoryName, priceWithSurcharge, finishArticleSync, missingSupplierCodes, planArticleSync } from './articles'
 import { DETAIL_COLUMNS, SHOWROOM_COLUMNS, showroomDetailFromCsv, showroomItemFromCsv } from './showroom'
@@ -440,6 +441,103 @@ async function finishNewOrder(db: Driver, id: string, input: OrderInput, lines: 
       }
     }
   }
+}
+
+// Kassa (POS) --------------------------------------------------------------------
+// Snelle verkoop in de winkel: scannen, afrekenen, de klant neemt alles mee en betaalt meteen.
+// Ligt een artikel er wel maar zegt het systeem dat er niets vrij is, dan is dat een voorraadverschil:
+// het verschil wordt als correctie op de winkel geboekt, zodat de verkoop gewoon doorgaat.
+
+export interface PosInput {
+  salesperson_id: string
+  /** Leeg: de vaste klant voor kassaverkopen zonder klantgegevens. */
+  customer_id: string | null
+  date: string
+  lines: PosLine[]
+  payment: { method: Payment['method']; reference: string }
+  /** Daar gaat de factuur als pdf naartoe; leeg = niet mailen. */
+  invoiceEmail?: string
+}
+
+/** Het dummy-artikel (DIVERSEN) voor een artikel met eigen omschrijving; bestaat het nog niet, dan wordt het aangemaakt. */
+export async function ensureDummyProduct(db: Driver) {
+  const found = (await db.list('products')).find((p) => p.sku === DUMMY_SKU)
+  if (found) return found.id
+  const id = newId()
+  await db.insert('products', [{
+    id, sku: DUMMY_SKU, name: 'Diversen (eigen omschrijving)', collection: '', category: 'Overig', material: '', color: '', dimensions: '',
+    weight_kg: 0, colli: 1, purchase_price: 0, sale_price: 0, vat_rate: 21, supplier_id: null, min_stock: 0, is_active: true, volume_m3: 0, catalog_article_number: null,
+  }])
+  return id
+}
+
+/** De vaste klant voor kassaverkopen zonder klantgegevens. Bestaat hij nog niet, dan wordt hij aangemaakt. */
+export async function ensurePosCustomer(db: Driver) {
+  const found = (await db.list('customers')).find((c) => c.notes === POS_CUSTOMER_NOTE)
+  if (found) return found.id
+  const id = newId()
+  await db.insert('customers', [{ id, kind: 'particulier', name: 'Kassaverkoop', company: '', tax_id: '', email: '', phone: '', language: 'es', address: '', postal_code: '', city: '', province: '', country: 'España', notes: POS_CUSTOMER_NOTE }])
+  return id
+}
+
+/** Afrekenen aan de kassa: verkooporder, direct afgeleverd, factuur van vandaag en de betaling erop. Geeft verkooporder en factuur terug. */
+export async function posCheckout(db: Driver, input: PosInput) {
+  if (!input.salesperson_id) fail(tx("Kies eerst de medewerker."))
+  if (!input.lines.length) fail(tx("Scan of voeg minimaal één artikel toe."))
+  for (const l of input.lines) {
+    if (l.qty <= 0 || !Number.isInteger(l.qty)) fail(tx("Vul bij {0} een aantal in.", l.description || l.code))
+    if (l.unit_price < 0) fail(tx("Een prijs kan niet negatief zijn."))
+    if (l.discount_pct < 0 || l.discount_pct > 100) fail(tx("Korting ligt tussen 0 en 100%."))
+    if (l.dummy && !l.description.trim()) fail(tx("Vul bij het artikel {0} een omschrijving in.", DUMMY_SKU))
+    if (!l.dummy && !l.article && !l.product_id) fail(tx("Elke regel heeft een artikel nodig."))
+  }
+  checkInvoiceEmail(input)
+  const s0 = await loadSnapshot(db)
+  const shop = posWarehouse(s0.warehouses) ?? (fail(tx("Er is geen actieve winkel of magazijn onder Beheer.")) as never)
+  if (input.customer_id && !s0.customers.some((c) => c.id === input.customer_id)) fail(tx("Klant niet gevonden."))
+
+  // Producten vastleggen: catalogusartikelen worden product, het dummy-artikel bestaat altijd.
+  const resolved: (OrderLineInput & { dummy: boolean })[] = []
+  for (const l of input.lines) {
+    const product_id = l.dummy ? await ensureDummyProduct(db) : l.product_id || await productForArticle(db, l.article!)
+    resolved.push({ product_id, description: l.description.trim(), options: '', qty: l.qty, unit_price: round2(l.unit_price), discount_pct: l.discount_pct, vat_rate: l.vat_rate, source: 'voorraad', warehouse_id: shop.id, take_now: true, dummy: !!l.dummy })
+  }
+  const customer_id = input.customer_id || await ensurePosCustomer(db)
+  const s = await loadSnapshot(db)
+  const customer = s.customers.find((c) => c.id === customer_id)!
+
+  // Voorraadverschil: wat de klant meeneemt maar niet vrij in de winkel staat, eerst bijboeken.
+  const shortfalls = posShortfalls(s, resolved, shop.id)
+  const corrections = shortfalls.map((x) => ({
+    id: newId(), product_id: x.product_id, warehouse_id: shop.id, qty: x.qty, kind: 'correctie' as const, ref_id: '', moved_at: input.date,
+    note: x.dummy ? 'Kassa: diversen, geen voorraad' : `Kassa: voorraadverschil, ${x.free} vrij, ${x.free + x.qty} verkocht`,
+  }))
+  if (corrections.length) await db.insert('stock_movements', corrections)
+
+  const header: OrderHeader = {
+    customer_id, order_date: input.date, channel: 'winkel', salesperson_id: input.salesperson_id, customer_reference: '', order_type: 'direct', fulfilment: 'meenemen',
+    requested_date: null, promised_date: null, delivery_name: customer.company || customer.name, delivery_phone: customer.phone, delivery_address: customer.address,
+    delivery_postal_code: customer.postal_code, delivery_city: customer.city, delivery_latitude: null, delivery_longitude: null, floor: '', has_elevator: false,
+    needs_assembly: false, remove_old_furniture: false, delivery_notes: '', notes: 'Kassaverkoop',
+  }
+  let orderId = ''
+  try {
+    orderId = await createOrder(db, { header, lines: resolved.map(({ dummy: _d, ...l }) => l) }, { invoiceNow: true, invoiceDate: input.date, invoiceEmail: input.invoiceEmail })
+  } catch (e) {
+    for (const c of corrections) await db.remove('stock_movements', c.id)
+    throw e
+  }
+  const s2 = await loadSnapshot(db)
+  const order = s2.sales_orders.find((o) => o.id === orderId)!
+  const invoice = s2.invoices.find((i) => i.sales_order_id === orderId) ?? (fail(tx("De factuur is niet gemaakt.")) as never)
+  for (const c of corrections) await db.update('stock_movements', c.id, { ref_id: order.number })
+  if (shortfalls.some((x) => !x.dummy)) {
+    const list = shortfalls.filter((x) => !x.dummy).map((x) => `${s2.products.find((p) => p.id === x.product_id)?.name} +${x.qty}`).join(', ')
+    await db.insert('order_events', [event(orderId, 'voorraad', `Voorraadverschil op ${shop.name} bijgeboekt: ${list}.`)])
+  }
+  const open = round2(invoice.total - invoice.deposit_settled)
+  if (open > 0) await payInvoice(db, { invoice_id: invoice.id, amount: open, method: input.payment.method, paid_at: input.date, reference: input.payment.reference })
+  return { orderId, orderNumber: order.number, invoiceId: invoice.id, invoiceNumber: invoice.number, corrections: shortfalls }
 }
 
 // Proforma (scan.bellaflow.es) -------------------------------------------------

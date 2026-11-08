@@ -720,3 +720,40 @@ tr.focus-flash td { animation: focus-flash-cell 2.6s ease-out; }
 /* Meerdere documenten in één afdruk: elk op een eigen pagina */
 .paper-stack { display: grid; gap: 18px; }
 @media print { .paper-stack { display: block; } .paper-stack > .paper + .paper { break-before: page; } }
+
+/* Kassa (POS): groot en eenvoudig, voor scannen met een handscanner. */
+.pos { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 18px; align-items: start; }
+.pos-side { position: sticky; top: calc(var(--top-h, 80px) + 12px); }
+.pos-who { max-width: 520px; }
+.pos-user { display: flex; flex-direction: column; gap: 2px; }
+.pos-user select { min-width: 180px; }
+.pos-scan { border-top: 4px solid var(--primary); }
+.pos-scan-row { display: flex; align-items: center; gap: 10px; color: var(--primary); }
+.pos-scan-row input { flex: 1; min-width: 0; font-size: 1.25rem; padding: 12px 14px; letter-spacing: .02em; }
+.pos-scan-row2 { display: flex; gap: 10px; margin-top: 10px; align-items: center; }
+.pos-search { flex: 1; min-width: 0; }
+.pos-lines { list-style: none; margin: 0; padding: 0; }
+.pos-lines li { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+.pos-lines li:last-child { border-bottom: 0; }
+.pos-li-main { flex: 1 1 240px; min-width: 0; }
+.pos-desc { width: 100%; margin-top: 2px; }
+.pos-qty { display: flex; align-items: center; gap: 4px; }
+.pos-qty .qty { width: 56px; text-align: center; }
+.pos-num { display: flex; flex-direction: column; gap: 2px; }
+.pos-num .price { width: 104px; text-align: right; }
+.pos-disc .qty, .pos-disc select { width: 72px; }
+.pos-li-total { width: 104px; text-align: right; font-size: 1.05rem; }
+.pos-total { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; }
+.pos-total span { font: 600 1.1rem var(--display); color: var(--heading); }
+.pos-total strong { font: 700 2rem var(--display); color: var(--heading); }
+.pos-pay { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.pos-pay .btn { justify-content: center; padding: 14px 10px; font-size: 1.05rem; }
+.pos-pay .btn.on { background: var(--selected); color: var(--on-selected); border-color: var(--selected); }
+.pos-change { font: 700 1.2rem var(--display); color: var(--heading); }
+.pos-go { width: 100%; justify-content: center; padding: 18px; font-size: 1.25rem; }
+.pos-done { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; border-left: 4px solid var(--good); }
+.pos-done-icon { width: 48px; height: 48px; border-radius: 50%; display: grid; place-items: center; background: var(--good-bg); color: var(--good); flex: 0 0 auto; }
+@media (max-width: 1000px) {
+  .pos { grid-template-columns: 1fr; }
+  .pos-side { position: static; }
+}

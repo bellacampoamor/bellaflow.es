@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { BookOpen, FileBarChart, Headset, Languages, Moon, Store, Sun, Boxes, ClipboardList, FileText, LayoutDashboard, PackageCheck, Settings2, ShoppingCart, Truck, Warehouse as WarehouseIcon } from 'lucide-react'
+import { BookOpen, Calculator, FileBarChart, Headset, Languages, Moon, Store, Sun, Boxes, ClipboardList, FileText, LayoutDashboard, PackageCheck, Settings2, ShoppingCart, Truck, Warehouse as WarehouseIcon } from 'lucide-react'
 import { parseOrdersParam } from './domain/orderFlow'
 import { parsePurchasesParam } from './domain/purchaseFlow'
 import { useApp, useHash } from './ui/app-context'
@@ -23,6 +23,7 @@ import { PurchaseOrderDocument, PurchaseOrdersDocument } from './screens/Purchas
 import { PurchaseDispatch } from './screens/PurchaseDispatch'
 import { Reports } from './screens/Reports'
 import { Catalogs } from './screens/Catalogs'
+import { Pos } from './screens/Pos'
 import { getLanguage, setLanguage, tx, type UiLanguage } from './i18n'
 
 // Twee gescheiden processen, elk met eigen menu-optie. Er is geen stappenbalk meer: het spoor per
@@ -98,6 +99,7 @@ export function App({ onResetDemo, onSignOut }: { onResetDemo?: () => Promise<vo
           <a className="brand" href="#overzicht" aria-label={tx("Bella Flow, naar overzicht")}><Logo /></a>
           <nav className="util" aria-label={tx("Algemeen")}>
             <a href="#overzicht" className={screen === 'overzicht' ? 'on' : ''}><LayoutDashboard size={16} />{tx("Overzicht")}</a>
+            <a href="#kassa" className={screen === 'kassa' ? 'on' : ''}><Calculator size={16} />{tx("Kassa")}</a>
             {(Object.keys(FLOWS) as FlowKey[]).map((k) => {
               const F = FLOWS[k], Icon = F.icon
               return <a key={k} href={`#${F.home}`} className={flow === k ? 'on flow-link' : 'flow-link'}><Icon size={16} />{tx(F.label)}</a>
@@ -139,6 +141,7 @@ export function App({ onResetDemo, onSignOut }: { onResetDemo?: () => Promise<vo
 function Route({ screen, param }: { screen: string; param: string }) {
   switch (screen) {
     case 'overzicht': return <Overview />
+    case 'kassa': return <Pos />
     case 'inkoop': return param.startsWith('versturen') ? <PurchaseDispatch key={param} date={param.slice(10)} /> : param.startsWith('afdrukken-') ? <PurchaseOrdersDocument key={param} ids={param.slice(21).split(',').filter(Boolean)} back={`inkoop-versturen-${param.slice(10, 20)}`} /> : param.startsWith('print-') ? <PurchaseOrderDocument key={param} id={param.slice(6)} /> : param === 'nieuw' ? <PurchaseForm /> : param.startsWith('nieuw-order-') ? <PurchaseForm orderId={param.slice(12)} /> : param.startsWith('omzetten-') ? <PurchaseDetail key={param} id={param.slice(9)} convert /> : param && param !== 'proforma' && !param.startsWith('lijst-') ? <PurchaseDetail key={param} id={param} /> : (() => { const l = parsePurchasesParam(param); return <Purchases key={param} tab={l.tab} phase={l.phase} /> })()
     case 'inkomend': return <Inbound key={param} focus={param.replace(/^(nl|klaar)-/, '') || undefined} />
     case 'ontvangst': return param.startsWith('io-') ? <ReceiptForm key={param} purchaseOrderId={param.slice(3)} /> : param ? <ReceiptForm key={param} transportId={param} /> : <Receipts />

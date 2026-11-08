@@ -4,6 +4,7 @@ import { onHandMap, reservedMap, stockKey, todayISO } from '../domain/calc'
 import { correctStock, transferStock } from '../domain/services'
 import { useApp } from '../ui/app-context'
 import { Combo, Empty, Field, fmtDate, Head, Modal, NumberField, Pill, SelectField, Sku, Tabs, TextField } from '../ui/kit'
+import { isDummyProduct } from '../domain/pos'
 import { tx } from '../i18n'
 
 export function Stock() {
@@ -19,9 +20,9 @@ export function Stock() {
   const hand = onHandMap(s), res = reservedMap(s)
   const wh = s.warehouses.filter((w) => w.is_active)
   const t = q.trim().toLowerCase()
-  const products = s.products.filter((p) => !t || `${p.name} ${p.sku} ${p.collection} ${p.category}`.toLowerCase().includes(t))
+  const products = s.products.filter((p) => !isDummyProduct(p)).filter((p) => !t || `${p.name} ${p.sku} ${p.collection} ${p.category}`.toLowerCase().includes(t))
   const moves = [...s.stock_movements].sort((a, b) => b.moved_at.localeCompare(a.moved_at)).slice(0, 80)
-  const productOpts = s.products.map((p) => ({ value: p.id, label: p.name, sub: p.sku, search: p.sku }))
+  const productOpts = s.products.filter((p) => !isDummyProduct(p)).map((p) => ({ value: p.id, label: p.name, sub: p.sku, search: p.sku }))
   const openModal = (m: 'transfer' | 'correct') => { setModal(m); setProductId(''); setFrom(wh[0]?.id ?? ''); setTo(wh[1]?.id ?? ''); setQty(m === 'transfer' ? 1 : -1); setNote('') }
 
   const moveToShowroom = (id: string) => {
