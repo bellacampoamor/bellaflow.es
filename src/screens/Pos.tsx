@@ -3,7 +3,7 @@ import { AlertTriangle, Banknote, Check as CheckIcon, CreditCard, Minus, PenLine
 import type { Customer, Payment } from '../data/types'
 import { freeAt, lineTotal, todayISO } from '../domain/calc'
 import { labelBasePrice } from '../domain/labels'
-import { addPosLine, DUMMY_SKU, isDummyCode, POS_CUSTOMER_NOTE, posTotals, posWarehouse, type PosLine } from '../domain/pos'
+import { addPosLine, DUMMY_SKU, isDummyCode, missingCustomerData, POS_CUSTOMER_NOTE, posTotals, posWarehouse, SIMPLIFIED_LIMIT, type PosLine } from '../domain/pos'
 import { findArticleByCode, posCheckout, saveRecord } from '../domain/services'
 import { loadSnapshot } from '../data/driver'
 import { ArticleSearch, type ArticlePick } from '../ui/ArticleSearch'
@@ -69,7 +69,7 @@ export function Pos() {
   const [code, setCode] = useState('')
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState('')
-  const [newCust, setNewCust] = useState<Omit<Customer, 'id'> | null>(null)
+  const [newCust, setNewCust] = useState<(Omit<Customer, 'id'> & { id?: string }) | null>(null)
   const [done, setDone] = useState<{ orderNumber: string; invoiceId: string; invoiceNumber: string; change: number; note: string; corrected: number } | null>(null)
   const [focusKey, setFocusKey] = useState<string | null>(null)
   const scanRef = useRef<HTMLInputElement>(null)
@@ -81,6 +81,9 @@ export function Pos() {
   const customer = customers.find((c) => c.id === customerId)
   const mailTo = (mail ?? customer?.email ?? '').trim()
   const totals = posTotals(lines)
+  // Factura simplificada: boven de grens zijn naam, adres, woonplaats en NIE of paspoort verplicht.
+  const over = totals.total > SIMPLIFIED_LIMIT
+  const missing = over ? (customer ? missingCustomerData(customer) : ['Klant']) : []
   const change = method === 'contant' && received > totals.total ? Math.round((received - totals.total) * 100) / 100 : 0
 
   const refocus = () => setTimeout(() => scanRef.current?.focus(), 0)
@@ -155,6 +158,7 @@ export function Pos() {
     if (noPrice) return toast(tx("Vul bij {0} een prijs in.", noPrice.description || noPrice.code), true)
     const noDesc = lines.find((l) => l.dummy && !l.description.trim())
     if (noDesc) return toast(tx("Vul bij het artikel {0} een omschrijving in.", DUMMY_SKU), true)
+    if (missing.length) return toast(tx("Boven {0} zijn de gegevens van de klant verplicht: naam, adres, woonplaats en NIE of paspoortnummer.", eur(SIMPLIFIED_LIMIT)), true)
     if (method === 'contant' && received > 0 && received < totals.total) return toast(tx("Ontvangen is minder dan het totaal."), true)
     let result: Awaited<ReturnType<typeof posCheckout>> | null = null
     let note = ''
@@ -173,7 +177,7 @@ export function Pos() {
   const saveCustomer = async () => {
     if (!newCust?.name.trim()) return toast(tx("Vul de naam van de klant in."), true)
     let cid = ''
-    if (await run(async (d) => { cid = await saveRecord(d, 'customers', newCust as Customer) }, tx("Klant toegevoegd"))) { setCustomerId(cid); setNewCust(null) }
+    if (await run(async (d) => { cid = await saveRecord(d, 'customers', newCust as Customer) }, newCust.id ? tx("Klant opgeslagen") : tx("Klant toegevoegd"))) { setCustomerId(cid); setNewCust(null) }
   }
 
   if (!me) return (
@@ -218,7 +222,7 @@ export function Pos() {
             <section className="panel pos-done">
               <div className="pos-done-icon"><CheckIcon size={28} /></div>
               <div style={{ flex: 1 }}>
-                <h2 style={{ margin: 0 }}>{tx("Afgerekend: factuur {0}", done.invoiceNumber)}</h2>
+                <h2 style={{ margin: 0 }}>{tx("Afgerekend: factura simplificada {0}", done.invoiceNumber)}</h2>
                 <div className="small muted">{tx("Verkooporder {0}, afgeleverd en betaald.", done.orderNumber)} {done.note}</div>
                 {done.change > 0 && <div className="pos-change">{tx("Wisselgeld")}: {eur(done.change)}</div>}
                 {done.corrected > 0 && <div className="small warn-text"><AlertTriangle size={13} /> {tx("Voorraadverschil bijgeboekt voor {0} artikel(en); zie Voorraad, mutaties.", done.corrected)}</div>}
@@ -287,21 +291,28 @@ export function Pos() {
             {method === 'pin' && <TextField label={tx("Betaalreferentie")} value={reference} onChange={setReference} placeholder={tx("Optioneel, bijv. bonnummer pinautomaat")} />}
           </section>
           <section className="panel stack" style={{ gap: 10 }}>
-            <Field label={tx("Klant")} hint={customer ? undefined : tx("Leeg: kassaverkoop zonder klantgegevens.")}>{(id) => <Combo id={id} value={customerId} options={custOptions} placeholder={tx("Zonder klantgegevens")} onChange={setCustomerId} />}</Field>
+            <Field label={tx("Klant")} hint={customer ? undefined : tx("Leeg: kassaverkoop zonder klantgegevens (tot {0}).", eur(SIMPLIFIED_LIMIT))}>{(id) => <Combo id={id} value={customerId} options={custOptions} placeholder={tx("Zonder klantgegevens")} onChange={setCustomerId} />}</Field>
             <div className="actions">
               <button className="btn sm" type="button" onClick={() => setNewCust({ ...emptyCustomer })}><UserPlus size={14} />{tx("Nieuwe klant")}</button>
               {customerId && <button className="linklike small" type="button" onClick={() => { setCustomerId(''); setMail(null) }}>{tx("Zonder klantgegevens")}</button>}
             </div>
+            {over && <div className={missing.length ? 'note warn' : 'note'}>
+              <div>
+                {tx("Boven {0} zijn de gegevens van de klant verplicht: naam, adres, woonplaats en NIE of paspoortnummer.", eur(SIMPLIFIED_LIMIT))}
+                {customer && missing.length > 0 && <div className="strong">{tx("Nog in te vullen: {0}.", missing.map((m) => tx(m)).join(', '))}</div>}
+                {customer && missing.length > 0 && <button className="btn sm" type="button" style={{ marginTop: 6 }} onClick={() => setNewCust({ ...customer })}>{tx("Gegevens aanvullen")}</button>}
+              </div>
+            </div>}
             <TextField label={tx("Factuur mailen naar")} type="email" value={mail ?? customer?.email ?? ''} onChange={setMail} placeholder={tx("naam@voorbeeld.es")} hint={tx("Leeg laten: niet mailen.")} />
           </section>
           <button className="btn primary pos-go" disabled={!lines.length} onClick={checkout}>{tx("Afrekenen {0}", eur(totals.total))}</button>
-          <p className="small muted" style={{ margin: 0 }}>{tx("Maakt de verkooporder, de factuur van vandaag en de betaling, in één keer.")}</p>
+          <p className="small muted" style={{ margin: 0 }}>{tx("Maakt de verkooporder, de factura simplificada van vandaag en de betaling, in één keer.")}</p>
           <button className="linklike small" style={{ alignSelf: 'flex-start' }} onClick={() => go('orders-nieuw')}>{tx("Bezorgen of bestellen? Maak een gewone verkooporder.")}</button>
         </div>
       </div>
 
       {newCust && (
-        <Modal wide title={tx("Nieuwe klant")} onClose={() => setNewCust(null)} footer={<>
+        <Modal wide title={newCust.id ? tx("Klantgegevens aanvullen") : tx("Nieuwe klant")} onClose={() => setNewCust(null)} footer={<>
           <button className="btn" onClick={() => setNewCust(null)}>{tx("Annuleren")}</button>
           <button className="btn primary" onClick={saveCustomer}>{tx("Klant opslaan")}</button>
         </>}>

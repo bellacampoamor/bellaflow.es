@@ -6,7 +6,8 @@ import { ensureProformas, invoiceProformas, mailInvoice, payInvoice } from '../d
 import { go, useApp, useAutoPrint } from '../ui/app-context'
 import { Empty, eur, fmtDate, Head, Modal, NumberField, Pill, SelectField, Tabs, TextField, DocPaper, pickRow, PickMark, TaxQr, useScrollToFocus } from '../ui/kit'
 import { tx } from '../i18n'
-import { INVOICE_TEXT } from '../domain/noteText'
+import { INVOICE_TEXT, invoiceTitle } from '../domain/noteText'
+import { POS_CUSTOMER_NOTE } from '../domain/pos'
 
 const STATE = { betaald: ['Betaald', 'good'], open: ['Open', 'bill'], te_laat: ['Te laat', 'bad'] } as const
 
@@ -148,16 +149,16 @@ export function InvoiceDetail({ id, autoPrint = false }: { id: string; autoPrint
           </div>
           <TaxQr url={invoiceQrUrl({ nif: co.tax_id, number: inv.number, date: inv.invoice_date, total: inv.total }, IS_PRODUCTION)} />
           <div style={{ textAlign: 'right' }}>
-            <h1 style={{ fontSize: '1.45rem' }}>{t[inv.kind]}</h1>
+            <h1 style={{ fontSize: '1.45rem' }}>{invoiceTitle(t, inv)}</h1>
             <div className="strong">{inv.number}</div>
-            <div className="small muted">{t.date}: {fmtDate(inv.invoice_date)}<br />{t.due}: {fmtDate(inv.due_date)}<br />{t.order}: {o.number}{o.customer_reference ? ` (${o.customer_reference})` : ''}</div>
+            <div className="small muted">{t.date}: {fmtDate(inv.invoice_date)}<br />{!inv.simplified && <>{t.due}: {fmtDate(inv.due_date)}<br /></>}{t.order}: {o.number}{o.customer_reference ? ` (${o.customer_reference})` : ''}</div>
           </div>
         </div>
-        <div style={{ marginBottom: 22 }}>
+        {c.notes !== POS_CUSTOMER_NOTE && <div style={{ marginBottom: 22 }}>
           <div className="small muted">{t.to}</div>
           <div className="strong">{c.company || c.name}</div>
           <div className="small">{c.address}<br />{c.postal_code} {c.city}, {c.country}{c.tax_id && <><br />{t.tax}: {c.tax_id}</>}</div>
-        </div>
+        </div>}
         <div className="table-wrap flush"><table>
           <thead><tr><th>{t.code}</th><th>{t.desc}</th><th className="num">{t.qty}</th><th className="num">{t.price}</th><th className="num">{t.disc}</th><th className="num">{t.vat}</th><th className="num">{t.total}</th></tr></thead>
           <tbody>{lines.map((l) => <tr key={l.id}><td>{l.article_number || articleOf(l.delivery_line_id)}</td><td>{l.description}</td><td className="num">{l.qty}</td><td className="num">{eur(l.unit_price)}</td><td className="num">{l.discount_pct ? `${l.discount_pct}%` : ''}</td><td className="num">{l.vat_rate}%</td><td className="num">{eur(l.line_total)}</td></tr>)}</tbody>
@@ -170,7 +171,7 @@ export function InvoiceDetail({ id, autoPrint = false }: { id: string; autoPrint
           {paid > 0 && <div><span>{t.paid}</span><span>−{eur(paid)}</span></div>}
           <div className="grand"><span>{t.due_amt}</span><span>{eur(balance)}</span></div>
         </div>
-        <p className="small muted" style={{ marginTop: 26, marginBottom: 0 }}>{t.pay}: {co.iban}{co.invoice_footer ? <><br />{co.invoice_footer}</> : ''}</p>
+        {(!inv.simplified || co.invoice_footer) && <p className="small muted" style={{ marginTop: 26, marginBottom: 0 }}>{!inv.simplified && <>{t.pay}: {co.iban}</>}{co.invoice_footer ? <>{!inv.simplified && <br />}{co.invoice_footer}</> : ''}</p>}
       </DocPaper>
       {mailTo !== null && (
         <Modal title={tx("Factuur mailen")} onClose={() => setMailTo(null)} footer={<>

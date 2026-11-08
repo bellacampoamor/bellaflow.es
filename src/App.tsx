@@ -153,7 +153,7 @@ function Route({ screen, param }: { screen: string; param: string }) {
       return <OrderDetail id={param} />
     case 'levering': return param.startsWith('print-') ? <DeliveryNote key={param} id={param.slice(6)} autoPrint /> : param.startsWith('archief-') ? <DeliveryNote key={param} id={param.slice(8)} fromArchive /> : param.startsWith('naar-') ? <Deliveries key={param} focus={param.slice(5)} /> : param ? <DeliveryNote key={param} id={param} /> : <Deliveries />
     case 'facturatie': return param.startsWith('print-') ? <InvoiceDetail key={param} id={param.slice(6)} autoPrint /> : param.startsWith('naar-') ? <Invoices key={param} focus={param.slice(5)} /> : param ? <InvoiceDetail key={param} id={param} /> : <Invoices />
-    case 'rapportage': return <Reports key={param} tab={param === 'leverbaar' ? 'leverbaar' : 'facturen'} />
+    case 'rapportage': return <Reports key={param} tab={param === 'leverbaar' ? 'leverbaar' : param === 'kassa' ? 'kassa' : 'facturen'} />
     case 'archief': return <Reports tab="archief" />
     case 'catalogi': return <Catalogs supplierId={param} />
     case 'voorraad': return <Stock />

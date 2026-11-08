@@ -16,10 +16,13 @@ export const DOC_MARK: Record<Language, string> = {
 
 // Vaste teksten van de factuur, in de taal van het document (scherm en pdf).
 export const INVOICE_TEXT: Record<Language, Record<string, string>> = {
-  es: { title: 'Factura', code: 'Referencia', deelfactuur: 'Factura parcial', eindfactuur: 'Factura final', volledig: 'Factura', date: 'Fecha', due: 'Vencimiento', order: 'Pedido', to: 'Facturar a', desc: 'Descripción', qty: 'Cant.', price: 'Precio', disc: 'Dto.', total: 'Total', base: 'Base imponible', vat: 'IVA', deposit: 'Anticipo aplicado', paid: 'Pagado', due_amt: 'Importe a pagar', pay: 'Pago por transferencia a', tax: 'NIF' },
-  nl: { title: 'Factuur', code: 'Artikelnummer', deelfactuur: 'Deelfactuur', eindfactuur: 'Eindfactuur', volledig: 'Factuur', date: 'Datum', due: 'Vervaldatum', order: 'Order', to: 'Factuur aan', desc: 'Omschrijving', qty: 'Aantal', price: 'Prijs', disc: 'Korting', total: 'Totaal', base: 'Grondslag', vat: 'IVA', deposit: 'Vooruitbetaling verrekend', paid: 'Betaald', due_amt: 'Te betalen', pay: 'Betaling per overboeking op', tax: 'NIF' },
-  en: { title: 'Invoice', code: 'Item no.', deelfactuur: 'Partial invoice', eindfactuur: 'Final invoice', volledig: 'Invoice', date: 'Date', due: 'Due date', order: 'Order', to: 'Bill to', desc: 'Description', qty: 'Qty', price: 'Price', disc: 'Disc.', total: 'Total', base: 'Tax base', vat: 'IVA', deposit: 'Advance applied', paid: 'Paid', due_amt: 'Amount due', pay: 'Pay by bank transfer to', tax: 'Tax ID' },
+  es: { title: 'Factura', code: 'Referencia', deelfactuur: 'Factura parcial', eindfactuur: 'Factura final', volledig: 'Factura', simplified: 'Factura simplificada', date: 'Fecha', due: 'Vencimiento', order: 'Pedido', to: 'Facturar a', desc: 'Descripción', qty: 'Cant.', price: 'Precio', disc: 'Dto.', total: 'Total', base: 'Base imponible', vat: 'IVA', deposit: 'Anticipo aplicado', paid: 'Pagado', due_amt: 'Importe a pagar', pay: 'Pago por transferencia a', tax: 'NIF' },
+  nl: { title: 'Factuur', code: 'Artikelnummer', deelfactuur: 'Deelfactuur', eindfactuur: 'Eindfactuur', volledig: 'Factuur', simplified: 'Vereenvoudigde factuur', date: 'Datum', due: 'Vervaldatum', order: 'Order', to: 'Factuur aan', desc: 'Omschrijving', qty: 'Aantal', price: 'Prijs', disc: 'Korting', total: 'Totaal', base: 'Grondslag', vat: 'IVA', deposit: 'Vooruitbetaling verrekend', paid: 'Betaald', due_amt: 'Te betalen', pay: 'Betaling per overboeking op', tax: 'NIF' },
+  en: { title: 'Invoice', code: 'Item no.', deelfactuur: 'Partial invoice', eindfactuur: 'Final invoice', volledig: 'Invoice', simplified: 'Simplified invoice', date: 'Date', due: 'Due date', order: 'Order', to: 'Bill to', desc: 'Description', qty: 'Qty', price: 'Price', disc: 'Disc.', total: 'Total', base: 'Tax base', vat: 'IVA', deposit: 'Advance applied', paid: 'Paid', due_amt: 'Amount due', pay: 'Pay by bank transfer to', tax: 'Tax ID' },
 }
+
+/** Titel op de factuur: factura simplificada (kassa) of de soort factuur. */
+export const invoiceTitle = (t: Record<string, string>, inv: { kind: string; simplified?: boolean }) => (inv.simplified ? t.simplified : t[inv.kind])
 
 // Mail bij een factuur, in de taal van de klant.
 export const INVOICE_MAIL: Record<Language, { subject: (n: string, c: string) => string; body: (name: string, n: string, c: string) => string }> = {

@@ -24,7 +24,7 @@ export function CustomerFields({ c, set }: { c: Omit<Customer, 'id'>; set: (p: P
       <TextField className="span-2" label={tx("Naam")} value={c.name} onChange={(v) => set({ name: v })} />
       <SelectField label={tx("Factuurtaal")} value={c.language} onChange={(v) => set({ language: v })} options={[{ value: 'es', label: tx("Spaans") }, { value: 'nl', label: tx("Nederlands") }, { value: 'en', label: tx("Engels") }]} />
       {c.kind === 'zakelijk' && <TextField className="span-2" label={tx("Bedrijfsnaam")} value={c.company} onChange={(v) => set({ company: v })} />}
-      <TextField label={c.kind === 'zakelijk' ? tx("CIF") : tx("NIF / NIE")} value={c.tax_id} onChange={(v) => set({ tax_id: v })} />
+      <TextField label={c.kind === 'zakelijk' ? tx("CIF") : tx("NIF / NIE / paspoort")} value={c.tax_id} onChange={(v) => set({ tax_id: v })} />
       <TextField label={tx("Telefoon")} type="tel" value={c.phone} onChange={(v) => set({ phone: v })} />
       <TextField label={tx("E-mail")} type="email" value={c.email} onChange={(v) => set({ email: v })} />
       <TextField className="span-2" label={tx("Adres")} value={c.address} onChange={(v) => set({ address: v })} />

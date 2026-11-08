@@ -5,6 +5,8 @@ export interface Settings {
   province: string; phone: string; email: string; iban: string
   payment_days: number; invoice_footer: string
   prefix_sales_order: string; prefix_purchase: string; prefix_receipt: string; prefix_delivery: string; prefix_invoice: string; prefix_transport: string; prefix_proforma: string
+  /** Voorvoegsel van de facturas simplificadas (kassa), standaard FS. */
+  prefix_invoice_simplified?: string
   delivery_note_mode: 'papier' | 'digitaal'; shop_email: string; language_purchase_order: Language; language_reports: Language; language_sales_order: DocumentLanguage; language_delivery_note: DocumentLanguage; language_invoice: DocumentLanguage
 }
 export interface Warehouse {
@@ -160,6 +162,8 @@ export interface Invoice {
   id: string; number: string; sales_order_id: string; customer_id: string
   kind: 'deelfactuur' | 'eindfactuur' | 'volledig'; invoice_date: string; due_date: string
   base_amount: number; vat_amount: number; total: number; deposit_settled: number; language: Language
+  /** Factura simplificada (kassa), met een eigen nummerreeks. */
+  simplified?: boolean
 }
 export interface InvoiceLine {
   id: string; invoice_id: string; delivery_line_id: string | null; article_number: string; description: string; qty: number

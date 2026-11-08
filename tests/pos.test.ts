@@ -4,8 +4,10 @@ import { LocalDriver } from '../src/data/localDriver'
 import type { CatalogArticle } from '../src/data/types'
 import { freeAt, onHandMap, stockKey } from '../src/domain/calc'
 import { seedDemo } from '../src/domain/demo'
-import { addPosLine, DUMMY_SKU, isDummyCode, POS_CUSTOMER_NOTE, posTotals, type PosLine } from '../src/domain/pos'
-import { importShowroom, posCheckout, productForArticle, syncCatalogArticles } from '../src/domain/services'
+import { addPosLine, DUMMY_SKU, isDummyCode, missingCustomerData, POS_CUSTOMER_NOTE, posTotals, SIMPLIFIED_LIMIT, type PosLine } from '../src/domain/pos'
+import { importShowroom, posCheckout, productForArticle, saveRecord, syncCatalogArticles } from '../src/domain/services'
+import { invoiceReport } from '../src/domain/calc'
+import type { Customer } from '../src/data/types'
 import { showNum } from '../src/ui/NumInput'
 
 const TODAY = '2026-11-08'
@@ -114,6 +116,58 @@ describe('Kassa (POS)', () => {
     expect(l).toHaveLength(3)
     expect(isDummyCode(' diversen ')).toBe(true)
     expect(posTotals(l.slice(0, 1)).total).toBeCloseTo(374.8)
+  })
+})
+
+const dummy = (price: number): PosLine => ({ key: newId(), dummy: true, code: DUMMY_SKU, description: 'Loungeset uit de showroom', qty: 1, unit_price: price, discount_pct: 0, vat_rate: 21 })
+const person = (p: Partial<Customer> = {}) => saveRecord(db, 'customers', { kind: 'particulier', name: 'Verzonnen Klant', company: '', tax_id: 'X0000000T', email: '', phone: '', language: 'es', address: 'Calle Inventada 1', postal_code: '03189', city: 'Orihuela Costa', province: 'Alicante', country: 'España', notes: '', ...p } as Customer)
+
+describe('Factura simplificada (kassa)', () => {
+  it('kassafacturen krijgen een eigen nummerreeks met het voorvoegsel uit Beheer', async () => {
+    const r = await checkout([dummy(50)])
+    const inv = db.data.invoices.find((i) => i.id === r.invoiceId)!
+    expect(inv.simplified).toBe(true)
+    expect(inv.number).toMatch(/^FS-2026-\d{4}$/)
+    await db.update('settings', db.data.settings[0].id, { prefix_invoice_simplified: 'TPV' })
+    const r2 = await checkout([dummy(20)])
+    expect(r2.invoiceNumber).toMatch(/^TPV-2026-0002$/)
+  })
+
+  it('gewone facturen houden hun reeks en staan niet in het kassaoverzicht', async () => {
+    await checkout([dummy(50)])
+    const kassa = invoiceReport(db.data, '2026-01-01', '2026-12-31', true)
+    const gewoon = invoiceReport(db.data, '2026-01-01', '2026-12-31', false)
+    expect(kassa.rows.every((r) => r.invoice.simplified)).toBe(true)
+    expect(kassa.rows).toHaveLength(1)
+    expect(gewoon.rows.length).toBeGreaterThan(0)
+    expect(gewoon.rows.every((r) => !r.invoice.simplified)).toBe(true)
+    expect(gewoon.rows.every((r) => r.invoice.number.startsWith('F-'))).toBe(true)
+  })
+
+  it(`tot ${SIMPLIFIED_LIMIT} euro zonder klantgegevens, precies op de grens ook`, async () => {
+    const r = await checkout([dummy(1000)])
+    expect(db.data.invoices.find((i) => i.id === r.invoiceId)!.simplified).toBe(true)
+  })
+
+  it('boven de grens: zonder klant geweigerd, en zonder volledige gegevens geweigerd', async () => {
+    await expect(checkout([dummy(1000.01)])).rejects.toThrow(/verplicht/)
+    const incomplete = await person({ tax_id: '', address: '' })
+    await expect(checkout([dummy(1500)], { customer_id: incomplete })).rejects.toThrow(/Adres/)
+    expect(db.data.invoices.filter((i) => i.simplified)).toHaveLength(0)
+  })
+
+  it('boven de grens met naam, adres, woonplaats en NIE of paspoort: simplificada met die klant', async () => {
+    const id = await person({ tax_id: 'PAS123456' })
+    const r = await checkout([dummy(1500)], { customer_id: id })
+    const inv = db.data.invoices.find((i) => i.id === r.invoiceId)!
+    expect(inv.simplified).toBe(true)
+    expect(inv.customer_id).toBe(id)
+  })
+
+  it('missingCustomerData noemt wat ontbreekt; de vaste kassaklant mist alles', () => {
+    const c = { name: 'A', company: '', address: '', city: 'B', tax_id: '', notes: '' }
+    expect(missingCustomerData(c)).toEqual(['Adres', 'NIE of paspoortnummer'])
+    expect(missingCustomerData({ ...c, notes: POS_CUSTOMER_NOTE })).toHaveLength(4)
   })
 })
 

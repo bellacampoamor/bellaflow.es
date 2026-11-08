@@ -11,7 +11,7 @@ import { parseCsv, sameName } from './catalog'
 import { articleNumberFromScan } from './scan'
 import { INVOICE_MAIL } from './noteText'
 import { isStaffRole } from './staff'
-import { DUMMY_SKU, POS_CUSTOMER_NOTE, posShortfalls, posWarehouse, type PosLine } from './pos'
+import { DUMMY_SKU, missingCustomerData, POS_CUSTOMER_NOTE, posShortfalls, posTotals, posWarehouse, SIMPLIFIED_LIMIT, type PosLine } from './pos'
 import { isSendable, PURCHASE_MAIL, purchaseJsonFileName, purchaseOrdersJson, toBase64 } from './purchaseExport'
 import { articleSources, categoryName, priceWithSurcharge, finishArticleSync, missingSupplierCodes, planArticleSync } from './articles'
 import { DETAIL_COLUMNS, SHOWROOM_COLUMNS, showroomDetailFromCsv, showroomItemFromCsv } from './showroom'
@@ -31,8 +31,8 @@ const event = (sales_order_id: string, kind: string, message: string, extra: Par
 
 // Nummering ----------------------------------------------------------------------
 
-export type PrefixField = 'prefix_sales_order' | 'prefix_purchase' | 'prefix_receipt' | 'prefix_delivery' | 'prefix_invoice' | 'prefix_transport' | 'prefix_proforma'
-export const PREFIX_FIELDS: PrefixField[] = ['prefix_sales_order', 'prefix_purchase', 'prefix_receipt', 'prefix_delivery', 'prefix_invoice', 'prefix_transport', 'prefix_proforma']
+export type PrefixField = 'prefix_sales_order' | 'prefix_purchase' | 'prefix_receipt' | 'prefix_delivery' | 'prefix_invoice' | 'prefix_transport' | 'prefix_proforma' | 'prefix_invoice_simplified'
+export const PREFIX_FIELDS: PrefixField[] = ['prefix_sales_order', 'prefix_purchase', 'prefix_receipt', 'prefix_delivery', 'prefix_invoice', 'prefix_transport', 'prefix_proforma', 'prefix_invoice_simplified']
 
 /** De teller hoort bij de soort document, dus een ander voorvoegsel laat de nummers gewoon doorlopen. */
 async function nextDocumentNumber(db: Driver, series: string, field: PrefixField, year: number) {
@@ -411,7 +411,7 @@ export async function createOrder(db: Driver, raw: OrderInput, opts: NewOrderOpt
  * invoiceNow: afrekenen aan de kassa (POS). Neemt de klant alles direct mee, dan ontstaat meteen de factuur (datum vandaag)
  * in plaats van alleen een proforma. invoiceEmail: daar gaat de factuur als pdf naartoe; leeg = niet mailen.
  */
-export interface NewOrderOptions { autoDeliverDate?: string; invoiceNow?: boolean; invoiceEmail?: string; invoiceDate?: string }
+export interface NewOrderOptions { autoDeliverDate?: string; invoiceNow?: boolean; invoiceEmail?: string; invoiceDate?: string; simplified?: boolean }
 
 function checkInvoiceEmail(opts: NewOrderOptions) {
   if (opts.invoiceEmail?.trim() && !isEmail(opts.invoiceEmail)) fail(tx("Vul een geldig e-mailadres in voor de factuur."))
@@ -430,7 +430,7 @@ async function finishNewOrder(db: Driver, id: string, input: OrderInput, lines: 
     await markDelivered(db, did, { date, signed_by: input.header.delivery_name || '' })
     // Afrekenen aan de kassa: alles gaat mee, dus meteen factureren en eventueel mailen.
     if (opts.invoiceNow && taken.length === lines.length) {
-      const [invoiceId] = await invoiceProformas(db, { delivery_ids: [did], invoice_date: opts.invoiceDate ?? todayISO() })
+      const [invoiceId] = await invoiceProformas(db, { delivery_ids: [did], invoice_date: opts.invoiceDate ?? todayISO(), simplified: opts.simplified })
       const to = opts.invoiceEmail?.trim() ?? ''
       if (to) {
         const order = (await db.list('sales_orders')).find((o) => o.id === id)
@@ -494,7 +494,13 @@ export async function posCheckout(db: Driver, input: PosInput) {
   checkInvoiceEmail(input)
   const s0 = await loadSnapshot(db)
   const shop = posWarehouse(s0.warehouses) ?? (fail(tx("Er is geen actieve winkel of magazijn onder Beheer.")) as never)
-  if (input.customer_id && !s0.customers.some((c) => c.id === input.customer_id)) fail(tx("Klant niet gevonden."))
+  const chosen = input.customer_id ? s0.customers.find((c) => c.id === input.customer_id) ?? (fail(tx("Klant niet gevonden.")) as never) : null
+  // Factura simplificada: boven de grens zijn naam, adres, woonplaats en NIE of paspoort van de klant verplicht.
+  if (posTotals(input.lines).total > SIMPLIFIED_LIMIT) {
+    if (!chosen) fail(tx("Boven {0} zijn de gegevens van de klant verplicht: naam, adres, woonplaats en NIE of paspoortnummer.", '€ 1.000'))
+    const missing = missingCustomerData(chosen!)
+    if (missing.length) fail(tx("Boven {0} vul bij de klant nog in: {1}.", '€ 1.000', missing.map((m) => tx(m)).join(', ')))
+  }
 
   // Producten vastleggen: catalogusartikelen worden product, het dummy-artikel bestaat altijd.
   const resolved: (OrderLineInput & { dummy: boolean })[] = []
@@ -522,7 +528,7 @@ export async function posCheckout(db: Driver, input: PosInput) {
   }
   let orderId = ''
   try {
-    orderId = await createOrder(db, { header, lines: resolved.map(({ dummy: _d, ...l }) => l) }, { invoiceNow: true, invoiceDate: input.date, invoiceEmail: input.invoiceEmail })
+    orderId = await createOrder(db, { header, lines: resolved.map(({ dummy: _d, ...l }) => l) }, { invoiceNow: true, invoiceDate: input.date, invoiceEmail: input.invoiceEmail, simplified: true })
   } catch (e) {
     for (const c of corrections) await db.remove('stock_movements', c.id)
     throw e
@@ -918,12 +924,12 @@ export async function ensureProformas(db: Driver) {
 }
 
 /** Pas hier ontstaan de facturen: één per aangevinkte proforma, oudste eerst, met verrekening van vooruitbetalingen. */
-export async function invoiceProformas(db: Driver, input: { delivery_ids: string[]; invoice_date: string }) {
+export async function invoiceProformas(db: Driver, input: { delivery_ids: string[]; invoice_date: string; simplified?: boolean }) {
   if (!input.delivery_ids.length) fail(tx("Vink minimaal één proforma aan."))
   const s = await loadSnapshot(db)
   const chosen = s.deliveries.filter((d) => input.delivery_ids.includes(d.id)).sort((a, b) => a.number.localeCompare(b.number))
   const ids: string[] = []
-  for (const d of chosen) ids.push(await createInvoice(db, { sales_order_id: d.sales_order_id, delivery_ids: [d.id], invoice_date: input.invoice_date, settle_deposit: true }))
+  for (const d of chosen) ids.push(await createInvoice(db, { sales_order_id: d.sales_order_id, delivery_ids: [d.id], invoice_date: input.invoice_date, settle_deposit: true, simplified: input.simplified }))
   return ids
 }
 
@@ -931,7 +937,7 @@ const latestInvoiceDate = (s: Snapshot) => s.invoices.reduce((m, i) => (i.invoic
 
 // Facturatie -------------------------------------------------------------------
 
-export async function createInvoice(db: Driver, input: { sales_order_id: string; delivery_ids: string[]; invoice_date: string; settle_deposit: boolean }) {
+export async function createInvoice(db: Driver, input: { sales_order_id: string; delivery_ids: string[]; invoice_date: string; settle_deposit: boolean; simplified?: boolean }) {
   const s = await loadSnapshot(db)
   if (!input.delivery_ids.length) fail(tx("Kies minimaal één levering om te factureren."))
   const last = latestInvoiceDate(s)
@@ -963,11 +969,14 @@ export async function createInvoice(db: Driver, input: { sales_order_id: string;
   const thisQty = dls.reduce((n, l) => n + l.qty, 0)
   const kind = billedQty + thisQty >= orderQty ? (billedQty === 0 ? 'volledig' : 'eindfactuur') : 'deelfactuur'
 
-  const number = await nextDocumentNumber(db, 'F', 'prefix_invoice', yearOf(input.invoice_date))
+  // Factura simplificada (kassa): eigen nummerreeks.
+  const number = input.simplified
+    ? await nextDocumentNumber(db, 'FS', 'prefix_invoice_simplified', yearOf(input.invoice_date))
+    : await nextDocumentNumber(db, 'F', 'prefix_invoice', yearOf(input.invoice_date))
   await db.insert('invoices', [{
     id, number, sales_order_id: order.id, customer_id: customer.id, kind, invoice_date: input.invoice_date,
     due_date: addDays(input.invoice_date, s.settings[0]?.payment_days ?? 14), base_amount: b.base, vat_amount: b.vat, total: b.total,
-    deposit_settled: round2(deposit), language: customer.language,
+    deposit_settled: round2(deposit), language: customer.language, ...(input.simplified ? { simplified: true } : {}),
   }])
   await db.insert('invoice_lines', lines)
   await db.insert('order_events', [event(order.id, 'factuur', `Factuur ${number} gemaakt.`)])

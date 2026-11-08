@@ -1,11 +1,25 @@
 // Kassa (POS): snelle verkoop in de winkel. De klant neemt alles direct mee en betaalt meteen.
-import type { CatalogArticle, Product, Snapshot, Warehouse } from '../data/types'
+import type { CatalogArticle, Customer, Product, Snapshot, Warehouse } from '../data/types'
 import { freeAt, lineTotal, round2, stockKey, vatBreakdown } from './calc'
 
 /** Vast artikelnummer voor een artikel met eigen omschrijving (diversen). Telt niet mee als voorraad. */
 export const DUMMY_SKU = 'DIVERSEN'
 /** Herkenning van de vaste klant voor kassaverkopen zonder klantgegevens. */
 export const POS_CUSTOMER_NOTE = 'Vaste klant voor kassaverkopen zonder klantgegevens (Bella Flow).'
+
+/** Grens voor een factura simplificada zonder klantgegevens (incl. IVA). Daarboven blijft het een simplificada, maar met klantgegevens. */
+export const SIMPLIFIED_LIMIT = 1000
+
+/** Welke klantgegevens ontbreken voor een factura simplificada boven de grens: naam, adres, woonplaats en NIE of paspoort. */
+export function missingCustomerData(c: Pick<Customer, 'name' | 'company' | 'address' | 'city' | 'tax_id' | 'notes'>) {
+  const out: string[] = []
+  if (c.notes === POS_CUSTOMER_NOTE) return ['Naam', 'Adres', 'Woonplaats', 'NIE of paspoortnummer']
+  if (!(c.name || c.company).trim()) out.push('Naam')
+  if (!c.address.trim()) out.push('Adres')
+  if (!c.city.trim()) out.push('Woonplaats')
+  if (!c.tax_id.trim()) out.push('NIE of paspoortnummer')
+  return out
+}
 
 export const isDummyProduct = (p: Pick<Product, 'sku'> | undefined | null) => p?.sku === DUMMY_SKU
 export const isDummyCode = (code: string) => code.trim().toUpperCase() === DUMMY_SKU

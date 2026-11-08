@@ -2,7 +2,8 @@ import { PDFDocument, StandardFonts, type PDFFont, type PDFPage } from 'pdf-lib'
 import qrcode from 'qrcode-generator'
 import type { Language, Snapshot } from '../data/types'
 import { articleNo, documentLanguage, invoiceBalance, invoiceQrUrl, IS_PRODUCTION, vatBreakdown } from './calc'
-import { DOC_MARK, INVOICE_TEXT } from './noteText'
+import { DOC_MARK, INVOICE_TEXT, invoiceTitle } from './noteText'
+import { POS_CUSTOMER_NOTE } from './pos'
 import { A4, drawDocMark, INK, MARGIN, MUTED, safe, wrap, ymd } from './signedNotePdf'
 
 const LOCALE: Record<Language, string> = { es: 'es-ES', nl: 'nl-NL', en: 'en-GB' }
@@ -22,7 +23,7 @@ export async function invoicePdf(s: Snapshot, invoiceId: string) {
   const b = vatBreakdown(lines.map((l) => ({ total: l.line_total, vat_rate: l.vat_rate })))
 
   const doc = await PDFDocument.create()
-  doc.setTitle(`${t[inv.kind]} ${inv.number}`)
+  doc.setTitle(`${invoiceTitle(t, inv)} ${inv.number}`)
   const regular = await doc.embedFont(StandardFonts.Helvetica)
   const bold = await doc.embedFont(StandardFonts.HelveticaBold)
   let page: PDFPage = doc.addPage(A4)
@@ -55,20 +56,22 @@ export async function invoicePdf(s: Snapshot, invoiceId: string) {
   }
 
   const right = MARGIN + width
-  text(t[inv.kind], right, top - 18, { font: bold, size: 18, right: true })
+  text(invoiceTitle(t, inv), right, top - 18, { font: bold, size: 18, right: true })
   text(inv.number, right, top - 34, { font: bold, size: 11, right: true })
   text(`${t.date}: ${ymd(inv.invoice_date)}`, right, top - 48, { color: MUTED, right: true })
-  text(`${t.due}: ${ymd(inv.due_date)}`, right, top - 60, { color: MUTED, right: true })
+  if (!inv.simplified) text(`${t.due}: ${ymd(inv.due_date)}`, right, top - 60, { color: MUTED, right: true })
   text(`${t.order}: ${o.number}${o.customer_reference ? ` (${o.customer_reference})` : ''}`, right, top - 72, { color: MUTED, right: true })
   y = Math.min(leftEnd, qy, top - 80) - 22
 
-  // Klant
-  block(t.to, MARGIN, width, { color: MUTED, size: 8.5 })
-  block(c.company || c.name, MARGIN, width, { font: bold, size: 10 })
-  if (c.address) block(c.address, MARGIN, width)
-  block(`${c.postal_code ?? ''} ${c.city ?? ''}${c.country ? `, ${c.country}` : ''}`.trim(), MARGIN, width)
-  if (c.tax_id) block(`${t.tax}: ${c.tax_id}`, MARGIN, width)
-  y -= 16
+  // Klant (niet bij een kassaverkoop zonder klantgegevens)
+  if (c.notes !== POS_CUSTOMER_NOTE) {
+    block(t.to, MARGIN, width, { color: MUTED, size: 8.5 })
+    block(c.company || c.name, MARGIN, width, { font: bold, size: 10 })
+    if (c.address) block(c.address, MARGIN, width)
+    block(`${c.postal_code ?? ''} ${c.city ?? ''}${c.country ? `, ${c.country}` : ''}`.trim(), MARGIN, width)
+    if (c.tax_id) block(`${t.tax}: ${c.tax_id}`, MARGIN, width)
+    y -= 16
+  }
 
   // Regels
   const col = { code: MARGIN, desc: MARGIN + 92, qty: MARGIN + 318, price: MARGIN + 378, disc: MARGIN + 418, vat: MARGIN + 450, total: right }
@@ -116,9 +119,9 @@ export async function invoicePdf(s: Snapshot, invoiceId: string) {
   }
   y -= 18
   room(30)
-  block(`${t.pay}: ${co?.iban ?? ''}`, MARGIN, width, { color: MUTED, size: 8.5 })
+  if (!inv.simplified) block(`${t.pay}: ${co?.iban ?? ''}`, MARGIN, width, { color: MUTED, size: 8.5 })
   if (co?.invoice_footer) block(co.invoice_footer, MARGIN, width, { color: MUTED, size: 8.5 })
 
   await drawDocMark(doc, regular, safe(DOC_MARK[language]))
-  return { name: `${t[inv.kind]} ${inv.number}.pdf`, base64: await doc.saveAsBase64() }
+  return { name: `${invoiceTitle(t, inv)} ${inv.number}.pdf`, base64: await doc.saveAsBase64() }
 }
