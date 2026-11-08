@@ -31,3 +31,17 @@ export const INVOICE_MAIL: Record<Language, { subject: (n: string, c: string) =>
   nl: { subject: (n, c) => `Factuur ${n}, ${c}`, body: (name, n, c) => `Beste ${name},\n\nHierbij ontvangt u factuur ${n}.\n\nBedankt voor uw aankoop.\n\n${c}` },
   en: { subject: (n, c) => `Invoice ${n}, ${c}`, body: (name, n, c) => `Dear ${name},\n\nPlease find attached invoice ${n}.\n\nThank you for your purchase.\n\n${c}` },
 }
+
+/** Teksten van de verkooporder (scherm en pdf). */
+export const SALES_ORDER_TEXT: Record<Language, Record<string, string>> = {
+  es: { proforma: 'Proforma', title: 'Pedido de venta', date: 'Fecha', ref: 'Su referencia', seller: 'Vendedor', wanted: 'Fecha deseada', promised: 'Fecha prevista', bill: 'Cliente', to: 'Entregar a', tel: 'Tel.', tax: 'NIF', code: 'Referencia', prod: 'Producto', opts: 'Acabado', qty: 'Cant.', price: 'Precio', disc: 'Dto.', vat: 'IVA', total: 'Total', base: 'Base imponible', paid: 'Anticipo pagado', open: 'Pendiente de pago', pickup: 'Recogida por el cliente', notes: 'Observaciones' },
+  nl: { proforma: 'Proforma', title: 'Verkooporder', date: 'Datum', ref: 'Uw referentie', seller: 'Verkoper', wanted: 'Gewenste datum', promised: 'Verwachte datum', bill: 'Klant', to: 'Afleveren bij', tel: 'Tel.', tax: 'NIF', code: 'Artikelnummer', prod: 'Product', opts: 'Uitvoering', qty: 'Aantal', price: 'Prijs', disc: 'Korting', vat: 'IVA', total: 'Totaal', base: 'Grondslag', paid: 'Vooruitbetaald', open: 'Nog te betalen', pickup: 'Klant haalt op', notes: 'Opmerkingen' },
+  en: { proforma: 'Pro forma', title: 'Sales order', date: 'Date', ref: 'Your reference', seller: 'Salesperson', wanted: 'Requested date', promised: 'Expected date', bill: 'Customer', to: 'Deliver to', tel: 'Tel.', tax: 'Tax ID', code: 'Item no.', prod: 'Product', opts: 'Finish', qty: 'Qty', price: 'Price', disc: 'Disc.', vat: 'IVA', total: 'Total', base: 'Tax base', paid: 'Advance paid', open: 'Amount due', pickup: 'Customer collects', notes: 'Notes' },
+}
+
+// Mail bij een verkooporder, in de taal van de klant.
+export const SALES_ORDER_MAIL: Record<Language, { subject: (n: string, c: string) => string; body: (name: string, n: string, c: string) => string }> = {
+  es: { subject: (n, c) => `Pedido de venta ${n}, ${c}`, body: (name, n, c) => `Estimado/a ${name}:\n\nAdjuntamos su pedido de venta ${n}. Por favor, compruebe que todo es correcto.\n\nGracias por su compra.\n\n${c}` },
+  nl: { subject: (n, c) => `Verkooporder ${n}, ${c}`, body: (name, n, c) => `Beste ${name},\n\nHierbij ontvangt u uw verkooporder ${n}. Wilt u controleren of alles klopt?\n\nBedankt voor uw aankoop.\n\n${c}` },
+  en: { subject: (n, c) => `Sales order ${n}, ${c}`, body: (name, n, c) => `Dear ${name},\n\nPlease find attached your sales order ${n}. Kindly check that everything is correct.\n\nThank you for your purchase.\n\n${c}` },
+}

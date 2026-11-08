@@ -1,8 +1,8 @@
 import { useMemo, useState } from 'react'
-import { CalendarClock, Copy, FileText, Pencil, Plus, ReceiptText, Truck, UserPlus } from 'lucide-react'
+import { CalendarClock, Copy, FileText, Mail, Pencil, Plus, ReceiptText, Truck, UserPlus } from 'lucide-react'
 import type { Delivery, Payment, SalesOrder } from '../data/types'
 import { articleNo, flowCounts, linePurchaseStatus, linesToPurchase, depositAvailable, depositPaid, invoiceBalance, lineTotal, onHandMap, orderLines, orderOutstanding, orderStage, orderTotal, plannedQty, shippedQty, stockKey, todayISO, uninvoicedDeliveries } from '../domain/calc'
-import { addOrderPayment, cancelOrder, createDelivery, defaultMethod, rescheduleOrder, setLineWarehouse } from '../domain/services'
+import { addOrderPayment, cancelOrder, createDelivery, defaultMethod, mailSalesOrder, rescheduleOrder, setLineWarehouse } from '../domain/services'
 import { go, useApp } from '../ui/app-context'
 import { Check, Empty, eur, fmtDate, Head, Modal, NumberField, NumInput, Pill, SelectField, Sku, Tabs, TextField, type Tone } from '../ui/kit'
 import { tx } from '../i18n'
@@ -92,9 +92,10 @@ export function Orders({ tab = 'opvolgen', phase: initialPhase = null }: { tab?:
 }
 
 export function OrderDetail({ id }: { id: string }) {
-  const { s, run } = useApp()
+  const { s, run, toast } = useApp()
   const o = s.sales_orders.find((x) => x.id === id)
   const [modal, setModal] = useState<'date' | 'plan' | 'pay' | 'cancel' | null>(null)
+  const [mailTo, setMailTo] = useState<string | null>(null)
   const withSku = (l?: { product_id: string; description: string }) => `${articleNo(s, l?.product_id)} ${l?.description ?? ''}`.trim()
   if (!o) return <div className="panel">{tx("Verkooporder niet gevonden.")} <a href="#orders">{tx("Terug naar verkooporders")}</a>.</div>
   const c = s.customers.find((x) => x.id === o.customer_id)
@@ -121,6 +122,13 @@ export function OrderDetail({ id }: { id: string }) {
   })
   const toPurchase = linesToPurchase(s).filter((l) => l.sales_order_id === id).length
   const plannable = lines.filter((l) => l.warehouse_id && l.qty - plannedQty(s, l.id) > 0)
+  const mail = s.email_outbox.find((m) => m.kind === 'verkooporder' && m.sales_order_id === id)
+  const MAIL_STATE = { sent: ['Gemaild naar {0}', 'good'], demo: ['Testversie: niet echt gemaild naar {0}', 'info'], pending: ['Wordt gemaild naar {0}', 'info'], failed: ['Mailen mislukt', 'bad'], no_recipient: ['Geen e-mailadres', 'warn'] } as const
+  const sendMail = async () => {
+    let result = ''
+    const ok = await run(async (db) => { result = await mailSalesOrder(db, id, mailTo ?? '') })
+    if (ok) { setMailTo(null); toast(result === 'failed' ? tx("Mailen is mislukt. Zie de melding bij de verkooporder.") : result === 'demo' ? tx("Testversie: de mail is niet echt verstuurd.") : tx("Verkooporder gemaild"), result === 'failed') }
+  }
 
   return (
     <>
@@ -129,6 +137,7 @@ export function OrderDetail({ id }: { id: string }) {
           <button className="btn danger" onClick={() => setModal('cancel')}>{tx("Proforma annuleren")}</button>
           <a className="btn primary" href={`#orders-wijzig-${id}`}><UserPlus size={16} />{tx("Klant invullen en bevestigen")}</a>
         </>}
+        {!proforma && c && <button className="btn" onClick={() => setMailTo(mail?.to_email || c.email || '')}><Mail size={15} />{mail ? tx("Opnieuw mailen") : tx("Mailen")}</button>}
         {open && stage !== 'gefactureerd' && <>
           {shipped < qty && <button className="btn" onClick={() => setModal('date')}><CalendarClock size={16} />{tx("Leverdatum")}</button>}
           <a className="btn" href={`#orders-wijzig-${id}`}><Pencil size={16} />{tx("Wijzigen")}</a>
@@ -136,6 +145,16 @@ export function OrderDetail({ id }: { id: string }) {
           <button className="btn primary" disabled={!plannable.length} onClick={() => setModal('plan')}><Truck size={16} />{tx("Levering plannen")}</button>
         </>}
       </Head>
+
+      {mail && <div style={{ marginBottom: 12 }}><Pill tone={MAIL_STATE[mail.status][1]}>{tx(MAIL_STATE[mail.status][0], mail.to_email)}</Pill>{mail.status === 'failed' && mail.error && <span className="small muted"> {mail.error}</span>}</div>}
+      {mailTo !== null && (
+        <Modal title={tx("Verkooporder mailen")} onClose={() => setMailTo(null)} footer={<>
+          <button className="btn" onClick={() => setMailTo(null)}>{tx("Annuleren")}</button>
+          <button className="btn primary" onClick={sendMail}>{tx("Versturen")}</button>
+        </>}>
+          <TextField label={tx("E-mailadres")} type="email" value={mailTo} onChange={setMailTo} hint={tx("De verkooporder gaat als pdf mee, met prijzen en een kopie (bcc) naar de winkel.")} />
+        </Modal>
+      )}
 
       {proforma && (
         <div className="note proforma" style={{ marginBottom: 16 }}>

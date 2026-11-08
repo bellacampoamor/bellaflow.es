@@ -81,6 +81,7 @@ function DriverStop({ id }: { id: string }) {
     const ok = await run(async (db) => { mail = await signDelivery(db, id, { signature, signed_by: name, date: todayISO() }) })
     if (!ok) return
     if (mail === 'sent') toast(tx("{0} is afgeleverd en de bon is gemaild", d.number))
+    else if (mail === 'off') toast(tx("{0} is afgeleverd", d.number))
     else if (mail === 'demo') toast(tx("{0} is afgeleverd. Voorbeeldgegevens: er is niets gemaild", d.number))
     else toast(tx("{0} is afgeleverd, maar de bon is niet gemaild. Meld dit op kantoor", d.number), true)
     go('chauffeur')

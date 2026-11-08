@@ -185,6 +185,8 @@ textarea { min-height: 72px; resize: vertical; }
 input:focus, select:focus, textarea:focus { outline: 2px solid var(--brand-line); outline-offset: 0; border-color: var(--brand-line); }
 input[type="number"], input[inputmode="decimal"], input[inputmode="numeric"] { font-variant-numeric: tabular-nums; }
 .check { display: inline-flex; align-items: center; gap: 8px; font-weight: 500; font-size: .92rem; min-height: 38px; cursor: pointer; }
+.mail-docs { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 6px 22px; }
+.mail-docs .small { margin: -6px 0 4px 26px; }
 .check input { width: 18px; min-height: 18px; height: 18px; accent-color: var(--brand-strong); }
 td input, td select { min-width: 72px; }
 td input.qty { width: 78px; }

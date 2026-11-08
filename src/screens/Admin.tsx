@@ -12,6 +12,7 @@ import { tx } from '../i18n'
 import { isSpanishSupplier } from '../domain/calc'
 import { ROLE_LABEL, roleOf, STAFF_ROLES } from '../domain/staff'
 import { BELLA_DEFAULTS, HDB_DEFAULTS, imageSrc } from '../domain/issuers'
+import { mailsAutomatically } from '../domain/mailSettings'
 
 // Geen tabblad Producten: de producten zijn de artikelen uit de catalogi van de leveranciers, met een eigen artikelnummer.
 type Tab = 'magazijnen' | 'leveranciers' | 'toeslagen' | 'klanten' | 'medewerkers' | 'bedrijf'
@@ -100,7 +101,6 @@ export function Admin({ param = '' }: { param?: string }) {
         <p className="small muted">{tx("Bij Digitaal tekent de klant in de chauffeursapp en wordt de bezorging daarmee afgemeld. Dit geldt voor het eigen bezorgteam; bij een vervoerder blijft de bon op papier.")}</p>
         <div className="form-grid">
           <SelectField label={tx("Soort afleverbon")} value={co.delivery_note_mode ?? 'papier'} onChange={(v: Settings['delivery_note_mode']) => setCo({ ...co, delivery_note_mode: v })} options={[{ value: 'papier', label: tx("Papier, geprint") }, { value: 'digitaal', label: tx("Digitaal, in de chauffeursapp") }]} />
-          <TextField label={tx("Winkel e-mail")} type="email" value={co.shop_email ?? ''} onChange={(v) => setCo({ ...co, shop_email: v })} hint={tx("Krijgt een bcc van elke digitaal getekende afleverbon.")} />
         </div>
         </section>
         <section className="panel section">
@@ -115,6 +115,18 @@ export function Admin({ param = '' }: { param?: string }) {
         </div>
         </section>
         </div>
+        <section className="panel section">
+        <h2>{tx("Mailen aan de klant")}</h2>
+        <p className="small muted">{tx("Kies welke documenten Bella Flow automatisch naar het e-mailadres van de klant mailt, als pdf en in de taal van de klant. Staat een document uit, dan gaat het niet vanzelf de deur uit; met de hand mailen vanaf het document blijft mogelijk.")}</p>
+        <div className="mail-docs">
+          {([['mail_sales_order', tx("Verkooporder"), tx("Na aanmaken of bevestigen, met prijzen. Niet bij afrekenen aan de kassa.")], ['mail_invoice_simplified', tx("Eenvoudige factuur"), tx("Na afrekenen aan de Kassa.")], ['mail_invoice', tx("Factuur"), tx("Na Afrekenen, factureren en meegeven op een verkooporder.")], ['mail_signed_note', tx("Afleverbon getekend"), tx("Na tekenen in de chauffeursapp.")]] as const).map(([field, label, hint]) => (
+            <div key={field}><Check label={label} checked={mailsAutomatically(co, field)} onChange={(v) => setCo({ ...co, [field]: v })} /><div className="small muted">{hint}</div></div>
+          ))}
+        </div>
+        <div className="form-grid" style={{ marginTop: 12 }}>
+          <TextField className="span-2" label={tx("Winkel e-mail")} type="email" value={co.shop_email ?? ''} onChange={(v) => setCo({ ...co, shop_email: v })} hint={tx("Afzender en antwoordadres; krijgt een bcc van elk gemaild document.")} />
+        </div>
+        </section>
         <div className="cols-even same-height">
         <section className="panel section">
         <h2>{tx("Kassa: Bella Outdoor and Furnishing")}</h2>

@@ -1,6 +1,7 @@
 // Kassa met twee bedrijven: een factura simplificada komt van Bella Outdoor and Furnishing of van
 // Handmade Bali Treasures SL (HomeDecoBali, HDB). HDB valt buiten de boekhouding van Bella.
 import type { Invoice, Language, ListLanguage, Settings } from '../data/types'
+import { MAIL_DEFAULTS } from './mailSettings'
 
 export type Issuer = 'bella' | 'hdb'
 export const ISSUERS: Issuer[] = ['bella', 'hdb']
@@ -79,6 +80,8 @@ export function settingsUpgrade(co: Partial<Settings>): Partial<Settings> {
   if (co.language_invoice_simplified === undefined) patch.language_invoice_simplified = 'es'
   // Lijsten volgen voortaan de schermtaal, tenzij er bewust een vaste taal gekozen wordt (besluit Rick 8 november 2026).
   if (co.language_lists === undefined) patch.language_lists = 'scherm'
+  // Mailen per document (8 november 2026): ontbreekt de keuze, dan de standaard.
+  for (const [k, v] of Object.entries(MAIL_DEFAULTS)) if ((co as Record<string, unknown>)[k] === undefined) (patch as Record<string, unknown>)[k] = v
   // Nog nooit een logo voor Bella ingesteld: de aangeleverde logo's. Bewust verwijderd (leeg) blijft leeg.
   for (const [k, v] of Object.entries(BELLA_DEFAULTS)) if ((co as Record<string, unknown>)[k] === undefined) (patch as Record<string, unknown>)[k] = v
   for (const [k, v] of Object.entries(HDB_DEFAULTS)) if ((co as Record<string, unknown>)[k] === undefined) (patch as Record<string, unknown>)[k] = v

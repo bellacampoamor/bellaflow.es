@@ -10,6 +10,7 @@ import { loadSnapshot } from '../data/driver'
 import { go, useApp } from '../ui/app-context'
 import { AreaField, Check, Combo, Empty, eur, Field, Head, Modal, NumberField, SelectField, TextField } from '../ui/kit'
 import { tx } from '../i18n'
+import { mailsAutomatically } from '../domain/mailSettings'
 
 /** Een regel kan een catalogusartikel zijn dat nog geen product onder Instellingen heeft; dat product ontstaat bij opslaan. */
 type Line = OrderLineInput & { key: number }
@@ -200,7 +201,8 @@ export function OrderForm({ id }: { id?: string }) {
   const someTaken = lines.some((l) => l.take_now)
   const needsAddress = !allTaken && h.fulfilment !== 'meenemen'
   const customer = s.customers.find((c) => c.id === h.customer_id)
-  const mailTo = (invoiceEmail ?? customer?.email ?? '').trim()
+  const mailInvoiceOn = mailsAutomatically(s.settings[0], 'mail_invoice')
+  const mailTo = mailInvoiceOn ? (invoiceEmail ?? customer?.email ?? '').trim() : ''
 
   return (
     <>
@@ -330,7 +332,9 @@ export function OrderForm({ id }: { id?: string }) {
             <section className="panel">
               <h2><Mail size={16} style={{ verticalAlign: -2, marginRight: 6 }} />{tx("Factuur")}</h2>
               <p className="small muted" style={{ marginTop: 0 }}>{tx("De klant neemt alles mee: bij afronden wordt meteen de factuur gemaakt, met de datum van vandaag.")}</p>
-              <TextField label={tx("Factuur mailen naar")} type="email" value={invoiceEmail ?? customer?.email ?? ''} onChange={setInvoiceEmail} placeholder={tx("naam@voorbeeld.es")} hint={customer && !customer.email && mailTo ? tx("Wordt ook bij de klant bewaard.") : tx("Leeg laten: niet mailen.")} />
+              {mailInvoiceOn
+                ? <TextField label={tx("Factuur mailen naar")} type="email" value={invoiceEmail ?? customer?.email ?? ''} onChange={setInvoiceEmail} placeholder={tx("naam@voorbeeld.es")} hint={customer && !customer.email && mailTo ? tx("Wordt ook bij de klant bewaard.") : tx("Leeg laten: niet mailen.")} />
+                : <p className="small muted" style={{ margin: 0 }}>{tx("Mailen van de factuur staat uit onder Instellingen. Je kunt hem daarna vanaf de factuur mailen.")}</p>}
             </section>
           )}
           {fresh && (

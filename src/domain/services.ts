@@ -9,7 +9,8 @@ import type {
 } from '../data/types'
 import { parseCsv, sameName } from './catalog'
 import { articleNumberFromScan } from './scan'
-import { INVOICE_MAIL } from './noteText'
+import { INVOICE_MAIL, SALES_ORDER_MAIL } from './noteText'
+import { mailsAutomatically } from './mailSettings'
 import { isStaffRole } from './staff'
 import { ISSUER_SERIES, issuerOf, type Issuer } from './issuers'
 import { creditableAmount, creditableLines, creditSeries, creditSettlement, isCredit } from './credit'
@@ -409,6 +410,7 @@ export async function createOrder(db: Driver, raw: OrderInput, opts: NewOrderOpt
   await db.insert('order_events', [event(id, 'aangemaakt', `Verkooporder ${number} aangemaakt.`)])
   await finishNewOrder(db, id, input, lines, opts)
   await syncPurchaseProformas(db)
+  await autoMailSalesOrder(db, id, opts.invoiceNow === true && allTaken)
   return id
 }
 
@@ -438,7 +440,9 @@ async function finishNewOrder(db: Driver, id: string, input: OrderInput, lines: 
     if (opts.invoiceNow && taken.length === lines.length) {
       const [invoiceId] = await invoiceProformas(db, { delivery_ids: [did], invoice_date: opts.invoiceDate ?? todayISO(), simplified: opts.simplified, issuer: opts.issuer })
       const to = opts.invoiceEmail?.trim() ?? ''
-      if (to) {
+      // Mailen per document onder Instellingen: staat het uit, dan gaat de factuur niet automatisch de deur uit.
+      const co = (await db.list('settings'))[0]
+      if (to && mailsAutomatically(co, opts.simplified ? 'mail_invoice_simplified' : 'mail_invoice')) {
         const order = (await db.list('sales_orders')).find((o) => o.id === id)
         const customer = order?.customer_id ? (await db.list('customers')).find((c) => c.id === order.customer_id) : undefined
         // Het adres wordt bij de klant bewaard als die er nog geen had.
@@ -643,6 +647,7 @@ export async function confirmProforma(db: Driver, id: string, raw: OrderInput, o
   await db.insert('order_events', [event(id, 'bevestigd', `Proforma ${order.number} bevestigd als verkooporder ${number}.`)])
   await finishNewOrder(db, id, input, rows, opts)
   await syncPurchaseProformas(db)
+  await autoMailSalesOrder(db, id, opts.invoiceNow === true && allTaken)
   return number
 }
 
@@ -854,6 +859,8 @@ export async function signDelivery(db: Driver, id: string, input: { signature: s
   if (d.status === 'planned') fail(tx("Deze levering is nog niet klaargezet."))
   await markDelivered(db, id, { date: input.date, signed_by: input.signed_by, signed_note_received: true })
   await db.update('deliveries', id, { signature_data: input.signature, signed_at: new Date().toISOString() })
+  // Mailen per document onder Instellingen: staat de getekende bon uit, dan wordt er niets gemaild.
+  if (!mailsAutomatically((await db.list('settings'))[0], 'mail_signed_note')) return 'off' as const
   return mailSignedNote(db, id)
 }
 
@@ -873,7 +880,7 @@ export async function mailSignedNote(db: Driver, deliveryId: string): Promise<Em
   const co = s.settings[0]
   const to = isEmail(c.email ?? '') ? c.email.trim() : ''
   const text = MAIL_TEXT[c.language]
-  const existing = s.email_outbox.find((m) => m.kind !== 'factuur' && m.delivery_id === deliveryId)
+  const existing = s.email_outbox.find((m) => m.kind === 'getekende_afleverbon' && m.delivery_id === deliveryId)
   const id = existing?.id ?? newId()
   const status0: EmailStatus = to ? 'pending' : 'no_recipient'
   const fields = { to_email: to, bcc_email: co?.shop_email?.trim() ?? '', status: status0, error: to ? '' : tx("Geen e-mailadres bekend bij de klant.") }
@@ -913,6 +920,49 @@ export async function mailInvoice(db: Driver, invoiceId: string, toEmail?: strin
     const result = await db.sendEmail(id, await invoicePdf(s, invoiceId))
     await db.update('email_outbox', id, { status: result, error: '', sent_at: result === 'sent' ? new Date().toISOString() : null })
     if (result === 'sent') await db.insert('order_events', [event(inv.sales_order_id, 'mail', `Factuur ${inv.number} gemaild naar ${to}.`)])
+    return result
+  } catch (e) {
+    await db.update('email_outbox', id, { status: 'failed', error: e instanceof Error ? e.message : String(e) })
+    return 'failed'
+  }
+}
+
+/**
+ * Mailt de verkooporder automatisch na aanmaken of bevestigen, als dat onder Instellingen aan staat en de klant
+ * een e-mailadres heeft. Niet bij afrekenen aan de kassa: dan krijgt de klant de factuur.
+ */
+async function autoMailSalesOrder(db: Driver, orderId: string, checkout: boolean) {
+  if (checkout) return
+  const s = await loadSnapshot(db)
+  if (!mailsAutomatically(s.settings[0], 'mail_sales_order')) return
+  const o = s.sales_orders.find((x) => x.id === orderId)
+  const c = o && s.customers.find((x) => x.id === o.customer_id)
+  if (!c || !isEmail(c.email ?? '')) return
+  await mailSalesOrder(db, orderId)
+}
+
+/** Mailt de verkooporder als pdf (met prijzen) met een bcc naar de winkel. Opnieuw mailen werkt dezelfde regel in de wachtrij bij. */
+export async function mailSalesOrder(db: Driver, orderId: string, toEmail?: string): Promise<EmailStatus> {
+  const s = await loadSnapshot(db)
+  const o = s.sales_orders.find((x) => x.id === orderId) ?? (fail(tx("Verkooporder niet gevonden.")) as never)
+  if (o.status === 'proforma') fail(tx("Een proforma wordt niet gemaild. Bevestig eerst de verkooporder."))
+  const c = s.customers.find((x) => x.id === o.customer_id) ?? (fail(tx("Deze verkooporder heeft nog geen klant.")) as never)
+  const co = s.settings[0]
+  const to = (toEmail ?? c.email ?? '').trim()
+  if (to && !isEmail(to)) fail(tx("Vul een geldig e-mailadres in voor de verkooporder."))
+  const text = SALES_ORDER_MAIL[c.language]
+  const existing = s.email_outbox.find((m) => m.kind === 'verkooporder' && m.sales_order_id === orderId)
+  const id = existing?.id ?? newId()
+  const status0: EmailStatus = to ? 'pending' : 'no_recipient'
+  const fields = { to_email: to, bcc_email: co?.shop_email?.trim() ?? '', status: status0, error: to ? '' : tx("Geen e-mailadres bekend bij de klant.") }
+  if (existing) await db.update('email_outbox', id, fields)
+  else await db.insert('email_outbox', [{ id, kind: 'verkooporder', delivery_id: null, invoice_id: null, sales_order_id: orderId, subject: text.subject(o.number, co?.company_name ?? ''), body_text: text.body(c.name, o.number, co?.company_name ?? ''), created_at: new Date().toISOString(), sent_at: null, ...fields }])
+  if (!to) return 'no_recipient'
+  try {
+    const { salesOrderPdf } = await import('./salesOrderPdf')
+    const result = await db.sendEmail(id, await salesOrderPdf(s, orderId))
+    await db.update('email_outbox', id, { status: result, error: '', sent_at: result === 'sent' ? new Date().toISOString() : null })
+    if (result === 'sent') await db.insert('order_events', [event(orderId, 'mail', `Verkooporder ${o.number} gemaild naar ${to}.`)])
     return result
   } catch (e) {
     await db.update('email_outbox', id, { status: 'failed', error: e instanceof Error ? e.message : String(e) })

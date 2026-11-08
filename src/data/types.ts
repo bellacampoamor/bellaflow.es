@@ -16,6 +16,8 @@ export interface Settings {
   /** Tweede bedrijf aan de kassa: Handmade Bali Treasures SL (HomeDecoBali), buiten de boekhouding van Bella. */
   hdb_company_name?: string; hdb_trade_name?: string; hdb_tax_id?: string; hdb_address?: string; hdb_postal_code?: string; hdb_city?: string
   hdb_province?: string; hdb_country?: string; hdb_phone?: string; hdb_email?: string
+  /** Automatisch mailen aan de klant, per document (besluit Rick 8 november 2026). Ontbreekt een waarde, dan geldt MAIL_DEFAULTS. */
+  mail_sales_order?: boolean; mail_invoice?: boolean; mail_invoice_simplified?: boolean; mail_signed_note?: boolean
   delivery_note_mode: 'papier' | 'digitaal'; shop_email: string; language_purchase_order: Language; language_lists: ListLanguage; language_sales_order: DocumentLanguage; language_delivery_note: DocumentLanguage; language_invoice: DocumentLanguage
 }
 export interface Warehouse {
@@ -156,7 +158,7 @@ export interface Delivery {
 }
 export type EmailStatus = 'pending' | 'sent' | 'failed' | 'no_recipient' | 'demo'
 export interface OutgoingEmail {
-  id: string; kind: 'getekende_afleverbon' | 'factuur' | 'inkooporders'; delivery_id: string | null; invoice_id?: string | null; to_email: string; bcc_email: string
+  id: string; kind: 'getekende_afleverbon' | 'factuur' | 'inkooporders' | 'verkooporder'; delivery_id: string | null; invoice_id?: string | null; sales_order_id?: string | null; to_email: string; bcc_email: string
   subject: string; body_text: string; status: EmailStatus; error: string; created_at: string; sent_at: string | null
 }
 export interface EmailAttachment { name: string; base64: string }

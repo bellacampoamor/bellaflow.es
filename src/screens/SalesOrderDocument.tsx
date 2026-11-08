@@ -1,14 +1,9 @@
-import type { Language } from '../data/types'
+import { SALES_ORDER_TEXT } from '../domain/noteText'
 import { articleNo, depositPaid, documentLanguage, lineTotal, orderLines, orderTotal, vatBreakdown } from '../domain/calc'
 import { useApp, useAutoPrint } from '../ui/app-context'
 import { eur, fmtDate, Head, DocPaper } from '../ui/kit'
 import { tx } from '../i18n'
 
-const T: Record<Language, Record<string, string>> = {
-  es: { proforma: 'Proforma', title: 'Pedido de venta', date: 'Fecha', ref: 'Su referencia', seller: 'Vendedor', wanted: 'Fecha deseada', promised: 'Fecha prevista', bill: 'Cliente', to: 'Entregar a', tel: 'Tel.', tax: 'NIF', code: 'Referencia', prod: 'Producto', opts: 'Acabado', qty: 'Cant.', price: 'Precio', disc: 'Dto.', vat: 'IVA', total: 'Total', base: 'Base imponible', paid: 'Anticipo pagado', open: 'Pendiente de pago', pickup: 'Recogida por el cliente', notes: 'Observaciones' },
-  nl: { proforma: 'Proforma', title: 'Verkooporder', date: 'Datum', ref: 'Uw referentie', seller: 'Verkoper', wanted: 'Gewenste datum', promised: 'Verwachte datum', bill: 'Klant', to: 'Afleveren bij', tel: 'Tel.', tax: 'NIF', code: 'Artikelnummer', prod: 'Product', opts: 'Uitvoering', qty: 'Aantal', price: 'Prijs', disc: 'Korting', vat: 'IVA', total: 'Totaal', base: 'Grondslag', paid: 'Vooruitbetaald', open: 'Nog te betalen', pickup: 'Klant haalt op', notes: 'Opmerkingen' },
-  en: { proforma: 'Pro forma', title: 'Sales order', date: 'Date', ref: 'Your reference', seller: 'Salesperson', wanted: 'Requested date', promised: 'Expected date', bill: 'Customer', to: 'Deliver to', tel: 'Tel.', tax: 'Tax ID', code: 'Item no.', prod: 'Product', opts: 'Finish', qty: 'Qty', price: 'Price', disc: 'Disc.', vat: 'IVA', total: 'Total', base: 'Tax base', paid: 'Advance paid', open: 'Amount due', pickup: 'Customer collects', notes: 'Notes' },
-}
 
 /** Afdrukbare verkooporder. Dit is geen factuur. */
 export function SalesOrderDocument({ id }: { id: string }) {
@@ -19,7 +14,7 @@ export function SalesOrderDocument({ id }: { id: string }) {
   const c = s.customers.find((x) => x.id === o.customer_id)
   const co = s.settings[0]
   const language = documentLanguage(co.language_sales_order, c?.language ?? 'es')
-  const t = T[language]
+  const t = SALES_ORDER_TEXT[language]
   const lines = orderLines(s, id)
   const b = vatBreakdown(lines.map((l) => ({ total: lineTotal(l), vat_rate: l.vat_rate })))
   const total = orderTotal(s, id)

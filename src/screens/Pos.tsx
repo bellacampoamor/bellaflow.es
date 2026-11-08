@@ -13,6 +13,7 @@ import { Check, Combo, Empty, eur, Field, Head, Modal, NumInput, TextField } fro
 import { issuerInfo } from '../domain/issuers'
 import { CustomerFields } from './OrderForm'
 import { tx } from '../i18n'
+import { mailsAutomatically } from '../domain/mailSettings'
 
 const USER_KEY = 'bella-flow-pos-user'
 const CART_KEY = 'bella-flow-pos-cart'
@@ -86,7 +87,8 @@ export function Pos() {
   const customers = useMemo(() => s.customers.filter((c) => c.notes !== POS_CUSTOMER_NOTE), [s.customers])
   const custOptions = useMemo(() => customers.map((c) => ({ value: c.id, label: c.company || c.name, sub: [c.company ? c.name : '', c.city, c.phone].filter(Boolean).join(', '), search: `${c.email} ${c.tax_id}` })), [customers])
   const customer = customers.find((c) => c.id === customerId)
-  const mailTo = (mail ?? customer?.email ?? '').trim()
+  const mailOn = mailsAutomatically(s.settings[0], 'mail_invoice_simplified')
+  const mailTo = mailOn ? (mail ?? customer?.email ?? '').trim() : ''
   const totals = posTotals(lines)
   // Factura simplificada: boven de grens zijn naam, adres, woonplaats en NIE of paspoort verplicht.
   const over = totals.total > SIMPLIFIED_LIMIT
@@ -317,7 +319,9 @@ export function Pos() {
                 {customer && missing.length > 0 && <button className="btn sm" type="button" style={{ marginTop: 6 }} onClick={() => setNewCust({ ...customer })}>{tx("Gegevens aanvullen")}</button>}
               </div>
             </div>}
-            <TextField label={tx("Factuur mailen naar")} type="email" value={mail ?? customer?.email ?? ''} onChange={setMail} placeholder={tx("naam@voorbeeld.es")} hint={tx("Leeg laten: niet mailen.")} />
+            {mailOn
+              ? <TextField label={tx("Factuur mailen naar")} type="email" value={mail ?? customer?.email ?? ''} onChange={setMail} placeholder={tx("naam@voorbeeld.es")} hint={tx("Leeg laten: niet mailen.")} />
+              : <p className="small muted" style={{ margin: 0 }}>{tx("Mailen van de eenvoudige factuur staat uit onder Instellingen.")}</p>}
           </section>
           <button className="btn primary pos-go" disabled={!lines.length} onClick={checkout}>{tx("Afrekenen {0}", eur(totals.total))}</button>
           <p className="small muted" style={{ margin: 0 }}>{tx("Maakt de verkooporder, de factura simplificada van vandaag en de betaling, in één keer.")}</p>
