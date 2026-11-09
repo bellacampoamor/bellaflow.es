@@ -34,17 +34,18 @@ function wrapLines(ctx: CanvasRenderingContext2D, text: string, maxWidth: number
 }
 
 /** Tekent één etiket, liggend, zwart op wit. */
-export function drawLabel(canvas: HTMLCanvasElement, data: LabelData, mark: HTMLImageElement | null) {
+export function drawLabel(canvas: HTMLCanvasElement, data: LabelData, mark: HTMLImageElement | null, edgeMm = DEFAULT_PRINTER.edgeMm) {
   const { w: W, h: H } = LABEL_PX
   canvas.width = W; canvas.height = H
   const ctx = canvas.getContext('2d')!
   ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, W, H)
   ctx.fillStyle = '#000'; ctx.strokeStyle = '#000'
   ctx.textBaseline = 'alphabetic'
-  const M = mm(2.5)
+  // Rand: boven en onder 2,5 mm, links en rechts instelbaar (standaard 4,5 mm), want het stuurprogramma drukt niet tot de uiteinden.
+  const M = mm(2.5), E = mm(Math.max(1, Math.min(10, edgeMm)))
 
   // Beeldmerk, verticaal rechts
-  const slotW = mm(11), slotX = W - M - slotW, slotY = M, slotH = H - 2 * M
+  const slotW = mm(11), slotX = W - E - slotW, slotY = M, slotH = H - 2 * M
   if (mark) {
     const upright = mark.naturalHeight >= mark.naturalWidth
     ctx.save()
@@ -66,7 +67,7 @@ export function drawLabel(canvas: HTMLCanvasElement, data: LabelData, mark: HTML
     ctx.restore()
   }
 
-  const left = M, right = slotX - mm(2), areaW = right - left
+  const left = E, right = slotX - mm(2), areaW = right - left
 
   // Verkorte naam, maximaal twee regels, zo groot als past
   let size = mm(5.2), lines: string[] | null = null
@@ -88,24 +89,30 @@ export function drawLabel(canvas: HTMLCanvasElement, data: LabelData, mark: HTML
   const modules = code128Modules(code)
   // Smalste streep 4 stippen (0,34 mm) als het past: breed genoeg voor elke handscanner, ook na schalen in het printvenster.
   const x = Math.max(2, Math.min(4, Math.floor((areaW - 10) / modules.length)))
-  const barX = Math.max(left, 10 * x), barY = mm(21.4), barH = mm(9.8)
+  const barX = left, barY = mm(21.4), barH = mm(9.8)
   modules.forEach((on, i) => { if (on) ctx.fillRect(barX + i * x, barY, x, barH) })
   ctx.font = `${mm(2.6)}px ${FONT}`
   ctx.textAlign = 'center'
   ctx.fillText(code, barX + (modules.length * x) / 2, barY + barH + mm(2.5))
 
   if (data.test) {
-    ctx.lineWidth = 3
-    ctx.strokeRect(mm(1), mm(1), W - mm(2), H - mm(2))
+    ctx.lineWidth = 4
+    // Hoekmarkeringen net buiten de inhoud: valt er een weg, dan is de witte rand te klein. Geen volledig kader, zodat de streepjescode vrij blijft.
+    const x0 = E - mm(1.5), y0 = mm(1.5), x1 = W - E + mm(1.5), y1 = H - mm(1.5), k = mm(4)
+    ctx.beginPath()
+    for (const [cx, cy, dx, dy] of [[x0, y0, 1, 1], [x1, y0, -1, 1], [x0, y1, 1, -1], [x1, y1, -1, -1]]) {
+      ctx.moveTo(cx + dx * k, cy); ctx.lineTo(cx, cy); ctx.lineTo(cx, cy + dy * k)
+    }
+    ctx.stroke()
     ctx.textAlign = 'right'; ctx.font = `bold ${mm(2.6)}px ${FONT}`
     ctx.fillText('TEST  ↑', right, mm(20))
   }
 }
 
 /** Zwart-witbeeld van het etiket: 1 = zwart. */
-function labelBits(data: LabelData, mark: HTMLImageElement | null) {
+function labelBits(data: LabelData, mark: HTMLImageElement | null, edgeMm: number) {
   const canvas = document.createElement('canvas')
-  drawLabel(canvas, data, mark)
+  drawLabel(canvas, data, mark, edgeMm)
   const { width, height } = canvas
   const px = canvas.getContext('2d')!.getImageData(0, 0, width, height).data
   const bits = new Uint8Array(width * height)
@@ -115,7 +122,7 @@ function labelBits(data: LabelData, mark: HTMLImageElement | null) {
 
 export async function labelImage(data: LabelData) {
   const canvas = document.createElement('canvas')
-  drawLabel(canvas, data, await loadBrandMark())
+  drawLabel(canvas, data, await loadBrandMark(), loadPrinterSettings().edgeMm)
   return canvas.toDataURL('image/png')
 }
 
@@ -179,7 +186,7 @@ async function send(device: UsbDevice, data: Uint8Array) {
 export async function printDirect(device: UsbDevice, labels: { data: LabelData; qty: number }[], settings: PrinterSettings) {
   const mark = await loadBrandMark()
   const rasters = labels.flatMap(({ data, qty }) => {
-    const { bits, width, height } = labelBits(data, mark)
+    const { bits, width, height } = labelBits(data, mark, settings.edgeMm)
     const r = labelToRaster(bits, width, height, settings)
     return Array.from({ length: qty }, () => r)
   })

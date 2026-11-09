@@ -176,7 +176,7 @@ export function LabelAgent() {
             {m.from === 'bella' && <img className="lab-avatar-sm" src={AVATAR} alt="" />}
             <div className="lab-col">
               <div className={`lab-bubble ${m.from}`}>{m.text}</div>
-              {m.list && lists[m.list] && <ListCard list={lists[m.list]} onRows={(rows) => updateList(m.list!, rows)} onPrint={doPrint} onDialog={dialogPrint} />}
+              {m.list && lists[m.list] && <ListCard list={lists[m.list]} edge={settings.edgeMm} onRows={(rows) => updateList(m.list!, rows)} onPrint={doPrint} onDialog={dialogPrint} />}
             </div>
           </div>
         ))}
@@ -205,7 +205,7 @@ export function LabelAgent() {
   )
 }
 
-function ListCard({ list, onRows, onPrint, onDialog }: { list: PrintList; onRows: (rows: Row[]) => void; onPrint: (rows: Row[]) => Promise<void>; onDialog: (rows: Row[]) => Promise<void> }) {
+function ListCard({ list, edge, onRows, onPrint, onDialog }: { list: PrintList; edge: number; onRows: (rows: Row[]) => void; onPrint: (rows: Row[]) => Promise<void>; onDialog: (rows: Row[]) => Promise<void> }) {
   const pieces = list.rows.reduce((n, r) => n + r.qty, 0)
   const [busy, setBusy] = useState(false)
   const set = (key: string, patch: Partial<Row>) => onRows(list.rows.map((r) => (r.key === key ? { ...r, ...patch } : r)))
@@ -215,7 +215,7 @@ function ListCard({ list, onRows, onPrint, onDialog }: { list: PrintList; onRows
     <section className="lab-card">
       <div className="lab-card-title">{tx("Printlijst")} · {list.rows.length === 1 ? tx("1 etiket") : tx("{0} etiketten", list.rows.length)}, {tx("{0} stuks", pieces)}</div>
       <div className="small muted">{meta}</div>
-      <div className="lab-previews">{list.rows.slice(0, 3).map((r) => <Preview key={r.key} row={r} />)}</div>
+      <div className="lab-previews">{list.rows.slice(0, 3).map((r) => <Preview key={r.key} row={r} edge={edge} />)}</div>
       <div className="lab-table-wrap">
         <table className="lab-table">
           <thead><tr><th>{tx("Artikelnummer")}</th><th>{tx("Naam op etiket")}</th><th className="num">{tx("Prijs")}</th><th>{tx("Aantal")}</th><th aria-label={tx("Verwijderen")} /></tr></thead>
@@ -243,10 +243,10 @@ function ListCard({ list, onRows, onPrint, onDialog }: { list: PrintList; onRows
   )
 }
 
-function Preview({ row }: { row: Row }) {
+function Preview({ row, edge }: { row: Row; edge: number }) {
   const [url, setUrl] = useState('')
   const data = useMemo<LabelData>(() => ({ name: row.name, price: row.price, articleNumber: row.articleNumber, test: row.key === 'test' }), [row.name, row.price, row.articleNumber, row.key])
-  useEffect(() => { let live = true; labelImage(data).then((u) => { if (live) setUrl(u) }); return () => { live = false } }, [data])
+  useEffect(() => { let live = true; labelImage(data).then((u) => { if (live) setUrl(u) }); return () => { live = false } }, [data, edge])
   return url ? <img className="lab-preview" src={url} alt={`${row.name} ${row.articleNumber}`} /> : <div className="lab-preview" />
 }
 
@@ -276,6 +276,7 @@ function PrinterSetup({ printer, settings, onPrinter, onSettings, onTest, onClos
         <p className="small muted">{tx("Op Windows houdt het printerstuurprogramma de USB-poort soms vast; dan kan de browser er niet bij. Druk in dat geval af via het printvenster, of laat de poort vrijgeven met het programma Zadig (WinUSB). Op een Mac, Chromebook of Android-tablet werkt het meestal direct.")}</p>
         <div className="form-grid">
           <NumberField label={tx("Verschuiving over de breedte (mm)")} hint={tx("Als de tekst niet op het etiket valt")} value={settings.offsetMm} step="0.5" min={0} onChange={(v) => onSettings({ ...settings, offsetMm: Math.max(0, Math.min(25, v)) })} />
+          <NumberField label={tx("Witte rand links en rechts (mm)")} hint={tx("Groter maken als het kader of het logo wordt afgesneden")} value={settings.edgeMm} step="0.5" min={1} onChange={(v) => onSettings({ ...settings, edgeMm: Math.max(1, Math.min(10, v)) })} />
           <SelectField label={tx("Donkerte")} value={settings.density} onChange={(v) => onSettings({ ...settings, density: v })} options={[{ value: 'light', label: tx("Licht") }, { value: 'normal', label: tx("Normaal") }, { value: 'dark', label: tx("Donker") }]} />
         </div>
         <Check label={tx("Etiket 180° draaien")} checked={settings.rotate180} onChange={(v) => onSettings({ ...settings, rotate180: v })} />

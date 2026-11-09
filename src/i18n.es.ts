@@ -1639,4 +1639,6 @@ export const es: Record<string, string> = {
   "Een proforma wordt niet gemaild. Bevestig eerst de verkooporder.": "Una proforma no se envía. Confirma primero el pedido de venta.",
   "Deze verkooporder heeft nog geen klant.": "Este pedido de venta aún no tiene cliente.",
   "Vul een geldig e-mailadres in voor de verkooporder.": "Introduce un correo válido para el pedido de venta.",
+  "Witte rand links en rechts (mm)": "Margen blanco izquierda y derecha (mm)",
+  "Groter maken als het kader of het logo wordt afgesneden": "Auméntalo si el marco o el logotipo se cortan",
 }

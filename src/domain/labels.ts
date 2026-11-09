@@ -186,6 +186,8 @@ export const PRINTHEAD_DOTS = 672
 export interface PrinterSettings {
   /** Verschuiving over de printkop in mm (ESC B). */
   offsetMm: number
+  /** Witte rand aan de korte kanten (links en rechts op het liggende etiket), in mm. Het stuurprogramma van de DYMO drukt daar niet. */
+  edgeMm: number
   /** Etiket 180 graden draaien als het ondersteboven uit de printer komt. */
   rotate180: boolean
   /** Spiegelen over de breedte, als de tekst in spiegelbeeld uit de printer komt. */
@@ -193,7 +195,7 @@ export interface PrinterSettings {
   /** Donkerte: licht, normaal of donker. */
   density: 'light' | 'normal' | 'dark'
 }
-export const DEFAULT_PRINTER: PrinterSettings = { offsetMm: 0, rotate180: false, mirror: false, density: 'normal' }
+export const DEFAULT_PRINTER: PrinterSettings = { offsetMm: 0, edgeMm: 4.5, rotate180: false, mirror: false, density: 'normal' }
 
 /**
  * Zet een etiket (zwart-wit, liggend, rij voor rij van boven naar beneden) om naar rasterregels voor de printer.
