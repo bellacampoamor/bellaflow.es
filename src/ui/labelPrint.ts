@@ -200,7 +200,7 @@ export async function printViaDialog(labels: { data: LabelData; qty: number }[])
   sheet.className = 'label-sheet'
   for (const { url, qty } of urls) for (let i = 0; i < qty; i++) { const img = document.createElement('img'); img.src = url; img.alt = ''; sheet.append(img) }
   const style = document.createElement('style')
-  style.textContent = `@media print { @page { size: ${LABEL_MM.width}mm ${LABEL_MM.height}mm; margin: 0; } body > *:not(.label-sheet) { display: none !important; } body { background: #fff; } .label-sheet { display: block !important; } .label-sheet img { display: block; image-rendering: pixelated; width: ${LABEL_MM.width}mm; height: ${LABEL_MM.height}mm; break-after: page; } } .label-sheet { display: none; }`
+  style.textContent = `@media print { @page { size: ${LABEL_MM.width}mm ${LABEL_MM.height}mm; margin: 0; } html, body { margin: 0 !important; padding: 0 !important; height: auto !important; min-height: 0 !important; background: #fff; } body > *:not(.label-sheet) { display: none !important; } .label-sheet { display: block !important; margin: 0; padding: 0; } .label-sheet img { display: block; image-rendering: pixelated; width: ${LABEL_MM.width}mm; height: ${LABEL_MM.height - 0.3}mm; margin: 0; break-inside: avoid; } .label-sheet img + img { break-before: page; } } .label-sheet { display: none; }`
   document.head.append(style); document.body.append(sheet)
   await Promise.all([...sheet.querySelectorAll('img')].map((img) => img.decode().catch(() => {})))
   const done = () => { sheet.remove(); style.remove(); window.removeEventListener('afterprint', done) }
