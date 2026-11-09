@@ -6,6 +6,7 @@ import { labelBasePrice } from '../domain/labels'
 import { addToBasket, inBasket, removeFromBasket, stockShortage, type BasketRow } from '../domain/scan'
 import { createProformaOrder, findArticleByCode } from '../domain/services'
 import { BarcodeScanner } from '../ui/BarcodeScanner'
+import { armBeep, beepError } from '../ui/beep'
 import { useApp } from '../ui/app-context'
 import { eur, Modal, NumInput } from '../ui/kit'
 import { tx } from '../i18n'
@@ -41,6 +42,8 @@ export function ScanApp() {
   const [done, setDone] = useState<{ id: string; number: string } | null>(null)
   const [confirmRemove, setConfirmRemove] = useState<BasketRow | null>(null)
 
+  useEffect(() => armBeep(), [])
+
   const pieces = rows.reduce((n, r) => n + r.qty, 0)
   const total = rows.reduce((n, r) => n + (r.price ?? 0) * r.qty, 0)
 
@@ -49,7 +52,7 @@ export function ScanApp() {
     setBusy(true); setMessage('')
     try {
       const a = await findArticleByCode(db, code)
-      if (!a) { setMessage(tx("{0} niet gevonden. Scan opnieuw of typ het artikelnummer.", code)); return }
+      if (!a) { beepError(); setMessage(tx("{0} niet gevonden. Scan opnieuw of typ het artikelnummer.", code)); return }
       const product = s.products.find((p) => p.catalog_article_number === a.article_number)
       setFound({ article: a, price: labelBasePrice(a, s.products, s.suppliers), free: freeTotal(s, product?.id), already: inBasket(rows, a.article_number) })
       setQty(1)

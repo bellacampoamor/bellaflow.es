@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { tx } from '../i18n'
+import { armBeep, beepOk } from './beep'
 
 // Camera-scanner voor de streepjescode op het prijsetiket (Code 128 met het eigen artikelnummer), en EAN op de verpakking.
 // Chrome op Android heeft een ingebouwde BarcodeDetector; Safari op iPhone niet, daar leest ZXing het beeld.
@@ -20,6 +21,7 @@ export function BarcodeScanner({ onCode, paused = false }: { onCode: (code: stri
   pausedRef.current = paused
 
   useEffect(() => {
+    armBeep()
     let stream: MediaStream | null = null
     let timer = 0
     let stopZxing: (() => void) | null = null
@@ -30,6 +32,7 @@ export function BarcodeScanner({ onCode, paused = false }: { onCode: (code: stri
       // Dezelfde code blijft in beeld: niet elke frame opnieuw melden.
       if (!code || pausedRef.current || (code === last.code && now - last.at < 3000)) return
       last.code = code; last.at = now
+      beepOk()
       navigator.vibrate?.(60)
       handler.current(code)
     }
