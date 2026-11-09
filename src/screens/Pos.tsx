@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
-import { AlertTriangle, Banknote, Check as CheckIcon, CreditCard, Minus, PenLine, Plus, Printer, ScanLine, Trash2, Undo2, UserPlus } from 'lucide-react'
+import { AlertTriangle, Banknote, Check as CheckIcon, CreditCard, Minus, PenLine, Plus, Printer, ScanLine, Trash2, UserPlus } from 'lucide-react'
 import type { Customer, Payment } from '../data/types'
 import { freeAt, lineTotal, todayISO } from '../domain/calc'
 import { labelBasePrice } from '../domain/labels'
@@ -209,7 +209,7 @@ export function Pos() {
             {people.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
         </label>
-        <button className="btn" onClick={() => setReturning(true)} title={tx("Retour of correctie op een eerdere kassabon: maakt een creditfactuur")}><Undo2 size={16} />{tx("Retour")}</button>
+        <button className="btn danger-solid pos-credit" onClick={() => setReturning(true)} title={tx("Retour of correctie op een eerdere kassabon: maakt een creditfactuur")}>{tx("CREDIT")}</button>
       </Head>
       {returning && <ReturnPicker onClose={() => setReturning(false)} />}
       <div className="pos">

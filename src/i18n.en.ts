@@ -1542,6 +1542,7 @@ export const en: Record<string, string> = {
   "{0} t/m {1}": "{0} to {1}",
   "Creditfactuur": "Credit note",
   "Terug te betalen": "To refund",
+  "CREDIT": "CREDIT",
   "Retour": "Return",
   "Fout in de factuur": "Error in the invoice",
   "Korting achteraf": "Discount afterwards",

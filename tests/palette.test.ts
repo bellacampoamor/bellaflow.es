@@ -26,7 +26,7 @@ const pairs: [string, string][] = [
   ['muted', 'bg'], ['muted', 'surface'], ['muted', 'surface-2'],
   ['heading', 'bg'], ['heading', 'surface'], ['heading', 'surface-2'],
   ['link', 'surface'], ['link', 'surface-2'], ['link', 'bg'],
-  ['on-primary', 'primary'], ['on-primary', 'primary-hover'], ['on-selected', 'selected'],
+  ['on-primary', 'primary'], ['on-primary', 'primary-hover'], ['on-danger', 'danger'], ['on-danger', 'danger-hover'], ['on-selected', 'selected'],
   ['buy-fg', 'buy'], ['sell-fg', 'sell'], ['ship-fg', 'ship'], ['bill-fg', 'bill'],
   ['buy', 'buy-fg'], ['sell', 'sell-fg'], ['ship', 'ship-fg'], ['bill', 'bill-fg'],
   ['good', 'good-bg'], ['warn', 'warn-bg'], ['bad', 'bad-bg'], ['info', 'info-bg'],

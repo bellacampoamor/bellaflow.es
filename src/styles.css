@@ -18,6 +18,9 @@
   --on-primary: #FFFFFF;
   --primary: #AC5F41;
   --primary-hover: #915442;
+  --danger: #A8322B;
+  --danger-hover: #8A2620;
+  --on-danger: #FFFFFF;
   --selected: #40444E;
   --on-selected: #FFFFFF;
   --buy: #DFDFE0;      --buy-fg: #40444E;
@@ -43,7 +46,7 @@
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
   --heading: #F2E8DF; --link: #E0AC87; --brand-line: #CE8D61; --brand-strong: #CE8D61;
   --bg: #252A33; --surface: #30343E; --surface-2: #40444E; --fg: #F2E8DF; --muted: #CDBFB4;
-  --line: #4D4C53; --line-strong: #6E6264; --on-primary: #0B182A; --primary: #CE8D61; --primary-hover: #BD7A52; --selected: #CE8D61; --on-selected: #0B182A;
+  --line: #4D4C53; --line-strong: #6E6264; --on-primary: #0B182A; --primary: #CE8D61; --primary-hover: #BD7A52; --selected: #CE8D61; --on-selected: #0B182A; --danger: #B83A32; --danger-hover: #9E2B2B; --on-danger: #FFFFFF;
   --buy: #4A505C; --buy-fg: #E0E3E8; --sell: #5F4235; --sell-fg: #F2D6C2; --ship: #54484A; --ship-fg: #EADCD8; --bill: #1F3D54; --bill-fg: #C9DBE7;
   --acc-klant: #9FC3DC; --acc-producten: #E0AC87; --acc-levering: #D2B3AE; --acc-notitie: #C3C9D4;
   --good: #AFD6B3; --good-bg: #2F463A; --warn: #E9C786; --warn-bg: #4D3D22; --bad: #F4B0A8; --bad-bg: #57302D; --info: #BAD2E1; --info-bg: #2B4354;
@@ -52,7 +55,7 @@
 :root[data-theme="dark"] {
   --heading: #F2E8DF; --link: #E0AC87; --brand-line: #CE8D61; --brand-strong: #CE8D61;
   --bg: #252A33; --surface: #30343E; --surface-2: #40444E; --fg: #F2E8DF; --muted: #CDBFB4;
-  --line: #4D4C53; --line-strong: #6E6264; --on-primary: #0B182A; --primary: #CE8D61; --primary-hover: #BD7A52; --selected: #CE8D61; --on-selected: #0B182A;
+  --line: #4D4C53; --line-strong: #6E6264; --on-primary: #0B182A; --primary: #CE8D61; --primary-hover: #BD7A52; --selected: #CE8D61; --on-selected: #0B182A; --danger: #B83A32; --danger-hover: #9E2B2B; --on-danger: #FFFFFF;
   --buy: #4A505C; --buy-fg: #E0E3E8; --sell: #5F4235; --sell-fg: #F2D6C2; --ship: #54484A; --ship-fg: #EADCD8; --bill: #1F3D54; --bill-fg: #C9DBE7;
   --acc-klant: #9FC3DC; --acc-producten: #E0AC87; --acc-levering: #D2B3AE; --acc-notitie: #C3C9D4;
   --good: #AFD6B3; --good-bg: #2F463A; --warn: #E9C786; --warn-bg: #4D3D22; --bad: #F4B0A8; --bad-bg: #57302D; --info: #BAD2E1; --info-bg: #2B4354;
@@ -126,6 +129,8 @@ main { padding-block: 22px 56px; }
 .btn.primary { background: var(--primary); border-color: var(--primary); color: var(--on-primary); }
 .btn.primary:hover { background: var(--primary-hover); }
 .btn.danger { color: var(--bad); border-color: var(--bad); }
+.btn.danger-solid { background: var(--danger); border-color: var(--danger); color: var(--on-danger); }
+.btn.danger-solid:hover { background: var(--danger-hover); border-color: var(--danger-hover); }
 .btn.sm { padding: 4px 10px; min-height: 30px; font-size: .84rem; }
 .btn.icon { padding: 4px 7px; min-height: 30px; border-color: transparent; background: none; color: var(--muted); }
 .btn.icon:hover { color: var(--bad); }
@@ -752,7 +757,9 @@ tr.focus-flash td { animation: focus-flash-cell 2.6s ease-out; }
 .pos-side { position: sticky; top: calc(var(--top-h, 80px) + 12px); }
 .pos-who { max-width: 520px; }
 .pos-user { display: flex; flex-direction: column; gap: 2px; }
-.pos-user select { min-width: 180px; }
+.pos-user select { min-width: 180px; height: 42px; box-sizing: border-box; }
+.head .actions:has(.pos-credit) { align-items: flex-end; }
+.pos-credit { height: 42px; min-height: 42px; box-sizing: border-box; letter-spacing: .04em; }
 .pos-scan { border-top: 4px solid var(--primary); }
 .pos-scan-row { display: flex; align-items: center; gap: 10px; color: var(--primary); }
 .pos-scan-row input { flex: 1; min-width: 0; font-size: 1.25rem; padding: 12px 14px; letter-spacing: .02em; }
