@@ -892,3 +892,28 @@ tr.close-hist.on td { background: var(--selected); color: var(--on-selected); }
 .gs-row.on { background: var(--surface-2); box-shadow: inset 3px 0 0 var(--brand-line); }
 .gs-title { font-weight: 600; color: var(--heading); }
 .gs-sub { font-size: .84rem; color: var(--muted); }
+
+/* Kassabon 80 mm (thermische bonprinter, 9 november 2026). Bedrukbare breedte 72 mm, puur zwart op wit,
+   geen kleurvlakken: een thermische printer kent alleen zwart. Op het scherm een strookje van 80 mm breed. */
+.receipt { background: #fff; color: #000; width: 80mm; max-width: 100%; box-sizing: border-box; padding: 5mm 4mm 6mm; border: 1px solid var(--line); border-radius: 4px;
+  font: 400 9.5pt/1.3 "Helvetica Neue", Arial, sans-serif; font-variant-numeric: tabular-nums; }
+.receipt .small { font-size: 8pt; }
+.receipt .strong, .receipt strong { font-weight: 700; }
+.receipt-head { text-align: center; font-size: 8pt; display: grid; gap: 1mm; }
+.receipt-logo { display: block; margin: 0 auto 1mm; max-width: 52mm; max-height: 22mm; object-fit: contain; filter: grayscale(1) brightness(1.5) contrast(8); }
+.receipt-name { font-size: 12pt; font-weight: 700; }
+.receipt-title { text-align: center; font-weight: 700; font-size: 11pt; text-transform: uppercase; letter-spacing: .03em; margin-bottom: 1.5mm; }
+.receipt-rule { border-top: 1px dashed #000; margin: 2.5mm 0; }
+.receipt-kv { display: flex; justify-content: space-between; gap: 3mm; }
+.receipt-kv > :last-child { text-align: right; white-space: nowrap; }
+.receipt-kv > :first-child { min-width: 0; overflow-wrap: anywhere; }
+.receipt-line + .receipt-line { margin-top: 1.5mm; }
+.receipt-desc { font-weight: 700; overflow-wrap: anywhere; }
+.receipt-note { font-size: 8pt; margin-top: 1.5mm; overflow-wrap: anywhere; }
+.receipt-total { font-size: 13pt; font-weight: 700; margin-top: 1mm; }
+.receipt-center { text-align: center; margin-top: 1mm; }
+.receipt-credit { display: flex; justify-content: center; align-items: center; gap: 1.5mm; margin-top: 3mm; font-size: 7pt; }
+.receipt-credit img { height: 3.5mm; width: auto; filter: grayscale(1); }
+@media print {
+  .receipt { width: 72mm; margin: 0 4mm; padding: 2mm 0 8mm; border: 0; border-radius: 0; }
+}

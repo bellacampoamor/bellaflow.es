@@ -1641,4 +1641,11 @@ export const en: Record<string, string> = {
   "Vul een geldig e-mailadres in voor de verkooporder.": "Enter a valid email address for the sales order.",
   "Witte rand links en rechts (mm)": "White margin left and right (mm)",
   "Groter maken als het kader of het logo wordt afgesneden": "Increase if the frame or the logo gets cut off",
+  "Kassa: afdrukken": "POS: printing",
+  "Kies hoe de eenvoudige factuur van de kassa uit de printer komt: op A4 of als kassabon op een thermische bonprinter met rollen van 80 mm. Geldt ook voor retouren aan de kassa. Gewone facturen blijven A4, de gemailde pdf ook.": "Choose how the POS simplified invoice is printed: on A4 or as a receipt on a thermal receipt printer with 80 mm rolls. Also applies to returns at the POS. Regular invoices stay A4, and so does the emailed PDF.",
+  "Eenvoudige factuur afdrukken": "Print simplified invoice",
+  "Eenvoudige factuur op A4": "Simplified invoice on A4",
+  "Kassabon, thermische printer 80 mm": "Receipt, 80 mm thermal printer",
+  "Kies in het afdrukvenster de bonprinter, papierformaat 80 mm en marges Geen.": "In the print dialog, choose the receipt printer, paper size 80 mm and margins None.",
+  "Bon afdrukken": "Print receipt",
 }

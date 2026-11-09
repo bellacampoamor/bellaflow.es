@@ -78,6 +78,8 @@ export function settingsUpgrade(co: Partial<Settings>): Partial<Settings> {
   if (co.prefix_invoice_credit_simplified === undefined) patch.prefix_invoice_credit_simplified = 'FRS-BELLA'
   if (co.prefix_invoice_credit_simplified_hdb === undefined) patch.prefix_invoice_credit_simplified_hdb = 'FRS-HDB'
   if (co.language_invoice_simplified === undefined) patch.language_invoice_simplified = 'es'
+  // Afdrukformaat van de eenvoudige factuur (9 november 2026): standaard A4, zoals tot nu toe.
+  if (co.print_invoice_simplified === undefined) patch.print_invoice_simplified = 'a4'
   // Lijsten volgen voortaan de schermtaal, tenzij er bewust een vaste taal gekozen wordt (besluit Rick 8 november 2026).
   if (co.language_lists === undefined) patch.language_lists = 'scherm'
   // Mailen per document (8 november 2026): ontbreekt de keuze, dan de standaard.

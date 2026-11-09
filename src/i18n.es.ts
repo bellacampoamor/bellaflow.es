@@ -1641,4 +1641,11 @@ export const es: Record<string, string> = {
   "Vul een geldig e-mailadres in voor de verkooporder.": "Introduce un correo válido para el pedido de venta.",
   "Witte rand links en rechts (mm)": "Margen blanco izquierda y derecha (mm)",
   "Groter maken als het kader of het logo wordt afgesneden": "Auméntalo si el marco o el logotipo se cortan",
+  "Kassa: afdrukken": "TPV: impresión",
+  "Kies hoe de eenvoudige factuur van de kassa uit de printer komt: op A4 of als kassabon op een thermische bonprinter met rollen van 80 mm. Geldt ook voor retouren aan de kassa. Gewone facturen blijven A4, de gemailde pdf ook.": "Elige cómo se imprime la factura simplificada del TPV: en A4 o como ticket en una impresora térmica de rollos de 80 mm. También vale para las devoluciones en el TPV. Las facturas normales siguen en A4, igual que el PDF enviado por correo.",
+  "Eenvoudige factuur afdrukken": "Imprimir factura simplificada",
+  "Eenvoudige factuur op A4": "Factura simplificada en A4",
+  "Kassabon, thermische printer 80 mm": "Ticket, impresora térmica 80 mm",
+  "Kies in het afdrukvenster de bonprinter, papierformaat 80 mm en marges Geen.": "En el cuadro de impresión, elige la impresora de tickets, tamaño de papel 80 mm y márgenes Ninguno.",
+  "Bon afdrukken": "Imprimir ticket",
 }

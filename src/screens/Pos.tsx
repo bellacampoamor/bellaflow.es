@@ -14,6 +14,7 @@ import { issuerInfo } from '../domain/issuers'
 import { CustomerFields } from './OrderForm'
 import { tx } from '../i18n'
 import { mailsAutomatically } from '../domain/mailSettings'
+import { simplifiedPrint } from '../domain/receipt'
 
 const USER_KEY = 'bella-flow-pos-user'
 const CART_KEY = 'bella-flow-pos-cart'
@@ -239,7 +240,7 @@ export function Pos() {
                 {done.corrected > 0 && <div className="small warn-text"><AlertTriangle size={13} /> {tx("Voorraadverschil bijgeboekt voor {0} artikel(en); zie Voorraad, mutaties.", done.corrected)}</div>}
               </div>
               <div className="actions">
-                <a className="btn" href={`#facturatie-print-${done.invoiceId}`}><Printer size={16} />{tx("Factuur afdrukken")}</a>
+                <a className="btn" href={`#facturatie-print-${done.invoiceId}`}><Printer size={16} />{simplifiedPrint(s.settings[0]) === 'bon80' ? tx("Bon afdrukken") : tx("Factuur afdrukken")}</a>
                 <button className="btn primary" onClick={() => { setDone(null); refocus() }}>{tx("Nieuwe verkoop")}</button>
               </div>
             </section>

@@ -13,6 +13,7 @@ import { isSpanishSupplier } from '../domain/calc'
 import { ROLE_LABEL, roleOf, STAFF_ROLES } from '../domain/staff'
 import { BELLA_DEFAULTS, HDB_DEFAULTS, imageSrc } from '../domain/issuers'
 import { mailsAutomatically } from '../domain/mailSettings'
+import { simplifiedPrint, type SimplifiedPrint } from '../domain/receipt'
 
 // Geen tabblad Producten: de producten zijn de artikelen uit de catalogi van de leveranciers, met een eigen artikelnummer.
 type Tab = 'magazijnen' | 'leveranciers' | 'toeslagen' | 'klanten' | 'medewerkers' | 'bedrijf'
@@ -125,6 +126,13 @@ export function Admin({ param = '' }: { param?: string }) {
         </div>
         <div className="form-grid" style={{ marginTop: 12 }}>
           <TextField className="span-2" label={tx("Winkel e-mail")} type="email" value={co.shop_email ?? ''} onChange={(v) => setCo({ ...co, shop_email: v })} hint={tx("Afzender en antwoordadres; krijgt een bcc van elk gemaild document.")} />
+        </div>
+        </section>
+        <section className="panel section">
+        <h2>{tx("Kassa: afdrukken")}</h2>
+        <p className="small muted">{tx("Kies hoe de eenvoudige factuur van de kassa uit de printer komt: op A4 of als kassabon op een thermische bonprinter met rollen van 80 mm. Geldt ook voor retouren aan de kassa. Gewone facturen blijven A4, de gemailde pdf ook.")}</p>
+        <div className="form-grid">
+          <SelectField label={tx("Eenvoudige factuur afdrukken")} value={simplifiedPrint(co)} onChange={(v: SimplifiedPrint) => setCo({ ...co, print_invoice_simplified: v })} options={[{ value: 'a4', label: tx("Eenvoudige factuur op A4") }, { value: 'bon80', label: tx("Kassabon, thermische printer 80 mm") }]} hint={simplifiedPrint(co) === 'bon80' ? tx("Kies in het afdrukvenster de bonprinter, papierformaat 80 mm en marges Geen.") : undefined} />
         </div>
         </section>
         <div className="cols-even same-height">

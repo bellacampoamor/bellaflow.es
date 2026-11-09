@@ -10,6 +10,8 @@ import { tx } from '../i18n'
 import { INVOICE_TEXT, invoiceTitle } from '../domain/noteText'
 import { POS_CUSTOMER_NOTE } from '../domain/pos'
 import { imageSrc, issuerInfo, issuerOf, legalLine } from '../domain/issuers'
+import { simplifiedPrint } from '../domain/receipt'
+import { ReceiptPaper } from './Receipt'
 
 const KIND = { deelfactuur: 'Deelfactuur', eindfactuur: 'Eindfactuur', volledig: 'Volledig', creditfactuur: 'Creditfactuur' } as const
 const STATE = { betaald: ['Betaald', 'good'], open: ['Open', 'bill'], te_laat: ['Te laat', 'bad'], terugbetalen: ['Terug te betalen', 'warn'] } as const
@@ -126,6 +128,8 @@ export function InvoiceDetail({ id, autoPrint = false }: { id: string; autoPrint
   // Voet van elke factuur (besluit Rick 8 november 2026): linksonder de QR (alleen gewone factuur, 30 x 30 mm),
   // midden het beeldmerk met de juridische regel van het uitgevende bedrijf, rechtsonder Bella Flow met bellaflow.es.
   const footIssuer = issuer ?? issuerInfo(co, 'bella')
+  // Kassabon van 80 mm in plaats van A4, als dat onder Instellingen > Kassa: afdrukken gekozen is (9 november 2026).
+  const receipt = !!inv.simplified && simplifiedPrint(co) === 'bon80'
   const bellaLogo = issuerInfo(co, 'bella').logo
   const base = import.meta.env.BASE_URL
   // Facturen van voor het artikelnummer op de factuurregel
@@ -152,7 +156,7 @@ export function InvoiceDetail({ id, autoPrint = false }: { id: string; autoPrint
     <>
       <Head title={inv.number} sub={<>{c.company || c.name} <Pill tone={tone}>{tx(label)}</Pill>{issuer?.key === 'hdb' && <> <Pill tone="info">HDB</Pill></>}</>} back={{ href: '#facturatie', label: tx("Facturatie") }}>
         <a className="btn" href={`#orders-${o.id}`}>{tx("Naar")} {o.number}</a>
-        {canPrint && <button className="btn" onClick={() => window.print()}>{tx("Afdrukken of PDF")}</button>}
+        {canPrint && <button className="btn" onClick={() => window.print()}>{receipt ? tx("Bon afdrukken") : tx("Afdrukken of PDF")}</button>}
         <button className="btn" onClick={() => setMailTo(mail?.to_email || c.email || '')}><Mail size={15} style={{ verticalAlign: -2, marginRight: 4 }} />{mail ? tx("Opnieuw mailen") : tx("Mailen")}</button>
         {!credit && canCredit(s, inv) && <a className="btn" href={`#facturatie-crediteren-${inv.id}`}>{tx("Crediteren of retour")}</a>}
         {!credit && balance > 0 && <button className="btn primary" onClick={() => { setAmount(balance); setPay(true) }}>{tx("Betaling registreren")}</button>}
@@ -162,6 +166,11 @@ export function InvoiceDetail({ id, autoPrint = false }: { id: string; autoPrint
       {original && <div className="note no-print" style={{ marginBottom: 12 }}>{tx("Creditfactuur op factuur")} <a href={`#facturatie-${original.id}`}>{original.number}</a>. {tx("Reden")}: {inv.credit_reason}</div>}
       {credits.length > 0 && <div className="note no-print" style={{ marginBottom: 12 }}>{tx("Gecrediteerd met")} {credits.map((c, n) => <span key={c.id}>{n > 0 && ', '}<a href={`#facturatie-${c.id}`}>{c.number}</a> ({eur(c.total)})</span>)}</div>}
       {!inv.simplified && !hasTaxId(nif) && <div className="note warn no-print" style={{ marginBottom: 12 }}>{tx("De QR-code op deze factuur klopt pas als het CIF is ingevuld onder Instellingen.")}</div>}
+      {receipt && issuer ? (
+        <ReceiptPaper language={language} t={t} title={invoiceTitle(t, inv)} inv={inv} issuer={issuer} base={base} lines={lines} articleOf={(l) => articleOf(l.delivery_line_id)}
+          rates={b.rates} customer={c.notes !== POS_CUSTOMER_NOTE ? c : null} orderNumber={o.number} seller={s.salespeople.find((x) => x.id === o.salesperson_id)?.name ?? ''}
+          original={original} pays={pays} balance={balance} credit={credit} />
+      ) : (
       <DocPaper language={language} tallFoot={!inv.simplified} foot={<div className="invoice-foot">
           <div className="invoice-foot-qr">{!inv.simplified && <TaxQr url={invoiceQrUrl({ nif, number: inv.number, date: inv.invoice_date, total: inv.total }, IS_PRODUCTION)} />}</div>
           <div className="issuer-foot">
@@ -217,6 +226,7 @@ export function InvoiceDetail({ id, autoPrint = false }: { id: string; autoPrint
         {!inv.simplified && !credit && <p className="small muted" style={{ marginTop: 26, marginBottom: 0 }}>{t.pay}: {co.iban}{co.invoice_footer ? <><br />{co.invoice_footer}</> : ''}</p>}
         {issuer?.key === 'bella' && co.invoice_footer && <p className="small muted" style={{ marginTop: 26, marginBottom: 0 }}>{co.invoice_footer}</p>}
       </DocPaper>
+      )}
       {mailTo !== null && (
         <Modal title={tx("Factuur mailen")} onClose={() => setMailTo(null)} footer={<>
           <button className="btn" onClick={() => setMailTo(null)}>{tx("Annuleren")}</button>

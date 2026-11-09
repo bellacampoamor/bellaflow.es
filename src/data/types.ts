@@ -11,6 +11,8 @@ export interface Settings {
   prefix_invoice_credit?: string; prefix_invoice_credit_simplified?: string; prefix_invoice_credit_simplified_hdb?: string
   /** Afdruktaal van de eenvoudige factuur (kassa), standaard Spaans. */
   language_invoice_simplified?: DocumentLanguage
+  /** Afdrukformaat van de eenvoudige factuur (kassa): A4 (standaard) of kassabon op een thermische printer van 80 mm. */
+  print_invoice_simplified?: 'a4' | 'bon80'
   /** Logo (linksboven) en beeldmerk (klein onderaan) op de eenvoudige factuur: data-URL of pad in public/. */
   logo_bella?: string; mark_bella?: string; logo_hdb?: string; mark_hdb?: string
   /** Tweede bedrijf aan de kassa: Handmade Bali Treasures SL (HomeDecoBali), buiten de boekhouding van Bella. */
