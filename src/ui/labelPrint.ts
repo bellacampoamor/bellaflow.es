@@ -81,15 +81,16 @@ export function drawLabel(canvas: HTMLCanvasElement, data: LabelData, mark: HTML
 
   // Prijs
   ctx.font = `bold ${mm(7.2)}px ${FONT}`
-  ctx.fillText(data.price === null ? '€ —' : fmtLabelPrice(data.price), left, mm(21), areaW)
+  ctx.fillText(data.price === null ? '€ —' : fmtLabelPrice(data.price), left, mm(20), areaW)
 
   // Streepjescode met het artikelnummer eronder
   const code = data.articleNumber || 'BELLAFLOW'
   const modules = code128Modules(code)
-  const x = Math.max(1, Math.min(4, Math.floor(mm(52) / modules.length)))
-  const barX = Math.max(left, 10 * x), barY = mm(22.6), barH = mm(8.6)
+  // Smalste streep 4 stippen (0,34 mm) als het past: breed genoeg voor elke handscanner, ook na schalen in het printvenster.
+  const x = Math.max(2, Math.min(4, Math.floor((areaW - 10) / modules.length)))
+  const barX = Math.max(left, 10 * x), barY = mm(21.4), barH = mm(9.8)
   modules.forEach((on, i) => { if (on) ctx.fillRect(barX + i * x, barY, x, barH) })
-  ctx.font = `${mm(2.4)}px ${FONT}`
+  ctx.font = `${mm(2.6)}px ${FONT}`
   ctx.textAlign = 'center'
   ctx.fillText(code, barX + (modules.length * x) / 2, barY + barH + mm(2.5))
 
@@ -97,7 +98,7 @@ export function drawLabel(canvas: HTMLCanvasElement, data: LabelData, mark: HTML
     ctx.lineWidth = 3
     ctx.strokeRect(mm(1), mm(1), W - mm(2), H - mm(2))
     ctx.textAlign = 'right'; ctx.font = `bold ${mm(2.6)}px ${FONT}`
-    ctx.fillText('TEST  ↑', right, mm(21))
+    ctx.fillText('TEST  ↑', right, mm(20))
   }
 }
 
@@ -192,7 +193,7 @@ export async function printViaDialog(labels: { data: LabelData; qty: number }[])
   sheet.className = 'label-sheet'
   for (const { url, qty } of urls) for (let i = 0; i < qty; i++) { const img = document.createElement('img'); img.src = url; img.alt = ''; sheet.append(img) }
   const style = document.createElement('style')
-  style.textContent = `@media print { @page { size: ${LABEL_MM.width}mm ${LABEL_MM.height}mm; margin: 0; } body > *:not(.label-sheet) { display: none !important; } body { background: #fff; } .label-sheet { display: block !important; } .label-sheet img { display: block; width: ${LABEL_MM.width}mm; height: ${LABEL_MM.height}mm; break-after: page; } } .label-sheet { display: none; }`
+  style.textContent = `@media print { @page { size: ${LABEL_MM.width}mm ${LABEL_MM.height}mm; margin: 0; } body > *:not(.label-sheet) { display: none !important; } body { background: #fff; } .label-sheet { display: block !important; } .label-sheet img { display: block; image-rendering: pixelated; width: ${LABEL_MM.width}mm; height: ${LABEL_MM.height}mm; break-after: page; } } .label-sheet { display: none; }`
   document.head.append(style); document.body.append(sheet)
   await Promise.all([...sheet.querySelectorAll('img')].map((img) => img.decode().catch(() => {})))
   const done = () => { sheet.remove(); style.remove(); window.removeEventListener('afterprint', done) }
