@@ -2,6 +2,7 @@ import { PDFDocument, rgb, StandardFonts, type PDFFont, type PDFImage, type PDFP
 import type { Snapshot } from '../data/types'
 import { documentLanguage } from './calc'
 import { DOC_MARK, NOTE_TEXT } from './noteText'
+import { tradeName } from './issuers'
 
 export const A4: [number, number] = [595.28, 841.89]
 export const MARGIN = 48
@@ -65,7 +66,7 @@ export async function signedNotePdf(s: Snapshot, deliveryId: string) {
       y -= size + 4.5
     }
   }
-  put(co?.company_name ?? '', { font: bold, size: 15 })
+  put(tradeName(co), { font: bold, size: 15 })
   put([co?.address, `${co?.postal_code ?? ''} ${co?.city ?? ''}`.trim(), co?.phone, co?.email].filter(Boolean).join(', '), { size: 9, color: MUTED })
   y -= 14
   put(t.title, { font: bold, size: 19 })

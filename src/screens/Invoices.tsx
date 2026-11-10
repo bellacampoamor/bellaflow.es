@@ -5,13 +5,14 @@ import { IS_PRODUCTION, articleNo, deliveryValue, depositAvailable, documentLang
 import { ensureProformas, invoiceProformas, mailInvoice, payInvoice, refundCredit } from '../domain/services'
 import { canCredit, creditsOf, isCredit } from '../domain/credit'
 import { go, useApp, useAutoPrint } from '../ui/app-context'
-import { Empty, eur, fmtDate, Head, Modal, NumberField, Pill, SelectField, Tabs, TextField, DocPaper, pickRow, PickMark, TaxQr, useScrollToFocus, brandFile } from '../ui/kit'
+import { Empty, eur, fmtDate, Head, Modal, NumberField, Pill, SelectField, Tabs, TextField, pickRow, PickMark, TaxQr, useScrollToFocus, brandFile } from '../ui/kit'
 import { tx } from '../i18n'
 import { INVOICE_TEXT, invoiceTitle } from '../domain/noteText'
 import { POS_CUSTOMER_NOTE } from '../domain/pos'
-import { imageSrc, issuerInfo, issuerOf, legalLine } from '../domain/issuers'
+import { imageSrc, issuerInfo, issuerOf, legalLine, tradeName } from '../domain/issuers'
 import { simplifiedPrint } from '../domain/receipt'
 import { ReceiptPaper } from './Receipt'
+import { PagedDoc } from '../ui/PagedDoc'
 
 const KIND = { deelfactuur: 'Deelfactuur', eindfactuur: 'Eindfactuur', volledig: 'Volledig', creditfactuur: 'Creditfactuur' } as const
 const STATE = { betaald: ['Betaald', 'good'], open: ['Open', 'bill'], te_laat: ['Te laat', 'bad'], terugbetalen: ['Terug te betalen', 'warn'] } as const
@@ -108,7 +109,10 @@ function InvoiceProformasModal({ ids, onClose, onDone }: { ids: string[]; onClos
 export function InvoiceDetail({ id, autoPrint = false }: { id: string; autoPrint?: boolean }) {
   const { s, run, toast } = useApp()
   const inv = s.invoices.find((i) => i.id === id)
-  useAutoPrint(autoPrint, !!inv)
+  // Kassabon: direct afdrukken. A4: pas als de bladen gemeten zijn (logo en lettertype geladen).
+  const [sheetsReady, setSheetsReady] = useState(false)
+  const onReceipt = !!inv?.simplified && simplifiedPrint(s.settings[0]) === 'bon80'
+  useAutoPrint(autoPrint, !!inv && (onReceipt || sheetsReady))
   const [pay, setPay] = useState(false)
   const [amount, setAmount] = useState(() => (inv ? invoiceBalance(s, inv) : 0))
   const [method, setMethod] = useState<Payment['method']>('overboeking')
@@ -171,14 +175,16 @@ export function InvoiceDetail({ id, autoPrint = false }: { id: string; autoPrint
           rates={b.rates} customer={c.notes !== POS_CUSTOMER_NOTE ? c : null} orderNumber={o.number} seller={s.salespeople.find((x) => x.id === o.salesperson_id)?.name ?? ''}
           original={original} pays={pays} balance={balance} credit={credit} />
       ) : (
-      <DocPaper language={language} tallFoot={!inv.simplified} foot={<div className="invoice-foot">
+      <PagedDoc language={language} cols={7} onReady={() => setSheetsReady(true)}
+        foot={<div className="invoice-foot">
           <div className="invoice-foot-qr">{!inv.simplified && <TaxQr url={invoiceQrUrl({ nif, number: inv.number, date: inv.invoice_date, total: inv.total }, IS_PRODUCTION)} />}</div>
           <div className="issuer-foot">
             {footIssuer.mark && <img src={imageSrc(footIssuer.mark, base)} alt="" />}
             <span>{legalLine(footIssuer)}</span>
           </div>
           <div className="doc-credit"><img src={brandFile('bellaflow-beeldmerk-small.png')} alt="Bella Flow" /><span>bellaflow.es</span></div>
-        </div>}>
+        </div>}
+        head={<>
         <div className="paper-top invoice-top">
           {issuer ? (
             <div className="issuer-head">
@@ -188,7 +194,7 @@ export function InvoiceDetail({ id, autoPrint = false }: { id: string; autoPrint
           ) : (
           <div className="issuer-head">
             {/* Gewone factuur van Bella: het logo van Bella linksboven (besluit Rick 8 november 2026), daaronder adres en CIF. */}
-            {bellaLogo ? <img className="issuer-logo" src={imageSrc(bellaLogo, base)} alt={co.company_name} /> : <h2 style={{ fontSize: '1.3rem' }}>{co.company_name}</h2>}
+            {bellaLogo ? <img className="issuer-logo" src={imageSrc(bellaLogo, base)} alt={tradeName(co)} /> : <h2 style={{ fontSize: '1.3rem' }}>{tradeName(co)}</h2>}
             <div className="small muted">{[co.address, `${co.postal_code} ${co.city}`.trim(), co.province, co.phone, co.email].filter(Boolean).join(', ')}<br />{t.tax}: {co.tax_id}</div>
           </div>
           )}
@@ -204,10 +210,24 @@ export function InvoiceDetail({ id, autoPrint = false }: { id: string; autoPrint
           <div className="strong">{c.company || c.name}</div>
           <div className="small">{c.address}<br />{c.postal_code} {c.city}, {c.country}{c.tax_id && <><br />{t.tax}: {c.tax_id}</>}</div>
         </div>}
-        <div className="table-wrap flush"><table>
-          <thead><tr><th>{t.code}</th><th>{t.desc}</th><th className="num">{t.qty}</th><th className="num">{t.price}</th><th className="num">{t.disc}</th><th className="num">{t.vat}</th><th className="num">{t.total}</th></tr></thead>
-          <tbody>{lines.map((l) => <tr key={l.id}><td>{l.article_number || articleOf(l.delivery_line_id)}</td><td>{l.description}</td><td className="num">{l.qty}</td><td className="num">{eur(l.unit_price)}</td><td className="num">{l.discount_pct ? `${l.discount_pct}%` : ''}</td><td className="num">{l.vat_rate}%</td><td className="num">{eur(l.line_total)}</td></tr>)}</tbody>
-        </table></div>
+        </>}
+        contHead={
+          /* Vervolgblad: korte kop met afzender, klant (niet bij kassaverkoop zonder klant), titel, nummer en datum. */
+          <div className="paper-top invoice-top" style={{ marginBottom: 18 }}>
+            <div>
+              <div className="strong">{issuer ? issuer.name : tradeName(co)}</div>
+              {c.notes !== POS_CUSTOMER_NOTE && <div className="small">{t.to}: {c.company || c.name}</div>}
+            </div>
+            <div style={{ textAlign: 'right' }}>
+              <div className="strong">{invoiceTitle(t, inv)} {inv.number}</div>
+              <div className="small muted">{t.date}: {fmtDate(inv.invoice_date)}</div>
+            </div>
+          </div>
+        }
+        colgroup={<colgroup><col style={{ width: '17%' }} /><col /><col style={{ width: '8%' }} /><col style={{ width: '13%' }} /><col style={{ width: '8%' }} /><col style={{ width: '7%' }} /><col style={{ width: '14%' }} /></colgroup>}
+        thead={<tr><th>{t.code}</th><th>{t.desc}</th><th className="num">{t.qty}</th><th className="num">{t.price}</th><th className="num">{t.disc}</th><th className="num">{t.vat}</th><th className="num">{t.total}</th></tr>}
+        rows={lines.map((l) => ({ key: l.id, amount: l.line_total, cells: <><td>{l.article_number || articleOf(l.delivery_line_id)}</td><td>{l.description}</td><td className="num">{l.qty}</td><td className="num">{eur(l.unit_price)}</td><td className="num">{l.discount_pct ? `${l.discount_pct}%` : ''}</td><td className="num">{l.vat_rate}%</td><td className="num">{eur(l.line_total)}</td></> }))}
+        totals={<>
         <div className="totals" style={{ marginTop: 18 }}>
           <div><span>{t.base}</span><span>{eur(inv.base_amount)}</span></div>
           {b.rates.map((r) => <div key={r.rate}><span>{t.vat} {r.rate}%</span><span>{eur(r.vat)}</span></div>)}
@@ -225,7 +245,7 @@ export function InvoiceDetail({ id, autoPrint = false }: { id: string; autoPrint
         </div>
         {!inv.simplified && !credit && <p className="small muted" style={{ marginTop: 26, marginBottom: 0 }}>{t.pay}: {co.iban}{co.invoice_footer ? <><br />{co.invoice_footer}</> : ''}</p>}
         {issuer?.key === 'bella' && co.invoice_footer && <p className="small muted" style={{ marginTop: 26, marginBottom: 0 }}>{co.invoice_footer}</p>}
-      </DocPaper>
+        </>} />
       )}
       {mailTo !== null && (
         <Modal title={tx("Factuur mailen")} onClose={() => setMailTo(null)} footer={<>

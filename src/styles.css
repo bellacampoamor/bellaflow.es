@@ -917,3 +917,27 @@ tr.close-hist.on td { background: var(--selected); color: var(--on-selected); }
 @media print {
   .receipt { width: 72mm; margin: 0 4mm; padding: 2mm 0 8mm; border: 0; border-radius: 0; }
 }
+
+/* Factuur op losse A4-bladen (besluit Rick 9 november 2026). Op het scherm en afgedrukt dezelfde maat:
+   breedte zonder de 16 px van .wrap aan elke kant, zodat de meting op het scherm klopt voor het papier. */
+.sheets { display: grid; gap: 18px; overflow-x: auto; padding-bottom: 4px; justify-content: start; }
+.paper.sheet { box-sizing: border-box; width: 210mm; max-width: none; height: 296mm; padding: 15mm calc(15mm + 16px) 6mm; display: flex; flex-direction: column; overflow: hidden; border-radius: 0; }
+.paper.sheet.sheet-free { height: auto; overflow: visible; }
+.sheet-body { flex: 1 1 auto; min-height: 0; }
+.sheet-foot { flex: none; padding-top: 4mm; }
+.sheet-block { display: flow-root; }
+.sheet-page { text-align: right; font-size: 7.5pt; color: var(--muted); margin-bottom: 2mm; }
+.paper.sheet table.doc-lines { width: 100%; table-layout: fixed; font-size: 9.5pt; margin: 0; }
+.paper.sheet table.doc-lines td { overflow-wrap: anywhere; }
+.paper.sheet tr.doc-carry td, .paper.sheet tr.doc-brought td { font-style: italic; color: var(--muted); }
+.paper.sheet tr.doc-carry td { border-top: 1px solid var(--line-strong); border-bottom: 0; }
+.paper.sheet tr.doc-brought td { border-bottom: 1px solid var(--line-strong); }
+.paper.sheet tr.doc-carry td.num, .paper.sheet tr.doc-brought td.num { font-style: normal; font-weight: 600; color: var(--fg); }
+.sheets-measure { position: absolute; left: -10000px; top: 0; visibility: hidden; pointer-events: none; }
+@media print {
+  .sheets { display: block; overflow: visible; padding: 0; }
+  .paper.sheet { width: auto; height: 296mm; padding: 15mm 15mm 6mm; border: 0; break-after: page; }
+  .paper.sheet:last-child { break-after: auto; }
+  .paper.sheet table.doc-lines { font-size: 9.5pt; }
+  .sheets-measure { display: none; }
+}

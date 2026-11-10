@@ -69,4 +69,15 @@ describe('Getallen op het scherm', () => {
     }
     setLanguage('nl')
   })
+  it('veel regels: vervolgbladen met suma y sigue, suma anterior en paginanummer; totalen alleen op het laatste blad', async () => {
+    const lines = Array.from({ length: 90 }, (_, k) => ({ ...dummy(10), description: `Testartikel ${k + 1}` }))
+    const r = await posCheckout(db, { salesperson_id: db.data.salespeople[0].id, customer_id: null, date: TODAY, lines, payment: { method: 'pin', reference: '' }, issuer: 'bella' })
+    const text = pdfText((await invoicePdf(db.data, r.invoiceId)).base64)
+    const pages = Number(/P\xe1gina 1 de (\d+)/.exec(text)?.[1] ?? /Página 1 de (\d+)/.exec(text)?.[1] ?? 0)
+    expect(pages).toBeGreaterThan(1)
+    expect(text.split('Suma y sigue').length - 1).toBe(pages - 1)
+    expect(text.split('Suma anterior').length - 1).toBe(pages - 1)
+    expect(text.split('Base imponible').length - 1).toBe(1)
+    expect(text).toContain('Testartikel 90')
+  })
 })

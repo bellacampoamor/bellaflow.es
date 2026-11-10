@@ -2,6 +2,7 @@ import { PDFDocument, StandardFonts, type PDFFont, type PDFPage } from 'pdf-lib'
 import type { Snapshot } from '../data/types'
 import { articleNo, depositPaid, documentLanguage, lineTotal, orderLines, orderTotal, vatBreakdown } from './calc'
 import { DOC_MARK, SALES_ORDER_TEXT } from './noteText'
+import { tradeName } from './issuers'
 import { A4, drawDocMark, INK, MARGIN, MUTED, safe, wrap, ymd } from './signedNotePdf'
 
 /** Bouwt de verkooporder als pdf (zelfde inhoud als de afgedrukte verkooporder, met prijzen) en geeft die terug als base64. */
@@ -42,7 +43,7 @@ export async function salesOrderPdf(s: Snapshot, orderId: string) {
     page.drawText(v, { x: xRight - font.widthOfTextAtSize(v, size), y: y - size, size, font, color: opts.color ?? INK })
   }
 
-  put(co?.company_name ?? '', { font: bold, size: 15 })
+  put(tradeName(co), { font: bold, size: 15 })
   put([co?.address, `${co?.postal_code ?? ''} ${co?.city ?? ''}`.trim(), co?.province, co?.phone, co?.email].filter(Boolean).join(', '), { size: 9, color: MUTED })
   if (co?.tax_id) put(`${t.tax}: ${co.tax_id}`, { size: 9, color: MUTED })
   y -= 14

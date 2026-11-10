@@ -1,4 +1,5 @@
 import { SALES_ORDER_TEXT } from '../domain/noteText'
+import { tradeName } from '../domain/issuers'
 import { articleNo, depositPaid, documentLanguage, lineTotal, orderLines, orderTotal, vatBreakdown } from '../domain/calc'
 import { useApp, useAutoPrint } from '../ui/app-context'
 import { eur, fmtDate, Head, DocPaper } from '../ui/kit'
@@ -26,7 +27,7 @@ export function SalesOrderDocument({ id }: { id: string }) {
       <DocPaper language={language}>
         <div className="paper-top">
           <div>
-            <h2 style={{ fontSize: '1.3rem' }}>{co.company_name}</h2>
+            <h2 style={{ fontSize: '1.3rem' }}>{tradeName(co)}</h2>
             <div className="small muted">{[co.address, `${co.postal_code} ${co.city}`.trim(), co.province, co.phone, co.email].filter(Boolean).join(', ')}<br />{t.tax}: {co.tax_id}</div>
           </div>
           <div style={{ textAlign: 'right' }}>

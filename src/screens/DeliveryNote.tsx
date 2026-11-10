@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Printer } from 'lucide-react'
 import { documentLanguage } from '../domain/calc'
 import { NOTE_TEXT } from '../domain/noteText'
+import { tradeName } from '../domain/issuers'
 import { markNotePrinted } from '../domain/services'
 import { go, useApp, useAutoPrint } from '../ui/app-context'
 import { fmtDate, Head, Modal, Pill, DocPaper } from '../ui/kit'
@@ -55,7 +56,7 @@ export function DeliveryNote({ id, autoPrint = false, fromArchive = false }: { i
       <DocPaper language={language}>
         <div className="paper-top">
           <div>
-            <h2 style={{ fontSize: '1.3rem' }}>{co.company_name}</h2>
+            <h2 style={{ fontSize: '1.3rem' }}>{tradeName(co)}</h2>
             <div className="small muted">{[co.address, `${co.postal_code} ${co.city}`.trim(), co.province, co.phone, co.email].filter(Boolean).join(', ')}</div>
           </div>
           <div style={{ textAlign: 'right' }}>

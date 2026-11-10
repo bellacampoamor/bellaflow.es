@@ -41,6 +41,10 @@ export interface IssuerInfo {
   logo: string; mark: string
 }
 
+/** Naam op documenten en in klantmails: de handelsnaam, anders de juridische naam (besluit Rick 10 november 2026). */
+export const tradeName = (co: Pick<Settings, 'company_name' | 'trade_name'> | undefined | null): string =>
+  co?.trade_name?.trim() || co?.company_name || ''
+
 export const issuerOf = (inv: Pick<Invoice, 'issuer'> | undefined | null): Issuer => (inv?.issuer === 'hdb' ? 'hdb' : 'bella')
 
 /** De gegevens van het bedrijf dat de factuur uitgeeft. */

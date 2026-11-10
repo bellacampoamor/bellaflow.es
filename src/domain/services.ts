@@ -12,7 +12,7 @@ import { articleNumberFromScan } from './scan'
 import { INVOICE_MAIL, SALES_ORDER_MAIL } from './noteText'
 import { mailsAutomatically } from './mailSettings'
 import { isStaffRole } from './staff'
-import { ISSUER_SERIES, issuerOf, type Issuer } from './issuers'
+import { ISSUER_SERIES, issuerOf, tradeName, type Issuer } from './issuers'
 import { creditableAmount, creditableLines, creditSeries, creditSettlement, isCredit } from './credit'
 import { cashCount, closingOn, closingsOf, countedTotal, DENOMINATIONS, denomKey, kassaDay, openingFloat, type CashCounts } from './cashClosing'
 import { DUMMY_SKU, missingCustomerData, POS_CUSTOMER_NOTE, posShortfalls, posTotals, posWarehouse, SIMPLIFIED_LIMIT, type PosLine } from './pos'
@@ -885,7 +885,7 @@ export async function mailSignedNote(db: Driver, deliveryId: string): Promise<Em
   const status0: EmailStatus = to ? 'pending' : 'no_recipient'
   const fields = { to_email: to, bcc_email: co?.shop_email?.trim() ?? '', status: status0, error: to ? '' : tx("Geen e-mailadres bekend bij de klant.") }
   if (existing) await db.update('email_outbox', id, fields)
-  else await db.insert('email_outbox', [{ id, kind: 'getekende_afleverbon', delivery_id: deliveryId, invoice_id: null, subject: text.subject(d.number, co?.company_name ?? ''), body_text: text.body(c.name, d.number, co?.company_name ?? ''), created_at: new Date().toISOString(), sent_at: null, ...fields }])
+  else await db.insert('email_outbox', [{ id, kind: 'getekende_afleverbon', delivery_id: deliveryId, invoice_id: null, subject: text.subject(d.number, tradeName(co)), body_text: text.body(c.name, d.number, tradeName(co)), created_at: new Date().toISOString(), sent_at: null, ...fields }])
   if (!to) return 'no_recipient'
   try {
     const { signedNotePdf } = await import('./signedNotePdf')
@@ -913,7 +913,7 @@ export async function mailInvoice(db: Driver, invoiceId: string, toEmail?: strin
   const status0: EmailStatus = to ? 'pending' : 'no_recipient'
   const fields = { to_email: to, bcc_email: co?.shop_email?.trim() ?? '', status: status0, error: to ? '' : tx("Geen e-mailadres bekend bij de klant.") }
   if (existing) await db.update('email_outbox', id, fields)
-  else await db.insert('email_outbox', [{ id, kind: 'factuur', delivery_id: null, invoice_id: invoiceId, subject: text.subject(inv.number, co?.company_name ?? ''), body_text: text.body(c.name, inv.number, co?.company_name ?? ''), created_at: new Date().toISOString(), sent_at: null, ...fields }])
+  else await db.insert('email_outbox', [{ id, kind: 'factuur', delivery_id: null, invoice_id: invoiceId, subject: text.subject(inv.number, tradeName(co)), body_text: text.body(c.name, inv.number, tradeName(co)), created_at: new Date().toISOString(), sent_at: null, ...fields }])
   if (!to) return 'no_recipient'
   try {
     const { invoicePdf } = await import('./invoicePdf')
@@ -956,7 +956,7 @@ export async function mailSalesOrder(db: Driver, orderId: string, toEmail?: stri
   const status0: EmailStatus = to ? 'pending' : 'no_recipient'
   const fields = { to_email: to, bcc_email: co?.shop_email?.trim() ?? '', status: status0, error: to ? '' : tx("Geen e-mailadres bekend bij de klant.") }
   if (existing) await db.update('email_outbox', id, fields)
-  else await db.insert('email_outbox', [{ id, kind: 'verkooporder', delivery_id: null, invoice_id: null, sales_order_id: orderId, subject: text.subject(o.number, co?.company_name ?? ''), body_text: text.body(c.name, o.number, co?.company_name ?? ''), created_at: new Date().toISOString(), sent_at: null, ...fields }])
+  else await db.insert('email_outbox', [{ id, kind: 'verkooporder', delivery_id: null, invoice_id: null, sales_order_id: orderId, subject: text.subject(o.number, tradeName(co)), body_text: text.body(c.name, o.number, tradeName(co)), created_at: new Date().toISOString(), sent_at: null, ...fields }])
   if (!to) return 'no_recipient'
   try {
     const { salesOrderPdf } = await import('./salesOrderPdf')
@@ -1403,7 +1403,7 @@ export async function sendPurchaseOrders(db: Driver, input: { date: string; ids:
     const now = new Date().toISOString()
     await db.insert('email_outbox', [{
       id: emailId, kind: 'inkooporders', delivery_id: null, invoice_id: null, to_email: to, bcc_email: co?.shop_email?.trim() ?? '',
-      subject: text.subject(input.date.split('-').reverse().join('-'), co?.company_name ?? ''), body_text: text.body(sup?.contact_name || sup?.name || '', numbers.map((n) => `- ${n}`).join('\n'), co?.company_name ?? ''),
+      subject: text.subject(input.date.split('-').reverse().join('-'), tradeName(co)), body_text: text.body(sup?.contact_name || sup?.name || '', numbers.map((n) => `- ${n}`).join('\n'), tradeName(co)),
       status: to ? 'pending' : 'no_recipient', error: to ? '' : tx("Geen e-mailadres bekend bij de leverancier."), created_at: now, sent_at: null,
     }])
     await db.insert('purchase_order_dispatches', f.ids.map((purchase_order_id) => ({ id: newId(), purchase_order_id, email_id: emailId, channel: 'json_mail' as const, dispatch_date: input.date, file_name: f.fileName, to_email: to, created_at: now })))

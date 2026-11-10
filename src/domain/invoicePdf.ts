@@ -5,8 +5,9 @@ import { articleNo, documentLanguage, invoiceBalance, invoiceQrUrl, IS_PRODUCTIO
 import { INVOICE_TEXT, invoiceTitle } from './noteText'
 import { POS_CUSTOMER_NOTE } from './pos'
 import { creditsOf, isCredit } from './credit'
-import { imageSrc, issuerInfo, issuerOf, legalLine } from './issuers'
+import { imageSrc, issuerInfo, issuerOf, legalLine, tradeName } from './issuers'
 import { A4, INK, MARGIN, MUTED, safe, wrap, ymd } from './signedNotePdf'
+import { PAGE_TEXT, pageLabel, paginateRows } from './docPages'
 
 const CREDIT = 'bellaflow.es'
 const QR_SIZE = 85.04 // 30 mm, de kleinste toegestane maat (Orden HAC/1177/2024, art. 21)
@@ -59,7 +60,6 @@ export async function invoicePdf(s: Snapshot, invoiceId: string) {
   let y = A4[1] - MARGIN
   // Ruimte onderaan voor de voet: QR (gewone factuur), beeldmerk met juridische gegevens en bellaflow.es.
   const foot = inv.simplified ? 70 : QR_SIZE + 40
-  const room = (need: number) => { if (y - need < MARGIN + foot) { page = doc.addPage(A4); y = A4[1] - MARGIN } }
   const text = (s0: string, x: number, yy: number, o0: { font?: PDFFont; size?: number; color?: typeof INK; right?: boolean } = {}) => {
     const font = o0.font ?? regular, size = o0.size ?? 9, str = safe(s0)
     page.drawText(str, { x: o0.right ? x - font.widthOfTextAtSize(str, size) : x, y: yy, size, font, color: o0.color ?? INK })
@@ -89,7 +89,7 @@ export async function invoicePdf(s: Snapshot, invoiceId: string) {
       const h = Math.min(52, (bellaLogo.height / bellaLogo.width) * 180), w = (bellaLogo.width / bellaLogo.height) * h
       page.drawImage(bellaLogo, { x: MARGIN, y: y - h, width: w, height: h })
       y -= h + 6
-    } else block(co?.company_name ?? '', MARGIN, 200, { font: bold, size: 14 })
+    } else block(tradeName(co), MARGIN, 200, { font: bold, size: 14 })
     block([co?.address, `${co?.postal_code ?? ''} ${co?.city ?? ''}`.trim(), co?.province, co?.phone, co?.email].filter(Boolean).join(', '), MARGIN, 200, { color: MUTED, size: 8.5 })
     block(`${t.tax}: ${co?.tax_id ?? ''}`, MARGIN, 200, { color: MUTED, size: 8.5 })
   }
@@ -119,10 +119,12 @@ export async function invoicePdf(s: Snapshot, invoiceId: string) {
     y -= 10
   }
 
-  // Regels
+  // Regels, verdeeld over A4-bladen (besluit Rick 9 november 2026): onderaan elk blad behalve het laatste een subtotaal,
+  // bovenaan het vervolgblad hetzelfde bedrag als transport, totalen alleen op het laatste blad. Zelfde regel als op het scherm.
   const col = { code: MARGIN, desc: MARGIN + 92, qty: MARGIN + 318, price: MARGIN + 378, disc: MARGIN + 418, vat: MARGIN + 450, total: right }
+  const pt = PAGE_TEXT[language]
+  const HEAD_H = 17, SUM_H = 16, CONT_H = 44, bottom = MARGIN + foot + 14
   const head = () => {
-    room(30)
     for (const [k, label, r] of [['code', t.code, false], ['desc', t.desc, false], ['qty', t.qty, true], ['price', t.price, true], ['disc', t.disc, true], ['vat', t.vat, true], ['total', t.total, true]] as const) {
       text(label, col[k], y - 8, { size: 8, color: MUTED, right: r })
     }
@@ -130,25 +132,12 @@ export async function invoicePdf(s: Snapshot, invoiceId: string) {
     page.drawLine({ start: { x: MARGIN, y }, end: { x: right, y }, thickness: 0.8, color: INK })
     y -= 4
   }
-  head()
-  for (const l of lines) {
+  const rowData = lines.map((l) => {
     const code = l.article_number || articleNo(s, s.sales_order_lines.find((x) => x.id === s.delivery_lines.find((d) => d.id === l.delivery_line_id)?.sales_order_line_id)?.product_id)
     const desc = wrap(l.description, regular, 8.5, col.qty - 40 - col.desc)
     const codeLines = wrap(code, regular, 8, col.desc - col.code - 6)
-    const h = Math.max(desc.length, codeLines.length) * 11 + 4
-    if (y - h < MARGIN + foot) { page = doc.addPage(A4); y = A4[1] - MARGIN; head() }
-    const yy = y - 9
-    codeLines.forEach((s0, i) => text(s0, col.code, yy - i * 11, { size: 8 }))
-    desc.forEach((s0, i) => text(s0, col.desc, yy - i * 11, { size: 8.5 }))
-    text(String(l.qty), col.qty, yy, { size: 8.5, right: true })
-    text(money(l.unit_price), col.price, yy, { size: 8.5, right: true })
-    text(l.discount_pct ? `${l.discount_pct}%` : '', col.disc, yy, { size: 8.5, right: true })
-    text(`${l.vat_rate}%`, col.vat, yy, { size: 8.5, right: true })
-    text(money(l.line_total), col.total, yy, { size: 8.5, right: true })
-    y -= h
-    page.drawLine({ start: { x: MARGIN, y: y + 1 }, end: { x: right, y: y + 1 }, thickness: 0.3, color: MUTED })
-  }
-  y -= 14
+    return { l, desc, codeLines, h: Math.max(desc.length, codeLines.length) * 11 + 4 }
+  })
 
   // Totalen
   const rows: [string, string, boolean][] = [[t.base, money(inv.base_amount), false]]
@@ -164,16 +153,62 @@ export async function invoicePdf(s: Snapshot, invoiceId: string) {
     if (paid > 0) rows.push([t.paid, `-${money(paid)}`, false])
     rows.push([t.due_amt, money(invoiceBalance(s, inv)), true])
   }
-  room(rows.length * 15 + 10)
+  const notes: string[] = []
+  if (!inv.simplified && !isCr) notes.push(`${t.pay}: ${co?.iban ?? ''}`)
+  if (co?.invoice_footer && issuer?.key !== 'hdb') notes.push(co.invoice_footer)
+  const noteLines = notes.flatMap((n) => wrap(n, regular, 8.5, width))
+  const totalsH = 14 + rows.length * 15 + 18 + noteLines.length * 12.5
+
+  const pages = paginateRows({
+    rows: rowData.map((r) => r.h),
+    first: y - bottom - HEAD_H,
+    next: A4[1] - MARGIN - CONT_H - bottom - HEAD_H,
+    carry: SUM_H, brought: SUM_H, totals: totalsH,
+  }, lines.map((l) => l.line_total))
+
+  const sumLine = (label: string, amount: number, line: 'above' | 'below') => {
+    if (line === 'above') page.drawLine({ start: { x: MARGIN, y: y - 1 }, end: { x: right, y: y - 1 }, thickness: 0.6, color: MUTED })
+    text(label, col.desc, y - 11, { size: 8.5, color: MUTED })
+    text(money(amount), col.total, y - 11, { font: bold, size: 8.5, right: true })
+    y -= SUM_H
+    if (line === 'below') page.drawLine({ start: { x: MARGIN, y: y + 1 }, end: { x: right, y: y + 1 }, thickness: 0.6, color: MUTED })
+  }
+
+  pages.forEach((pg, i) => {
+    if (i > 0) {
+      // Vervolgblad: korte kop met afzender, klant, titel, nummer en datum.
+      page = doc.addPage(A4); y = A4[1] - MARGIN
+      text(issuer ? issuer.name : tradeName(co), MARGIN, y - 10, { font: bold, size: 10 })
+      if (c.notes !== POS_CUSTOMER_NOTE) text(`${t.to}: ${c.company || c.name}`, MARGIN, y - 24, { size: 8.5 })
+      text(`${invoiceTitle(t, inv)} ${inv.number}`, right, y - 10, { font: bold, size: 10, right: true })
+      text(`${t.date}: ${ymd(inv.invoice_date)}`, right, y - 24, { color: MUTED, size: 8.5, right: true })
+      y -= CONT_H
+    }
+    head()
+    if (i > 0) sumLine(pt.brought, pg.brought, 'below')
+    for (const r of rowData.slice(pg.start, pg.end)) {
+      const l = r.l, yy = y - 9
+      r.codeLines.forEach((s0, k) => text(s0, col.code, yy - k * 11, { size: 8 }))
+      r.desc.forEach((s0, k) => text(s0, col.desc, yy - k * 11, { size: 8.5 }))
+      text(String(l.qty), col.qty, yy, { size: 8.5, right: true })
+      text(money(l.unit_price), col.price, yy, { size: 8.5, right: true })
+      text(l.discount_pct ? `${l.discount_pct}%` : '', col.disc, yy, { size: 8.5, right: true })
+      text(`${l.vat_rate}%`, col.vat, yy, { size: 8.5, right: true })
+      text(money(l.line_total), col.total, yy, { size: 8.5, right: true })
+      y -= r.h
+      page.drawLine({ start: { x: MARGIN, y: y + 1 }, end: { x: right, y: y + 1 }, thickness: 0.3, color: MUTED })
+    }
+    if (pg.carry !== null) sumLine(pt.carry, pg.carry, 'above')
+  })
+  y -= 14
+
   for (const [label, value, strong] of rows) {
     text(label, right - 200, y - 10, { font: strong ? bold : regular, size: strong ? 10 : 9 })
     text(value, right, y - 10, { font: strong ? bold : regular, size: strong ? 10 : 9, right: true })
     y -= 15
   }
   y -= 18
-  room(30)
-  if (!inv.simplified && !isCr) block(`${t.pay}: ${co?.iban ?? ''}`, MARGIN, width, { color: MUTED, size: 8.5 })
-  if (co?.invoice_footer && issuer?.key !== 'hdb') block(co.invoice_footer, MARGIN, width, { color: MUTED, size: 8.5 })
+  for (const l of noteLines) { text(l, MARGIN, y - 8.5, { color: MUTED, size: 8.5 }); y -= 12.5 }
 
   // Voet op elke pagina (besluit Rick 8 november 2026): linksonder de QR van 30 x 30 mm (alleen gewone factuur),
   // midden het beeldmerk met de juridische gegevens van het uitgevende bedrijf, rechtsonder Bella Flow met bellaflow.es.
@@ -182,7 +217,8 @@ export async function invoicePdf(s: Snapshot, invoiceId: string) {
   if (qr) { qr.addData(invoiceQrUrl({ nif, number: inv.number, date: inv.invoice_date, total: inv.total }, IS_PRODUCTION), 'Byte'); qr.make() }
   {
     const lines0 = wrap(safe(legalLine(footIssuer)), regular, 7.5, width - 2 * (QR_SIZE + 12)) // ruimte links (QR) en rechts (bellaflow.es)
-    for (const pg of doc.getPages()) {
+    const all = doc.getPages()
+    all.forEach((pg, pageNo) => {
       if (qr) {
         const n = qr.getModuleCount(), cell = QR_SIZE / n, qx = MARGIN, qy = 18
         pg.drawText('QR tributario:', { x: qx, y: qy + QR_SIZE + 6, size: 7, font: regular, color: MUTED })
@@ -196,11 +232,14 @@ export async function invoicePdf(s: Snapshot, invoiceId: string) {
         const h = 26, w = (mark.width / mark.height) * h
         pg.drawImage(mark, { x: (A4[0] - w) / 2, y: 30 + (lines0.length - 1) * 9, width: w, height: h })
       }
+      // Rechtsonder boven bellaflow.es: "Pagina x van y" in de taal van de factuur.
+      const label = safe(pageLabel(language, pageNo + 1, all.length)), lw = regular.widthOfTextAtSize(label, 7)
+      pg.drawText(label, { x: A4[0] - MARGIN - lw, y: 30, size: 7, font: regular, color: MUTED })
       // Helemaal rechtsonder: klein Bella Flow-beeldmerk met bellaflow.es (besluit Rick 8 november 2026).
       const cw = regular.widthOfTextAtSize(CREDIT, 6.5), cx = A4[0] - MARGIN - cw
       pg.drawText(CREDIT, { x: cx, y: 18, size: 6.5, font: regular, color: MUTED })
       if (credit) { const h = 9, w = (credit.width / credit.height) * h; pg.drawImage(credit, { x: cx - w - 3, y: 16.5, width: w, height: h }) }
-    }
+    })
   }
   return { name: `${invoiceTitle(t, inv)} ${inv.number}.pdf`, base64: await doc.saveAsBase64() }
 }

@@ -1648,4 +1648,6 @@ export const en: Record<string, string> = {
   "Kassabon, thermische printer 80 mm": "Receipt, 80 mm thermal printer",
   "Kies in het afdrukvenster de bonprinter, papierformaat 80 mm en marges Geen.": "In the print dialog, choose the receipt printer, paper size 80 mm and margins None.",
   "Bon afdrukken": "Print receipt",
+  "Handelsnaam": "Trade name",
+  "Naam op documenten en in mails aan klanten. Leeg = de juridische naam.": "Name on documents and in emails to customers. Empty = the legal name.",
 }

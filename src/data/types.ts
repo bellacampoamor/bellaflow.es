@@ -3,6 +3,8 @@
 export interface Settings {
   id: string; company_name: string; tax_id: string; address: string; postal_code: string; city: string
   province: string; phone: string; email: string; iban: string
+  /** Handelsnaam (besluit Rick 10 november 2026): de naam op documenten en in klantmails. company_name is de juridische naam (razón social), voor de juridische regel en het CIF. Leeg = de juridische naam. */
+  trade_name?: string
   payment_days: number; invoice_footer: string
   prefix_sales_order: string; prefix_purchase: string; prefix_receipt: string; prefix_delivery: string; prefix_invoice: string; prefix_transport: string; prefix_proforma: string
   /** Voorvoegsel van de eenvoudige facturen (kassa) van Bella, standaard FS-BELLA, en van HDB, standaard FS-HDB. */

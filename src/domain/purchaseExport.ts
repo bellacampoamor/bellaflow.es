@@ -1,5 +1,6 @@
 import type { CatalogArticle, EmailStatus, Language, PurchaseOrder, PurchaseOrderDispatch, Snapshot, Supplier } from '../data/types'
 import { round2 } from './calc'
+import { tradeName } from './issuers'
 
 /**
  * Inkooporders per dag als JSON naar de leverancier (besluit Rick 7 november 2026).
@@ -48,7 +49,7 @@ export function purchaseOrdersJson(s: Snapshot, ids: string[], date: string, art
     generated_at: generatedAt,
     date,
     currency: 'EUR',
-    buyer: { name: co?.company_name ?? '', tax_id: co?.tax_id ?? '', address: co?.address ?? '', postal_code: co?.postal_code ?? '', city: co?.city ?? '', province: co?.province ?? '', country: 'ES', email: co?.email ?? '', phone: co?.phone ?? '' },
+    buyer: { name: co?.company_name ?? '', trade_name: tradeName(co), tax_id: co?.tax_id ?? '', address: co?.address ?? '', postal_code: co?.postal_code ?? '', city: co?.city ?? '', province: co?.province ?? '', country: 'ES', email: co?.email ?? '', phone: co?.phone ?? '' },
     supplier: { name: sup?.name ?? '', code: sup?.code ?? '', vat_number: sup?.vat_number ?? '', email: sup?.email ?? '' },
     purchase_orders: pos.map((po) => {
       const lines = s.purchase_order_lines.filter((l) => l.purchase_order_id === po.id).map((l, i) => {

@@ -77,8 +77,9 @@ export function Admin({ param = '' }: { param?: string }) {
         <section className="panel section">
         <h2>{tx("Bedrijfsgegevens")}</h2>
         <div className="form-grid">
-          <TextField className="span-2" label={tx("Bedrijfsnaam")} value={co.company_name} onChange={(v) => setCo({ ...co, company_name: v })} />
+          <TextField className="span-2" label={tx("Juridische naam")} value={co.company_name} onChange={(v) => setCo({ ...co, company_name: v })} />
           <TextField label={tx("CIF")} value={co.tax_id} onChange={(v) => setCo({ ...co, tax_id: v })} />
+          <TextField className="span-all" label={tx("Handelsnaam")} hint={tx("Naam op documenten en in mails aan klanten. Leeg = de juridische naam.")} value={co.trade_name ?? ''} onChange={(v) => setCo({ ...co, trade_name: v })} />
           <TextField className="span-2" label={tx("Adres")} value={co.address} onChange={(v) => setCo({ ...co, address: v })} />
           <TextField label={tx("Postcode")} value={co.postal_code} onChange={(v) => setCo({ ...co, postal_code: v })} />
           <TextField label={tx("Plaats")} value={co.city} onChange={(v) => setCo({ ...co, city: v })} />
