@@ -32,6 +32,6 @@ create table if not exists cash_closings (
 create index if not exists cash_closings_issuer_date_idx on cash_closings (issuer, business_date desc);
 
 alter table cash_closings enable row level security;
-create policy team_read on cash_closings for select to authenticated using (true);
-create policy team_insert on cash_closings for insert to authenticated with check (true);
+create policy team_read on cash_closings for select to authenticated using ((select public.is_team_member()));
+create policy team_insert on cash_closings for insert to authenticated with check ((select public.is_team_member()));
 grant select, insert on cash_closings to authenticated;
