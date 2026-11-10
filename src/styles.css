@@ -944,4 +944,9 @@ tr.close-hist.on td { background: var(--selected); color: var(--on-selected); }
 
 /* Inloggen: tekstknop voor Wachtwoord vergeten / Terug naar inloggen */
 .login .link-btn { background: none; border: 0; color: var(--link); padding: 2px 0; justify-self: center; font-weight: 500; text-decoration: underline; text-underline-offset: 2px; }
+.pw-field { position: relative; display: block; }
+.pw-field input { width: 100%; padding-right: 42px; }
+.pw-field .pw-eye { position: absolute; right: 4px; top: 50%; transform: translateY(-50%); background: none; border: 0; padding: 6px; color: var(--muted); cursor: pointer; display: grid; place-items: center; border-radius: 6px; }
+.pw-field .pw-eye:hover { color: var(--fg); background: none; }
+.pw-field .pw-eye:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
 .login .link-btn:hover { background: none; color: var(--primary-hover, var(--link)); }

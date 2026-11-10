@@ -74,6 +74,23 @@ const LoginShell = ({ children, onSubmit }: { children: ReactNode; onSubmit?: (e
   </div>
 )
 
+/** Wachtwoordveld met een oogje om te zien wat je typt. */
+function PasswordInput({ id, value, onChange, autoComplete }: { id: string; value: string; onChange: (v: string) => void; autoComplete: string }) {
+  const [show, setShow] = useState(false)
+  const label = show ? tx("Wachtwoord verbergen") : tx("Wachtwoord tonen")
+  return (
+    <div className="pw-field">
+      <input id={id} type={show ? 'text' : 'password'} autoComplete={autoComplete} required value={value} onChange={(e) => onChange(e.target.value)} autoCapitalize="off" autoCorrect="off" spellCheck={false} />
+      <button type="button" className="pw-eye" aria-label={label} title={label} aria-pressed={show} onClick={() => setShow((v) => !v)}>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z" /><circle cx="12" cy="12" r="3" />
+          {show && <line x1="3" y1="3" x2="21" y2="21" />}
+        </svg>
+      </button>
+    </div>
+  )
+}
+
 /** Inloggen met e-mailadres en wachtwoord, met "Wachtwoord vergeten?" (mail met een link om een nieuw wachtwoord te kiezen). */
 function LoginForm({ sb }: { sb: SupabaseClient }) {
   const [mode, setMode] = useState<'login' | 'forgot' | 'sent'>('login')
@@ -103,7 +120,7 @@ function LoginForm({ sb }: { sb: SupabaseClient }) {
     <LoginShell onSubmit={submit}>
       {mode === 'forgot' && <p className="small muted" style={{ margin: 0 }}>{tx("Vul je e-mailadres in. Je krijgt een mail met een link om een nieuw wachtwoord te kiezen.")}</p>}
       {emailField}
-      {mode === 'login' && <div className="field"><label htmlFor="login-pass">{tx("Wachtwoord")}</label><input id="login-pass" type="password" autoComplete="current-password" required value={password} onChange={(e) => setPassword(e.target.value)} /></div>}
+      {mode === 'login' && <div className="field"><label htmlFor="login-pass">{tx("Wachtwoord")}</label><PasswordInput id="login-pass" autoComplete="current-password" value={password} onChange={setPassword} /></div>}
       {error && <div className="note bad">{error}</div>}
       <button className="btn primary" disabled={busy}>{mode === 'login' ? tx("Inloggen") : tx("Link versturen")}</button>
       <button type="button" className="btn link-btn" onClick={() => { setError(''); setMode(mode === 'login' ? 'forgot' : 'login') }}>{mode === 'login' ? tx("Wachtwoord vergeten?") : tx("Terug naar inloggen")}</button>
@@ -131,8 +148,8 @@ function SetPasswordForm({ sb, email, onDone }: { sb: SupabaseClient; email: str
   return (
     <LoginShell onSubmit={submit}>
       <p className="small muted" style={{ margin: 0 }}>{tx("Kies een wachtwoord voor {0}.", email)}</p>
-      <div className="field"><label htmlFor="pw-new">{tx("Nieuw wachtwoord")}</label><input id="pw-new" type="password" autoComplete="new-password" required value={password} onChange={(e) => setPassword(e.target.value)} /></div>
-      <div className="field"><label htmlFor="pw-again">{tx("Nogmaals")}</label><input id="pw-again" type="password" autoComplete="new-password" required value={again} onChange={(e) => setAgain(e.target.value)} /></div>
+      <div className="field"><label htmlFor="pw-new">{tx("Nieuw wachtwoord")}</label><PasswordInput id="pw-new" autoComplete="new-password" value={password} onChange={setPassword} /></div>
+      <div className="field"><label htmlFor="pw-again">{tx("Nogmaals")}</label><PasswordInput id="pw-again" autoComplete="new-password" value={again} onChange={setAgain} /></div>
       {error && <div className="note bad">{error}</div>}
       <button className="btn primary" disabled={busy}>{tx("Wachtwoord opslaan")}</button>
     </LoginShell>

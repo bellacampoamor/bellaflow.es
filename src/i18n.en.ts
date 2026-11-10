@@ -1661,6 +1661,8 @@ export const en: Record<string, string> = {
   "Opslaan is niet gelukt: {0}": "Saving failed: {0}",
   "Kies een wachtwoord voor {0}.": "Choose a password for {0}.",
   "Nieuw wachtwoord": "New password",
+  "Wachtwoord tonen": "Show password",
+  "Wachtwoord verbergen": "Hide password",
   "Nogmaals": "Repeat",
   "Wachtwoord opslaan": "Save password",
   "Je toegang kon niet worden gecontroleerd: {0}": "Your access could not be checked: {0}",
