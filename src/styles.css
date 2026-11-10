@@ -941,3 +941,7 @@ tr.close-hist.on td { background: var(--selected); color: var(--on-selected); }
   .paper.sheet table.doc-lines { font-size: 9.5pt; }
   .sheets-measure { display: none; }
 }
+
+/* Inloggen: tekstknop voor Wachtwoord vergeten / Terug naar inloggen */
+.login .link-btn { background: none; border: 0; color: var(--link); padding: 2px 0; justify-self: center; font-weight: 500; text-decoration: underline; text-underline-offset: 2px; }
+.login .link-btn:hover { background: none; color: var(--primary-hover, var(--link)); }

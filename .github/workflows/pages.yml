@@ -24,7 +24,17 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm test
+      # bellaflow.es: de echte database (Supabase), met inloggen. De publishable key is bedoeld om openbaar te zijn;
+      # de database laat alleen ingelogde teamleden toe (RLS met is_team_member()).
       - run: npm run build
+        env:
+          VITE_DATA_SOURCE: supabase
+          VITE_SUPABASE_URL: https://apmyllgfsqofjyowfbxc.supabase.co
+          VITE_SUPABASE_ANON_KEY: sb_publishable_WyzL-djTNGDMlspPz_4yGA_PlgXmxBJ
+      # bellaflow.es/demo/: de voorbeeldversie met verzonnen gegevens in de browser, zoals de site tot nu toe was.
+      - run: npx vite build --outDir dist/demo --emptyOutDir
+        env:
+          VITE_DATA_SOURCE: local
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist
