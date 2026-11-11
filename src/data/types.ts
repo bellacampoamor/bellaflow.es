@@ -98,10 +98,18 @@ export interface CatalogArticle {
   source: 'showroom' | 'webshop'; active: boolean; created_at: string
   /** Alle foto's van het artikel, de eerste is image_url (HA-CO: eerst uit het bestelportaal, daarna uit de webwinkel). */
   images?: string[]
+  /** Variant van een verzamelartikel (HA-CO: model uit de webwinkel), anders leeg. */
+  variant_of?: string | null
 }
 /** Koppeling artikel en element (subartikel), op de eigen id's. */
 export interface CatalogArticleElement { parent_id: string; element_id: string; position: number }
-export interface ArticleHit extends CatalogArticle { element_count: number }
+export interface ArticleHit extends CatalogArticle {
+  element_count: number
+  /** Aantal actieve varianten; groter dan 0 = verzamelartikel, je kiest eerst een variant. */
+  variant_count?: number
+  /** Naam van het verzamelartikel waar deze variant bij hoort. */
+  parent_name?: string | null
+}
 /** Een regel in de lijst van Catalogi: artikel met de voorraad die de leverancier opgeeft (bij HDB: de voorraad in Magazijn Campoamor). */
 export interface CatalogListItem extends ArticleHit { supplier_stock: number | null; supplier_stock_at: string | null }
 export interface CatalogListQuery {

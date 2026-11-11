@@ -65,24 +65,34 @@ describe('HA-CO webwinkel in de database', () => {
     // Een mislukte pagina wordt die dag niet opnieuw geprobeerd: door naar de catalogus.
     expect(await call('claim_supplier_haco_web_sync', HACO, 100)).toEqual({ action: 'catalog' })
     expect(await call('apply_supplier_haco_web_sync', HACO, JSON.stringify({ kind: 'catalog' })))
-      .toMatchObject({ catalog: { new: 4, models: 1, with_photo: 3 }, pages_failed: 1 })
+      .toMatchObject({ catalog: { new: 4, models: 1, with_photo: 4 }, pages_failed: 1 })
     expect(await call('claim_supplier_haco_web_sync', HACO, 100)).toMatchObject({ action: 'done' })
 
-    const arts = Object.fromEntries((await pg.query<{ supplier_sku: string; name: string; image_url: string; images: string[]; category_code: string; series: string; price: string }>(
-      'select supplier_sku, name, image_url, images, category_code, series, price from catalog_articles order by supplier_sku')).rows.map((a) => [a.supplier_sku, a]))
+    const arts = Object.fromEntries((await pg.query<{ id: string; supplier_sku: string; name: string; image_url: string; images: string[]; category_code: string; series: string; price: string; variant_of: string | null }>(
+      'select id, supplier_sku, name, image_url, images, category_code, series, price, variant_of from catalog_articles order by supplier_sku')).rows.map((a) => [a.supplier_sku, a]))
     // Los artikel zonder foto in MOS: de foto's van de webwinkel.
     expect(arts['0099001'].images).toEqual(['https://shop.test/l1.jpg', 'https://shop.test/l2.jpg'])
     expect(arts['0099001'].image_url).toBe('https://shop.test/l1.jpg')
     // Foto uit MOS gaat voor, de pdf telt niet mee, de webwinkel komt erachter.
     expect(arts['0099002'].images).toEqual(['https://mos.test/uploads/Product/rob.jpg', 'https://shop.test/r1.jpg'])
     expect(arts['0099002'].image_url).toBe('https://mos.test/uploads/Product/rob.jpg')
-    // Het verzamelartikel krijgt geen foto van een model; het model wordt een eigen artikel met het webwinkelnummer.
+    // Het verzamelartikel krijgt geen foto's van een model, alleen in de lijst de eerste foto van zijn eerste variant.
     expect(arts['0099003'].images).toEqual([])
+    expect(arts['0099003'].image_url).toBe('https://shop.test/n1.jpg')
+    // Het model wordt een eigen artikel met het webwinkelnummer, als variant van het verzamelartikel.
+    expect(arts['C0099003-11-20'].variant_of).toBe(arts['0099003'].id)
+    expect(arts['0099001'].variant_of).toBeNull()
     expect(arts['C0099003-11-20']).toMatchObject({ name: 'Nachtkastje Test', series: 'Testfabriek', image_url: 'https://shop.test/n1.jpg' })
     // Prijs uit het verzamelartikel in MOS (nu 0, zoals de andere commissieartikelen), niet de webwinkelprijs.
     expect(Number(arts['C0099003-11-20'].price)).toBe(0)
     // Een model zonder gelezen pagina komt er (nog) niet in.
     expect(arts['C0099003-12-20']).toBeUndefined()
+
+    // Zoeken: een variant noemt zijn verzamelartikel, een verzamelartikel telt zijn varianten.
+    const search = async (q: string) => (await pg.query<{ supplier_sku: string; variant_count: number; parent_name: string | null }>(
+      'select supplier_sku, variant_count, parent_name from search_catalog_articles($1)', [q])).rows
+    expect(await search('nachtkastje test')).toEqual([{ supplier_sku: 'C0099003-11-20', variant_count: 0, parent_name: 'Testfabriek serie' }])
+    expect((await search('testfabriek serie')).find((r) => r.supplier_sku === '0099003')).toMatchObject({ variant_count: 1, parent_name: null })
   }, 60000)
 
   it('zet een model inactief als het uit de webwinkel verdwijnt', async () => {
@@ -103,5 +113,6 @@ describe('HA-CO webwinkel in de database', () => {
     expect(await active()).toEqual([])
     const base = (await pg.query<{ images: string[] }>(`select images from catalog_articles where supplier_sku = '0099003'`)).rows[0]
     expect(base.images).toEqual(['https://shop.test/n1.jpg'])
+    expect((await pg.query(`select 1 from catalog_articles where variant_of is not null`)).rows).toEqual([])
   }, 60000)
 })

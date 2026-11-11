@@ -1,10 +1,10 @@
 // Artikel zoeken in de verkooporder: alle catalogi tegelijk, of alleen de gekozen catalogi.
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Check, Plus } from 'lucide-react'
-import type { ArticleHit, CatalogArticle, Product } from '../data/types'
+import type { ArticleHit, CatalogArticle, CatalogListItem, Product } from '../data/types'
 import { categoryName, priceWithSurcharge } from '../domain/articles'
 import { onHandMap, reservedMap, stockKey } from '../domain/calc'
-import { catalogArticleCounts, catalogArticleElements, catalogArticlesBySku, searchCatalogArticles } from '../domain/services'
+import { catalogArticleCounts, catalogArticleElements, catalogArticlesBySku, catalogArticleVariants, searchCatalogArticles } from '../domain/services'
 import { useApp } from './app-context'
 import { CatalogPhoto, Empty, eur, Modal, Pill } from './kit'
 import { tx } from '../i18n'
@@ -82,6 +82,7 @@ export function ArticleSearch({ id, label, sources, onPick }: { id?: string; lab
   const [pos, setPos] = useState<{ left: number; top: number; width: number } | null>(null)
   const ref = useRef<HTMLDivElement>(null)
   const seq = useRef(0)
+  const [choose, setChoose] = useState<ArticleHit | null>(null)
 
   const supplierIds = useMemo(() => s.suppliers.map((x) => x.id).filter((x) => !sources.off.includes(x)), [s.suppliers, sources.off])
   const byNumber = useMemo(() => new Map(s.products.filter((p) => p.catalog_article_number).map((p) => [p.catalog_article_number!, p])), [s.products])
@@ -121,7 +122,15 @@ export function ArticleSearch({ id, label, sources, onPick }: { id?: string; lab
     window.addEventListener('scroll', place, true); window.addEventListener('resize', place)
     return () => { window.removeEventListener('scroll', place, true); window.removeEventListener('resize', place) }
   }, [open])
-  const pick = (r: Row) => { onPick(r.pick); setQ(''); setOpen(false) }
+  // Een verzamelartikel bestel je niet zelf: eerst de variant kiezen.
+  const pick = (r: Row) => {
+    if (r.hit && (r.hit.variant_count ?? 0) > 0) { setChoose(r.hit); setOpen(false); return }
+    onPick(r.pick); setQ(''); setOpen(false)
+  }
+  const pickVariant = (a: CatalogArticle) => {
+    const p = byNumber.get(a.article_number)
+    onPick(p ? { kind: 'product', product: p } : { kind: 'article', article: a }); setChoose(null); setQ('')
+  }
   const supplierName = (id: string) => s.suppliers.find((x) => x.id === id)?.name ?? ''
 
   return (
@@ -149,12 +158,14 @@ export function ArticleSearch({ id, label, sources, onPick }: { id?: string; lab
                   <span className="article-main">
                     <span className="article-nrs"><span className="strong">{a?.article_number ?? p?.sku}</span>{a && <span className="muted"> · {a.supplier_sku}</span>}</span>
                     <span>{a?.name ?? p?.name}</span>
+                    {a?.parent_name && <small>{tx("Variant van {0}", a.parent_name)}</small>}
                     <small>{a ? `${supplierName(a.supplier_id)} · ${categoryName(a.category_code)}${a.series ? ` · ${a.series}` : ''}` : ''}</small>
                   </span>
                   <span className="article-side">
                     <span className="strong">{p ? eur(p.sale_price) : money(priceWithSurcharge(a?.price ?? null, s.suppliers.find((x) => x.id === a?.supplier_id)), a?.currency ?? 'EUR')}</span>
                     {p && <small>{tx("{0} vrij", free(p.id))}</small>}
                     {a && a.element_count > 0 && <small>{tx("+{0} elementen", a.element_count)}</small>}
+                    {a && (a.variant_count ?? 0) > 0 && <Pill tone="info">{tx("{0} varianten", a.variant_count)}</Pill>}
                     {p && a && <Pill tone="info">{tx("In assortiment")}</Pill>}
                   </span>
                 </button>
@@ -163,7 +174,38 @@ export function ArticleSearch({ id, label, sources, onPick }: { id?: string; lab
           {busy && rows.length > 0 && <div className="muted small" style={{ padding: '6px 11px' }}>{tx("Zoeken…")}</div>}
         </div>
       )}
+      {choose && <VariantsModal article={choose} onPick={pickVariant} onClose={() => setChoose(null)} />}
     </div>
+  )
+}
+
+/** De varianten van een verzamelartikel (bij HA-CO de modellen uit de webwinkel), om er één te kiezen. */
+export function VariantsModal({ article, onPick, onClose }: { article: CatalogArticle; onPick: (a: CatalogArticle) => void; onClose: () => void }) {
+  const { db, s } = useApp()
+  const [list, setList] = useState<CatalogListItem[] | null>(null)
+  const [q, setQ] = useState('')
+  useEffect(() => { catalogArticleVariants(db, article.id).then(setList).catch(() => setList([])) }, [db, article.id])
+  const sup = s.suppliers.find((x) => x.id === article.supplier_id)
+  const words = q.trim().toLowerCase().split(/\s+/).filter(Boolean)
+  const shown = (list ?? []).filter((x) => words.every((w) => `${x.name} ${x.article_number} ${x.supplier_sku}`.toLowerCase().includes(w)))
+  return (
+    <Modal wide title={tx("Kies een variant van {0}", article.name)} onClose={onClose} footer={<button className="btn" onClick={onClose}>{tx("Annuleren")}</button>}>
+      <p className="muted small" style={{ marginTop: 0 }}><span className="strong">{article.article_number}</span> · {article.supplier_sku} · {sup?.name ?? ''}</p>
+      {list && list.length > 8 && <input autoFocus style={{ marginBottom: 10 }} aria-label={tx("Variant zoeken")} placeholder={tx("Zoek een variant op naam of nummer")} value={q} onChange={(e) => setQ(e.target.value)} />}
+      {list === null ? <Empty>{tx("Laden…")}</Empty> : shown.length === 0 ? <Empty>{tx("Geen varianten gevonden.")}</Empty> : (
+        <div className="table-wrap flush"><table>
+          <thead><tr><th></th><th>{tx("Artikelnummer")}</th><th>{tx("Variant")}</th><th className="num">{tx("Prijs")}</th></tr></thead>
+          <tbody>{shown.map((x) => (
+            <tr key={x.id} className="click" onClick={() => onPick(x)}>
+              <td style={{ width: 64 }}><CatalogPhoto url={x.image_url} alt={x.name} className="thumb" /></td>
+              <td style={{ whiteSpace: 'nowrap' }}><span className="strong">{x.article_number}</span><div className="muted small">{x.supplier_sku}</div></td>
+              <td>{x.name}<div className="muted small">{categoryName(x.category_code)}</div></td>
+              <td className="num" style={{ whiteSpace: 'nowrap' }}>{money(s.products.find((p) => p.catalog_article_number === x.article_number)?.sale_price ?? priceWithSurcharge(x.price, sup), x.currency)}</td>
+            </tr>
+          ))}</tbody>
+        </table></div>
+      )}
+    </Modal>
   )
 }
 

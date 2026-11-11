@@ -1367,6 +1367,8 @@ export const catalogArticlesBySku = (db: Driver, supplierId: string, skus: strin
 export const catalogArticlesByNumber = (db: Driver, numbers: string[]) => (numbers.length ? db.findArticles({ numbers }) : Promise.resolve([]))
 export const catalogArticleElements = (db: Driver, parentId: string) => db.articleElements(parentId)
 export const catalogArticleParents = (db: Driver, elementId: string) => db.articleParents(elementId)
+export const catalogArticleVariants = (db: Driver, parentId: string) => db.articleVariants(parentId)
+export const catalogArticlesById = (db: Driver, ids: string[]) => (ids.length ? db.findArticles({ ids }) : Promise.resolve([]))
 export const catalogArticleCounts = (db: Driver) => db.articleCounts()
 /** Eén pagina artikelen van een leverancier voor Catalogi (leveranciers zonder showroom-export, zoals HA-CO en HomeDecoBali). */
 export const catalogArticlePage = (db: Driver, f: CatalogListQuery) => db.listArticles({ ...f, limit: Math.min(Math.max(f.limit, 1), 200), offset: Math.max(f.offset, 0) })

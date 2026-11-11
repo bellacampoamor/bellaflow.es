@@ -1,4 +1,4 @@
-import { TABLES, type ArticleHit, type ArticleQuery, type CatalogArticle, type CatalogListPage, type CatalogListQuery, type CatalogArticleElement, type EmailAttachment, type Snapshot, type TableName } from './types'
+import { TABLES, type ArticleHit, type ArticleQuery, type CatalogArticle, type CatalogListItem, type CatalogListPage, type CatalogListQuery, type CatalogArticleElement, type EmailAttachment, type Snapshot, type TableName } from './types'
 
 // De enige plek waar de app met opslag praat. Schermen en bedrijfslogica kennen alleen dit contract,
 // dus overstappen van browseropslag naar Supabase raakt geen enkel scherm.
@@ -30,6 +30,8 @@ export interface Driver {
   findArticles(f: { ids?: string[]; numbers?: string[]; supplierId?: string; skus?: string[]; skuPrefix?: string; limit?: number }): Promise<CatalogArticle[]>
   /** De elementen van een artikel, in de volgorde van de leverancier. */
   articleElements(parentId: string): Promise<ArticleHit[]>
+  /** De actieve varianten van een verzamelartikel, op naam. */
+  articleVariants(parentId: string): Promise<CatalogListItem[]>
   /** Het artikel of de artikelen waar dit artikel element van is. */
   articleParents(elementId: string): Promise<CatalogArticle[]>
   /** Aantal actieve artikelen per leverancier, voor de keuze in welke catalogi gezocht wordt. */

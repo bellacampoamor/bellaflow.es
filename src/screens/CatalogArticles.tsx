@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
-import type { ArticleHit, CatalogListItem, Supplier } from '../data/types'
+import type { ArticleHit, CatalogArticle, CatalogListItem, Supplier } from '../data/types'
 import { articlePhotos, categoryName } from '../domain/articles'
-import { catalogArticleElements, catalogArticlePage } from '../domain/services'
+import { catalogArticleElements, catalogArticlePage, catalogArticlesById, catalogArticleVariants } from '../domain/services'
 import { useApp } from '../ui/app-context'
 import { ArticleNumbers } from '../ui/ArticleSearch'
 import { takeCatalogQuery, useNavUi } from '../ui/nav'
@@ -83,20 +83,33 @@ export function ArticleCatalogList({ supplier }: { supplier: Supplier }) {
               <td><span className="strong">{x.name}</span><div className="muted small">{categoryName(x.category_code)}{x.series ? ` · ${x.series}` : ''}</div></td>
               <td><Stock x={x} /></td>
               <td className="num" style={{ whiteSpace: 'nowrap' }}>{price(x)}</td>
-              <td style={{ whiteSpace: 'nowrap' }}>{x.element_count > 0 && <span className="muted small">{tx("+{0} elementen", x.element_count)}</span>} {product(x) && <Pill tone="info">{tx("In assortiment")}</Pill>}</td>
+              <td style={{ whiteSpace: 'nowrap' }}>{(x.variant_count ?? 0) > 0 && <Pill tone="info">{tx("{0} varianten", x.variant_count)}</Pill>} {x.element_count > 0 && <span className="muted small">{tx("+{0} elementen", x.element_count)}</span>} {product(x) && <Pill tone="info">{tx("In assortiment")}</Pill>}</td>
             </tr>
           ))}</tbody>
         </table></div>
       )}
       {!error && total > 0 && <Pager page={Math.min(page, pages)} size={PAGE_SIZE} total={total} onPage={goPage} />}
-      {open && <ArticleCard key={open.id} item={open} supplier={supplier} onClose={() => setOpen(null)} />}
+      {open && <ArticleCard key={open.id} item={open} supplier={supplier} onOpen={setOpen} onClose={() => setOpen(null)} />}
     </section>
   )
 }
 
-function ArticleCard({ item, supplier, onClose }: { item: CatalogListItem; supplier: Supplier; onClose: () => void }) {
+function ArticleCard({ item, supplier, onOpen, onClose }: { item: CatalogListItem; supplier: Supplier; onOpen: (x: CatalogListItem) => void; onClose: () => void }) {
   const { db, s } = useApp()
   const [elements, setElements] = useState<ArticleHit[]>([])
+  // Verzamelartikel: de varianten (HA-CO: modellen uit de webwinkel). Variant: het verzamelartikel.
+  const [variants, setVariants] = useState<CatalogListItem[]>([])
+  const [parent, setParent] = useState<CatalogArticle | null>(null)
+  useEffect(() => {
+    let live = true
+    if (item.variant_of) catalogArticlesById(db, [item.variant_of]).then((r) => { if (live) setParent(r[0] ?? null) }).catch(() => {})
+    else if ((item.variant_count ?? 0) > 0) catalogArticleVariants(db, item.id).then((r) => { if (live) setVariants(r) }).catch(() => {})
+    return () => { live = false }
+  }, [db, item.id, item.variant_of, item.variant_count])
+  const openParent = () => {
+    if (!parent) return
+    onOpen({ ...parent, element_count: 0, variant_count: 1, supplier_stock: null, supplier_stock_at: null })
+  }
   useEffect(() => {
     if (!item.element_count) return
     let live = true
@@ -128,6 +141,7 @@ function ArticleCard({ item, supplier, onClose }: { item: CatalogListItem; suppl
           <dl className="cat-dl">
             <dt>{tx("Artikelnummer")}</dt><dd className="strong">{item.article_number}</dd>
             <dt>{tx("Artikelnummer leverancier")}</dt><dd>{item.supplier_sku}</dd>
+            {parent && <><dt>{tx("Variant van")}</dt><dd><button type="button" className="linklike" onClick={openParent}>{parent.name}</button><div className="muted small">{parent.article_number} · {parent.supplier_sku}</div></dd></>}
             <dt>{tx("EAN")}</dt><dd>{item.ean || '–'}</dd>
             <dt>{tx("Leverancier")}</dt><dd>{supplier.name}</dd>
             {item.series && <><dt>{tx("Serie")}</dt><dd>{item.series}</dd></>}
@@ -139,6 +153,23 @@ function ArticleCard({ item, supplier, onClose }: { item: CatalogListItem; suppl
             : <p className="muted small" style={{ margin: 0 }}>{tx("Nog niet verkocht: wordt een product zodra het op een verkooporder komt.")}</p>}
         </div>
       </div>
+      {variants.length > 0 && (
+        <section className="cat-elements">
+          <h3>{tx("Varianten")} <span className="muted small">({variants.length})</span></h3>
+          <p className="muted small" style={{ marginTop: 0 }}>{tx("Op de verkooporder kies je bij dit artikel eerst de variant.")}</p>
+          <div className="table-wrap flush"><table>
+            <thead><tr><th></th><th>{tx("Artikelnummer")}</th><th>{tx("Variant")}</th><th className="num">{tx("Prijs")}</th></tr></thead>
+            <tbody>{variants.map((a) => (
+              <tr key={a.id} className="click" onClick={() => onOpen(a)}>
+                <td style={{ width: 64 }}><Photo url={a.image_url} alt={a.name} className="thumb" /></td>
+                <td style={{ whiteSpace: 'nowrap' }}><ArticleNumbers own={a.article_number} supplier={a.supplier_sku} /></td>
+                <td>{a.name}<div className="muted small">{categoryName(a.category_code)}</div></td>
+                <td className="num" style={{ whiteSpace: 'nowrap' }}>{price(a)}</td>
+              </tr>
+            ))}</tbody>
+          </table></div>
+        </section>
+      )}
       {elements.length > 0 && (
         <section className="cat-elements">
           <h3>{tx("Elementen")} <span className="muted small">({elements.length})</span></h3>

@@ -3,7 +3,7 @@ import type { Driver } from './driver'
 import type { ArticleHit, ArticleQuery, CatalogArticle, CatalogListItem, CatalogListQuery, CatalogArticleElement, EmailAttachment, Snapshot, TableName } from './types'
 
 const PAGE = 1000
-const ARTICLE_COLUMNS = 'id, article_number, supplier_id, supplier_sku, ean, name, category_code, series, price, currency, image_url, source, active, created_at'
+const ARTICLE_COLUMNS = 'id, article_number, supplier_id, supplier_sku, ean, name, category_code, series, price, currency, image_url, source, active, created_at, variant_of'
 
 export function createSupabase(url: string, key: string) {
   return createClient(url, key)
@@ -63,7 +63,8 @@ export class SupabaseDriver implements Driver {
   async listArticles(f: CatalogListQuery) {
     const words = (f.q ?? '').trim().toLowerCase().split(/\s+/).filter(Boolean)
     let query = this.sb.from('catalog_articles').select(`${ARTICLE_COLUMNS}, supplier_stock, supplier_stock_at, images`, { count: 'exact' })
-      .eq('supplier_id', f.supplierId).eq('active', true)
+      .eq('supplier_id', f.supplierId).eq('active', true).is('variant_of', null)
+    // Varianten staan bij hun verzamelartikel, niet los in de lijst.
     // search_text is de kleine-letterversie van nummer, artikelnummer leverancier, EAN, naam en serie (zoals search_catalog_articles)
     for (const w of words) query = query.like('search_text', `%${w.replace(/[\\%_]/g, '\\$&')}%`)
     if (f.category) query = query.eq('category_code', f.category)
@@ -76,12 +77,18 @@ export class SupabaseDriver implements Driver {
       if (e2) throw new Error(e2.message)
       for (const r of (sub ?? []) as { parent_id: string }[]) counts.set(r.parent_id, (counts.get(r.parent_id) ?? 0) + 1)
     }
-    const rows: CatalogListItem[] = arts.map((a) => ({ ...a, element_count: counts.get(a.id) ?? 0 }))
+    const variants = new Map<string, number>()
+    if (arts.length) {
+      const { data: v, error: e4 } = await this.sb.from('catalog_articles').select('variant_of').eq('active', true).in('variant_of', arts.map((a) => a.id))
+      if (e4) throw new Error(e4.message)
+      for (const r of (v ?? []) as { variant_of: string }[]) variants.set(r.variant_of, (variants.get(r.variant_of) ?? 0) + 1)
+    }
+    const rows: CatalogListItem[] = arts.map((a) => ({ ...a, element_count: counts.get(a.id) ?? 0, variant_count: variants.get(a.id) ?? 0 }))
     let categories: { code: string; n: number }[] | undefined
     if (f.withCategories) {
       const m = new Map<string, number>()
       for (let from = 0; ; from += PAGE) {
-        const { data: c, error: e3 } = await this.sb.from('catalog_articles').select('category_code').eq('supplier_id', f.supplierId).eq('active', true).order('id').range(from, from + PAGE - 1)
+        const { data: c, error: e3 } = await this.sb.from('catalog_articles').select('category_code').eq('supplier_id', f.supplierId).eq('active', true).is('variant_of', null).order('id').range(from, from + PAGE - 1)
         if (e3) throw new Error(e3.message)
         for (const r of (c ?? []) as { category_code: string }[]) if (r.category_code) m.set(r.category_code, (m.get(r.category_code) ?? 0) + 1)
         if (!c || c.length < PAGE) break
@@ -110,6 +117,12 @@ export class SupabaseDriver implements Driver {
       out.push(...((data ?? []) as unknown as Record<string, unknown>[]).map(toNumbers) as unknown as CatalogArticle[])
     }
     return out
+  }
+  async articleVariants(parentId: string) {
+    const { data, error } = await this.sb.from('catalog_articles').select(`${ARTICLE_COLUMNS}, supplier_stock, supplier_stock_at, images`)
+      .eq('variant_of', parentId).eq('active', true).order('name').order('article_number')
+    if (error) throw new Error(error.message)
+    return ((data ?? []) as unknown as Record<string, unknown>[]).map(toNumbers).map((a) => ({ ...a, element_count: 0 })) as unknown as CatalogListItem[]
   }
   async articleElements(parentId: string) {
     const { data, error } = await this.sb.from('catalog_article_elements').select('position, element_id').eq('parent_id', parentId).order('position')

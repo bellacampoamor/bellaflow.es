@@ -54,6 +54,8 @@ export class LocalDriver implements Driver {
   async findArticles(f: { ids?: string[]; numbers?: string[]; supplierId?: string; skus?: string[]; skuPrefix?: string; limit?: number }) { return this.articles.find(f) }
   async articleElements(parentId: string) { return this.articles.elements(parentId) }
   async articleParents(elementId: string) { return this.articles.parentsOf(elementId) }
+  // De browserversie kent geen verzamelartikelen met varianten (alleen de koppeling met HA-CO in de database).
+  async articleVariants(_parentId: string) { return [] }
   async articleCounts() { return this.articles.counts() }
   async articleIndex() { return { articles: structuredClone(this.articles.articles), links: structuredClone(this.articles.links) } }
   async saveArticles(articles: CatalogArticle[], links: CatalogArticleElement[]) { this.articles.save(articles, links) }
