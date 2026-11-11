@@ -67,6 +67,11 @@ drop trigger if exists products_name_es on products;
 create trigger products_name_es before insert or update on products
   for each row execute function trg_product_name_es();
 
-revoke execute on function refresh_names_es() from public, anon;
+revoke execute on function refresh_names_es() from public;
+do $$ begin
+  if exists (select 1 from pg_roles where rolname = 'anon') then
+    execute 'revoke execute on function refresh_names_es() from anon';
+  end if;
+end $$;
 
 select refresh_names_es();
