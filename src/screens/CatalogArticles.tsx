@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { ArticleHit, CatalogListItem, Supplier } from '../data/types'
-import { categoryName } from '../domain/articles'
+import { articlePhotos, categoryName } from '../domain/articles'
 import { catalogArticleElements, catalogArticlePage } from '../domain/services'
 import { useApp } from '../ui/app-context'
 import { ArticleNumbers } from '../ui/ArticleSearch'
@@ -104,12 +104,25 @@ function ArticleCard({ item, supplier, onClose }: { item: CatalogListItem; suppl
     return () => { live = false }
   }, [db, item.id, item.element_count])
   const own = s.products.find((p) => p.catalog_article_number === item.article_number)
+  const photos = articlePhotos(item)
+  const [shown, setShown] = useState(0)
+  const current = photos[Math.min(shown, Math.max(photos.length - 1, 0))] ?? ''
   return (
     <Modal wide title={item.name} onClose={onClose} footer={<button className="btn primary" onClick={onClose}>{tx("Sluiten")}</button>}>
       <div className="cat-card">
         <div className="cat-gallery">
-          <Photo url={item.image_url} alt={item.name} className="large" />
-          {!item.image_url && <p className="muted small" style={{ margin: 0 }}>{tx("De leverancier heeft voor dit artikel geen foto aangeleverd.")}</p>}
+          <Photo key={current} url={current} alt={item.name} className="large" />
+          {photos.length > 1 && (
+            <div className="cat-thumbs" aria-label={tx("Foto {0} van {1}", Math.min(shown, photos.length - 1) + 1, photos.length)}>
+              {photos.map((u, i) => (
+                <button key={u} type="button" className={i === Math.min(shown, photos.length - 1) ? 'on' : ''} onClick={() => setShown(i)}
+                  title={tx("Foto {0} van {1}", i + 1, photos.length)}>
+                  <Photo url={u} alt={tx("Foto {0} van {1}", i + 1, photos.length)} className="thumb" />
+                </button>
+              ))}
+            </div>
+          )}
+          {!photos.length && <p className="muted small" style={{ margin: 0 }}>{tx("De leverancier heeft voor dit artikel geen foto aangeleverd.")}</p>}
         </div>
         <div className="cat-facts">
           <dl className="cat-dl">

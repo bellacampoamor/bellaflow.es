@@ -96,6 +96,8 @@ export interface CatalogArticle {
   id: string; article_number: string; supplier_id: string; supplier_sku: string; ean: string; name: string
   category_code: string; series: string; price: number | null; currency: string; image_url: string
   source: 'showroom' | 'webshop'; active: boolean; created_at: string
+  /** Alle foto's van het artikel, de eerste is image_url (HA-CO: eerst uit het bestelportaal, daarna uit de webwinkel). */
+  images?: string[]
 }
 /** Koppeling artikel en element (subartikel), op de eigen id's. */
 export interface CatalogArticleElement { parent_id: string; element_id: string; position: number }

@@ -307,3 +307,14 @@ export class ArticleStore {
     return first
   }
 }
+
+/** De foto's van een catalogusartikel, zonder dubbele en lege: eerst image_url, dan de rest in volgorde van de leverancier. */
+export function articlePhotos(a: { image_url?: string | null; images?: unknown }): string[] {
+  const list = [a.image_url ?? '', ...(Array.isArray(a.images) ? a.images : [])]
+  const out: string[] = []
+  for (const x of list) {
+    const u = typeof x === 'string' ? x.trim() : ''
+    if (u && !out.includes(u)) out.push(u)
+  }
+  return out
+}

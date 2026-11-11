@@ -62,7 +62,7 @@ export class SupabaseDriver implements Driver {
   }
   async listArticles(f: CatalogListQuery) {
     const words = (f.q ?? '').trim().toLowerCase().split(/\s+/).filter(Boolean)
-    let query = this.sb.from('catalog_articles').select(`${ARTICLE_COLUMNS}, supplier_stock, supplier_stock_at`, { count: 'exact' })
+    let query = this.sb.from('catalog_articles').select(`${ARTICLE_COLUMNS}, supplier_stock, supplier_stock_at, images`, { count: 'exact' })
       .eq('supplier_id', f.supplierId).eq('active', true)
     // search_text is de kleine-letterversie van nummer, artikelnummer leverancier, EAN, naam en serie (zoals search_catalog_articles)
     for (const w of words) query = query.like('search_text', `%${w.replace(/[\\%_]/g, '\\$&')}%`)
