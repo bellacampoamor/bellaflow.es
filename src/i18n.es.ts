@@ -1461,7 +1461,7 @@ export const es: Record<string, string> = {
   "NIE of paspoortnummer": "NIE o número de pasaporte",
   "Factuur van {0}.": "Factura de {0}.",
   "Factuur van": "Factura de",
-  "Factuur van HDB ({0})": "Factura de HDB ({0})",
+  "Bon voor": "Ticket para",
   "Eenvoudige factuur (kassa)": "Factura simplificada (TPV)",
   "Kassa: Bella Outdoor and Furnishing": "TPV: Bella Outdoor and Furnishing",
   "Logo linksboven en klein beeldmerk onderaan op de eenvoudige factuur van Bella. De bedrijfsgegevens komen uit Bedrijfsgegevens hierboven.": "Logotipo arriba a la izquierda e isotipo pequeño abajo en la factura simplificada de Bella. Los datos de la empresa vienen de Datos de la empresa, arriba.",

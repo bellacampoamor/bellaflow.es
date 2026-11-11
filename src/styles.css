@@ -759,6 +759,15 @@ tr.focus-flash td { animation: focus-flash-cell 2.6s ease-out; }
 .pos-user { display: flex; flex-direction: column; gap: 2px; }
 .pos-user select { min-width: 180px; height: 42px; box-sizing: border-box; }
 .head .actions:has(.pos-credit) { align-items: flex-end; }
+/* Kassa: toggle rechtsboven voor welk bedrijf de bon maakt (Bella of HomeDecoBali) */
+.pos-company { display: flex; flex-direction: column; gap: 2px; }
+.pos-company-toggle { display: inline-flex; height: 42px; box-sizing: border-box; padding: 3px; gap: 3px; border-radius: 10px; border: 2px solid var(--primary); background: var(--surface, transparent); }
+.pos-company-toggle.hdb { border-color: var(--info); }
+.pos-company-toggle button { border: 0; border-radius: 7px; padding: 0 14px; font: inherit; font-weight: 600; white-space: nowrap; cursor: pointer; background: transparent; color: var(--muted); }
+.pos-company-toggle button:hover:not(.on) { color: var(--fg); }
+.pos-company-toggle button.on { background: var(--primary); color: var(--on-primary); }
+.pos-company-toggle.hdb button.on { background: var(--info); color: var(--info-bg); }
+.pos-company-toggle button:focus-visible { outline: 2px solid var(--fg); outline-offset: 1px; }
 .pos-credit { height: 42px; min-height: 42px; box-sizing: border-box; letter-spacing: .04em; }
 .pos-scan { border-top: 4px solid var(--primary); }
 .pos-scan-row { display: flex; align-items: center; gap: 10px; color: var(--primary); }

@@ -9,7 +9,7 @@ import { canCredit, isCredit } from '../domain/credit'
 import { loadSnapshot } from '../data/driver'
 import { ArticleSearch, type ArticlePick } from '../ui/ArticleSearch'
 import { go, useApp } from '../ui/app-context'
-import { Check, Combo, Empty, eur, Field, Head, Modal, NumInput, TextField } from '../ui/kit'
+import { Combo, Empty, eur, Field, Head, Modal, NumInput, TextField } from '../ui/kit'
 import { issuerInfo } from '../domain/issuers'
 import { shopifyOrderOf } from '../domain/shopify'
 import { CustomerFields } from './OrderForm'
@@ -85,6 +85,9 @@ export function Pos() {
   const shop = posWarehouse(s.warehouses)
   const bella = issuerInfo(s.settings[0], 'bella'), hdbInfo = issuerInfo(s.settings[0], 'hdb')
   const issuer = hdb ? hdbInfo : bella
+  // Namen op de toggle rechtsboven: de handelsnamen (besluit Rick 11 november 2026).
+  const bellaLabel = s.settings[0]?.trade_name?.trim() || 'Bella Outdoor & Furniture'
+  const hdbLabel = s.settings[0]?.hdb_trade_name?.trim() || 'HomeDecoBali'
   const productOf = (id?: string) => (id ? s.products.find((p) => p.id === id) : undefined)
   const customers = useMemo(() => s.customers.filter((c) => c.notes !== POS_CUSTOMER_NOTE), [s.customers])
   const custOptions = useMemo(() => customers.map((c) => ({ value: c.id, label: c.company || c.name, sub: [c.company ? c.name : '', c.city, c.phone].filter(Boolean).join(', '), search: `${c.email} ${c.tax_id}` })), [customers])
@@ -213,6 +216,13 @@ export function Pos() {
   return (
     <>
       <Head title={tx("Kassa")} sub={shop ? tx("Verkoop vanuit {0}. De klant neemt alles mee en betaalt direct.", shop.name) : undefined}>
+        <div className="pos-company">
+          <span className="small muted" id="pos-company-label">{tx("Bon voor")}</span>
+          <div className={`pos-company-toggle${hdb ? ' hdb' : ''}`} role="radiogroup" aria-labelledby="pos-company-label">
+            <button type="button" role="radio" aria-checked={!hdb} className={!hdb ? 'on' : ''} onClick={() => { setHdb(false); scanRef.current?.focus() }} title={bella.name}>{bellaLabel}</button>
+            <button type="button" role="radio" aria-checked={hdb} className={hdb ? 'on' : ''} onClick={() => { setHdb(true); scanRef.current?.focus() }} title={hdbInfo.name}>{hdbLabel}</button>
+          </div>
+        </div>
         <label className="pos-user">
           <span className="small muted">{tx("Medewerker")}</span>
           <select value={user} onChange={(e) => pickUser(e.target.value)} aria-label={tx("Medewerker")}>
@@ -294,8 +304,8 @@ export function Pos() {
         <div className="stack pos-side">
           <section className={`panel pos-issuer${hdb ? ' hdb' : ''}`}>
             <div className="small muted">{tx("Factuur van")}</div>
-            <div className="strong">{issuer.name}</div>
-            <Check label={tx("Factuur van HDB ({0})", hdbInfo.name)} checked={hdb} onChange={setHdb} />
+            <div className="strong">{hdb ? hdbLabel : bellaLabel}</div>
+            <div className="small muted">{issuer.name}{issuer.tax_id ? ` · CIF ${issuer.tax_id}` : ''}</div>
           </section>
           <section className="panel">
             <div className="pos-total"><span>{tx("Totaal")}</span><strong>{eur(totals.total)}</strong></div>
