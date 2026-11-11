@@ -96,6 +96,8 @@ export class LocalDriver implements Driver {
   }
   // Voorbeeldgegevens in de browser: er gaat nooit echte mail de deur uit.
   async sendEmail(_id: string, _attachment: EmailAttachment): Promise<'sent' | 'demo'> { return 'demo' }
+  // En er gaat nooit iets naar de echte Shopify van HDB.
+  async pushShopifyOrders(_ids: string[]): Promise<'sent' | 'demo'> { return 'demo' }
   async nextNumber(series: string, year: number) {
     this.sync();
     const id = `${series}-${year}`

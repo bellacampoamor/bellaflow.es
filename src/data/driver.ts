@@ -13,6 +13,11 @@ export interface Driver {
   nextNumber(series: string, year: number): Promise<string>
   /** Verstuurt een mail uit de wachtrij. 'demo' betekent dat deze opslag niet kan mailen. */
   sendEmail(id: string, attachment: EmailAttachment): Promise<'sent' | 'demo'>
+  /**
+   * Zet kassaverkopen van HDB uit de wachtrij hdb_shopify_orders in Shopify (edge function hdb-shopify).
+   * Lege lijst = alles wat nog wacht of mislukt is. 'demo' betekent dat deze opslag niet met Shopify praat.
+   */
+  pushShopifyOrders(ids: string[]): Promise<'sent' | 'demo'>
 
   // Catalogusartikelen met eigen artikelnummer. Niet in de Snapshot: de opslag zoekt zelf, zodat ook
   // honderdduizenden artikelen van tien leveranciers het scherm niet vertragen.

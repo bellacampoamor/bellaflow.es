@@ -950,3 +950,8 @@ tr.close-hist.on td { background: var(--selected); color: var(--on-selected); }
 .pw-field .pw-eye:hover { color: var(--fg); background: none; }
 .pw-field .pw-eye:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
 .login .link-btn:hover { background: none; color: var(--primary-hover, var(--link)); }
+
+/* Stand van een kassaverkoop van HDB in Shopify (11 november 2026): nummer als link in de pil, knop Opnieuw versturen ernaast. */
+.shopify-status { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
+.shopify-status .pill a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
+.shopify-status .linklike svg { vertical-align: -2px; }

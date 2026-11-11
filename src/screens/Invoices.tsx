@@ -10,6 +10,8 @@ import { tx } from '../i18n'
 import { INVOICE_TEXT, invoiceTitle } from '../domain/noteText'
 import { POS_CUSTOMER_NOTE } from '../domain/pos'
 import { imageSrc, issuerInfo, issuerOf, legalLine, tradeName } from '../domain/issuers'
+import { goesToShopify } from '../domain/shopify'
+import { ShopifyStatus } from '../ui/ShopifyStatus'
 import { simplifiedPrint } from '../domain/receipt'
 import { ReceiptPaper } from './Receipt'
 import { PagedDoc } from '../ui/PagedDoc'
@@ -166,6 +168,8 @@ export function InvoiceDetail({ id, autoPrint = false }: { id: string; autoPrint
         {!credit && balance > 0 && <button className="btn primary" onClick={() => { setAmount(balance); setPay(true) }}>{tx("Betaling registreren")}</button>}
         {credit && balance < 0 && <button className="btn primary" onClick={() => { setAmount(-balance); setMethod(inv.simplified ? 'contant' : 'overboeking'); setPay(true) }}>{tx("Terugbetaling registreren")}</button>}
       </Head>
+      {goesToShopify(inv) && <div className="no-print" style={{ marginBottom: 12 }}><ShopifyStatus invoiceId={inv.id} /></div>}
+      {original && goesToShopify(original) && <div className="note warn no-print" style={{ marginBottom: 12 }}>{tx("Een creditfactuur van HDB gaat niet automatisch naar Shopify. Verwerk de retour of terugbetaling in Shopify bij de bestelling van {0}.", original.number)} <ShopifyStatus invoiceId={original.id} /></div>}
       {mail && <div className="no-print" style={{ marginBottom: 12 }}><Pill tone={MAIL_STATE[mail.status][1]}>{tx(MAIL_STATE[mail.status][0], mail.to_email)}</Pill>{mail.status === 'failed' && mail.error && <span className="small muted"> {mail.error}</span>}</div>}
       {original && <div className="note no-print" style={{ marginBottom: 12 }}>{tx("Creditfactuur op factuur")} <a href={`#facturatie-${original.id}`}>{original.number}</a>. {tx("Reden")}: {inv.credit_reason}</div>}
       {credits.length > 0 && <div className="note no-print" style={{ marginBottom: 12 }}>{tx("Gecrediteerd met")} {credits.map((c, n) => <span key={c.id}>{n > 0 && ', '}<a href={`#facturatie-${c.id}`}>{c.number}</a> ({eur(c.total)})</span>)}</div>}

@@ -20,6 +20,10 @@ export interface Settings {
   /** Tweede bedrijf aan de kassa: Handmade Bali Treasures SL (HomeDecoBali), buiten de boekhouding van Bella. */
   hdb_company_name?: string; hdb_trade_name?: string; hdb_tax_id?: string; hdb_address?: string; hdb_postal_code?: string; hdb_city?: string
   hdb_province?: string; hdb_country?: string; hdb_phone?: string; hdb_email?: string
+  /** Kassaverkoop van HDB in Shopify (11 november 2026): true (standaard) = de conceptorder wordt meteen een bestelling, als betaald, met het ordernummer van Shopify; false = blijft conceptorder. */
+  hdb_shopify_complete?: boolean
+  /** Naam van de winkel in Shopify (admin.shopify.com/store/<naam>), alleen voor de links naar de bestelling. */
+  hdb_shopify_store?: string
   /** Automatisch mailen aan de klant, per document (besluit Rick 8 november 2026). Ontbreekt een waarde, dan geldt MAIL_DEFAULTS. */
   mail_sales_order?: boolean; mail_invoice?: boolean; mail_invoice_simplified?: boolean; mail_signed_note?: boolean
   delivery_note_mode: 'papier' | 'digitaal'; shop_email: string; language_purchase_order: Language; language_lists: ListLanguage; language_sales_order: DocumentLanguage; language_delivery_note: DocumentLanguage; language_invoice: DocumentLanguage
@@ -216,6 +220,18 @@ export interface CashClosing {
   card_terminal: number | null
   deposited: number; kept_in_drawer: number; note: string; created_at: string
 }
+/**
+ * Kassaverkoop van HDB als conceptorder in de Shopify van HomeDecoBali (opdracht Rick 11 november 2026): wachtrij en resultaat,
+ * één rij per eenvoudige factuur van HDB. De edge function hdb-shopify vult de Shopify-velden.
+ */
+export type ShopifyPushStatus = 'wachtrij' | 'bezig' | 'aangemaakt' | 'mislukt' | 'demo'
+export interface HdbShopifyOrder {
+  id: string; invoice_id: string; status: ShopifyPushStatus
+  /** Meteen omzetten naar een bestelling (als betaald) met een Shopify-ordernummer, of conceptorder laten. */
+  complete_order: boolean
+  shopify_draft_id: string; shopify_draft_name: string; shopify_order_id: string; shopify_order_name: string
+  error: string; attempts: number; claimed_at: string | null; created_at: string; sent_at: string | null
+}
 
 export interface Snapshot {
   settings: Settings[]; warehouses: Warehouse[]; suppliers: Supplier[]; customers: Customer[]; salespeople: Salesperson[]; products: Product[]; supplier_showroom_items: SupplierShowroomItem[]; supplier_showroom_details: SupplierShowroomDetail[]
@@ -226,6 +242,7 @@ export interface Snapshot {
   deliveries: Delivery[]; delivery_lines: DeliveryLine[]; invoices: Invoice[]; invoice_lines: InvoiceLine[]
   payments: Payment[]; number_series: NumberSeries[]; email_outbox: OutgoingEmail[]
   purchase_order_dispatches: PurchaseOrderDispatch[]; cash_closings: CashClosing[]
+  hdb_shopify_orders: HdbShopifyOrder[]
 }
 export type TableName = keyof Snapshot
 
@@ -234,5 +251,5 @@ export const TABLES: TableName[] = [
   'settings', 'warehouses', 'suppliers', 'customers', 'salespeople', 'products', 'supplier_showroom_items', 'supplier_showroom_details', 'sales_orders', 'sales_order_lines',
   'order_events', 'purchase_orders', 'purchase_order_lines', 'transports', 'inbound_shipments', 'inbound_shipment_lines',
   'goods_receipts', 'goods_receipt_lines', 'stock_movements', 'deliveries', 'delivery_lines', 'invoices',
-  'invoice_lines', 'payments', 'number_series', 'email_outbox', 'purchase_order_dispatches', 'cash_closings',
+  'invoice_lines', 'payments', 'number_series', 'email_outbox', 'purchase_order_dispatches', 'cash_closings', 'hdb_shopify_orders',
 ]

@@ -13,6 +13,7 @@ import { INVOICE_MAIL, SALES_ORDER_MAIL } from './noteText'
 import { mailsAutomatically } from './mailSettings'
 import { isStaffRole } from './staff'
 import { ISSUER_SERIES, issuerOf, tradeName, type Issuer } from './issuers'
+import { goesToShopify, shopifyBacklog, shopifyCompletes, shopifyOrderOf } from './shopify'
 import { creditableAmount, creditableLines, creditSeries, creditSettlement, isCredit } from './credit'
 import { cashCount, closingOn, closingsOf, countedTotal, DENOMINATIONS, denomKey, kassaDay, openingFloat, type CashCounts } from './cashClosing'
 import { DUMMY_SKU, missingCustomerData, POS_CUSTOMER_NOTE, posShortfalls, posTotals, posWarehouse, SIMPLIFIED_LIMIT, type PosLine } from './pos'
@@ -555,7 +556,54 @@ export async function posCheckout(db: Driver, input: PosInput) {
   }
   const open = round2(invoice.total - invoice.deposit_settled)
   if (open > 0) await payInvoice(db, { invoice_id: invoice.id, amount: open, method: input.payment.method, paid_at: input.date, reference: input.payment.reference })
-  return { orderId, orderNumber: order.number, invoiceId: invoice.id, invoiceNumber: invoice.number, corrections: shortfalls }
+  // HDB: de verkoop gaat als conceptorder naar de Shopify van HomeDecoBali. Lukt dat niet, dan blijft de verkoop staan
+  // en staat hij onder Beheer > Kassa klaar om opnieuw te versturen.
+  const shopify = goesToShopify(invoice) ? await sendSaleToShopify(db, invoice.id).catch(() => 'mislukt' as const) : null
+  return { orderId, orderNumber: order.number, invoiceId: invoice.id, invoiceNumber: invoice.number, corrections: shortfalls, shopify }
+}
+
+// Shopify van HDB ----------------------------------------------------------------
+// Opdracht Rick 11 november 2026: kassaverkopen van HDB komen als conceptorder in Shopify, met het ordernummer van
+// Shopify en de gegevens die tot nu toe met de hand werden ingevoerd. Op Afgehandeld zetten doet HDB zelf.
+
+/** Zet een eenvoudige factuur van HDB in de wachtrij (één keer) en verstuurt hem meteen. Ook om één factuur opnieuw te versturen. */
+export async function sendSaleToShopify(db: Driver, invoiceId: string) {
+  const s = await loadSnapshot(db)
+  const inv = s.invoices.find((i) => i.id === invoiceId) ?? (fail(tx("Factuur niet gevonden.")) as never)
+  if (!goesToShopify(inv)) fail(tx("Alleen kassaverkopen van HDB gaan naar Shopify."))
+  let row = shopifyOrderOf(s, invoiceId)
+  if (!row) {
+    row = {
+      id: newId(), invoice_id: invoiceId, status: 'wachtrij', complete_order: shopifyCompletes(s.settings[0]), shopify_draft_id: '', shopify_draft_name: '',
+      shopify_order_id: '', shopify_order_name: '', error: '', attempts: 0, claimed_at: null, created_at: new Date().toISOString(), sent_at: null,
+    }
+    await db.insert('hdb_shopify_orders', [row])
+  }
+  if (row.status === 'aangemaakt') return row.status
+  return pushToShopify(db, [row.id])
+}
+
+/** Verstuurt wat in de wachtrij staat (of alleen deze rijen). Geeft de stand terug: 'demo' in de browserversie. */
+export async function pushToShopify(db: Driver, ids: string[] = []) {
+  const s = await loadSnapshot(db)
+  const todo = ids.length ? ids : shopifyBacklog(s).map((r) => r.id)
+  if (!todo.length) return 'aangemaakt' as const
+  try {
+    if (await db.pushShopifyOrders(ids) === 'demo') {
+      for (const id of todo) await db.update('hdb_shopify_orders', id, { status: 'demo', error: '' })
+      return 'demo' as const
+    }
+  } catch (e) {
+    // De functie is niet bereikbaar (nog niet gedeployd, geen internet): de rij blijft staan om opnieuw te versturen.
+    const error = e instanceof Error ? e.message : String(e)
+    for (const id of todo) {
+      const r = s.hdb_shopify_orders.find((x) => x.id === id)
+      if (r && r.status !== 'aangemaakt') await db.update('hdb_shopify_orders', id, { status: 'mislukt', error })
+    }
+    return 'mislukt' as const
+  }
+  const after = await db.list('hdb_shopify_orders')
+  return after.some((r) => todo.includes(r.id) && r.status === 'mislukt') ? 'mislukt' as const : 'aangemaakt' as const
 }
 
 // Proforma (scan.bellaflow.es) -------------------------------------------------

@@ -11,6 +11,7 @@ import { ArticleSearch, type ArticlePick } from '../ui/ArticleSearch'
 import { go, useApp } from '../ui/app-context'
 import { Check, Combo, Empty, eur, Field, Head, Modal, NumInput, TextField } from '../ui/kit'
 import { issuerInfo } from '../domain/issuers'
+import { shopifyOrderOf } from '../domain/shopify'
 import { CustomerFields } from './OrderForm'
 import { tx } from '../i18n'
 import { mailsAutomatically } from '../domain/mailSettings'
@@ -75,7 +76,7 @@ export function Pos() {
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState('')
   const [newCust, setNewCust] = useState<(Omit<Customer, 'id'> & { id?: string }) | null>(null)
-  const [done, setDone] = useState<{ issuer: string; orderNumber: string; invoiceId: string; invoiceNumber: string; change: number; note: string; corrected: number } | null>(null)
+  const [done, setDone] = useState<{ issuer: string; orderNumber: string; invoiceId: string; invoiceNumber: string; change: number; note: string; shop: string; shopBad: boolean; corrected: number } | null>(null)
   const [focusKey, setFocusKey] = useState<string | null>(null)
   // Welk bedrijf de eenvoudige factuur uitgeeft: Bella (standaard) of HDB (Handmade Bali Treasures SL). Na elke verkoop weer Bella.
   const [hdb, setHdb] = useState(false)
@@ -172,15 +173,23 @@ export function Pos() {
     if (method === 'contant' && received > 0 && received < totals.total) return toast(tx("Ontvangen is minder dan het totaal."), true)
     let result: Awaited<ReturnType<typeof posCheckout>> | null = null
     let note = ''
+    let shop = '', shopBad = false
     const ok = await run(async (d) => {
       result = await posCheckout(d, { salesperson_id: me.id, customer_id: customerId || null, date: todayISO(), lines, payment: { method, reference }, invoiceEmail: mailTo, issuer: hdb ? 'hdb' : 'bella' })
       const snap = await loadSnapshot(d)
       const m = snap.email_outbox.find((x) => x.kind === 'factuur' && x.invoice_id === result!.invoiceId)
       note = !m ? '' : m.status === 'sent' ? tx("Gemaild naar {0}.", m.to_email) : m.status === 'demo' ? tx("Testversie: de mail naar {0} is niet echt verstuurd.", m.to_email) : tx("Mailen is mislukt: {0}", m.error)
+      // HDB: stand in Shopify (conceptorder of bestelling met het nummer van Shopify).
+      const sh = shopifyOrderOf(snap, result!.invoiceId)
+      if (sh) shop = sh.status === 'aangemaakt'
+        ? (sh.shopify_order_name ? tx("In Shopify als bestelling {0}, nog niet afgehandeld.", sh.shopify_order_name) : tx("In Shopify als conceptorder {0}.", sh.shopify_draft_name))
+        : sh.status === 'demo' ? tx("Testversie: niet naar Shopify gestuurd.")
+        : tx("Nog niet in Shopify: {0} Opnieuw versturen kan onder Beheer > Kassa.", sh.error || tx("wacht op Shopify."))
+      shopBad = !!sh && sh.status !== 'aangemaakt' && sh.status !== 'demo'
     })
     if (!ok || !result) return
     const r = result as Awaited<ReturnType<typeof posCheckout>>
-    setDone({ issuer: issuer.name, orderNumber: r.orderNumber, invoiceId: r.invoiceId, invoiceNumber: r.invoiceNumber, change, note, corrected: r.corrections.filter((x) => !x.dummy).length })
+    setDone({ issuer: issuer.name, orderNumber: r.orderNumber, invoiceId: r.invoiceId, invoiceNumber: r.invoiceNumber, change, note, shop, shopBad, corrected: r.corrections.filter((x) => !x.dummy).length })
     setLines([]); setCustomerId(''); setReference(''); setReceived(0); setMail(null); setMethod('pin'); setMessage(''); setHdb(false)
   }
 
@@ -236,6 +245,7 @@ export function Pos() {
               <div style={{ flex: 1 }}>
                 <h2 style={{ margin: 0 }}>{tx("Afgerekend: factura simplificada {0}", done.invoiceNumber)}</h2>
                 <div className="small muted">{tx("Factuur van {0}.", done.issuer)} {tx("Verkooporder {0}, afgeleverd en betaald.", done.orderNumber)} {done.note}</div>
+                {done.shop && <div className={done.shopBad ? 'small warn-text' : 'small muted'}>{done.shopBad && <AlertTriangle size={13} />} {done.shop}</div>}
                 {done.change > 0 && <div className="pos-change">{tx("Wisselgeld")}: {eur(done.change)}</div>}
                 {done.corrected > 0 && <div className="small warn-text"><AlertTriangle size={13} /> {tx("Voorraadverschil bijgeboekt voor {0} artikel(en); zie Voorraad, mutaties.", done.corrected)}</div>}
               </div>

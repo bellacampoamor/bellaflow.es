@@ -161,6 +161,13 @@ export function Admin({ param = '' }: { param?: string }) {
           <LogoUpload label={tx("Logo")} value={co.logo_hdb ?? HDB_DEFAULTS.logo_hdb} onChange={(v) => setCo({ ...co, logo_hdb: v })} max={1000} />
           <LogoUpload label={tx("Beeldmerk")} value={co.mark_hdb ?? HDB_DEFAULTS.mark_hdb} onChange={(v) => setCo({ ...co, mark_hdb: v })} max={300} />
         </div>
+        {/* Kassaverkopen van HDB als conceptorder in Shopify (opdracht Rick 11 november 2026). De sleutels staan alleen in Supabase. */}
+        <h3 style={{ marginTop: 18 }}>{tx("Shopify van HomeDecoBali")}</h3>
+        <p className="small muted">{tx("Elke kassaverkoop van HDB komt als conceptorder in Shopify, met artikelen, prijzen, korting, klant, verkoper, betaalwijze en factuurnummer. Op Afgehandeld zetten doe je zelf in Shopify, als laatste controle.")}</p>
+        <div className="form-grid">
+          <Check label={tx("Conceptorder meteen omzetten naar een bestelling (betaald), met het ordernummer van Shopify")} checked={co.hdb_shopify_complete !== false} onChange={(v) => setCo({ ...co, hdb_shopify_complete: v })} />
+          <TextField label={tx("Naam van de winkel in Shopify")} value={co.hdb_shopify_store ?? ''} onChange={(v) => setCo({ ...co, hdb_shopify_store: v.trim() })} hint={tx("Voor de links naar de bestelling: admin.shopify.com/store/{0}", co.hdb_shopify_store || '…')} />
+        </div>
         </section>
         </div>
         <section className="panel section">

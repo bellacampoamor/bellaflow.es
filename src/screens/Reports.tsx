@@ -6,6 +6,8 @@ import { issuerInfo, listLanguage, type Issuer } from '../domain/issuers'
 import type { Language } from '../data/types'
 import { getLanguage, tx } from '../i18n'
 import { go, useApp } from '../ui/app-context'
+import { ShopifyBacklog, ShopifyStatus } from '../ui/ShopifyStatus'
+import { goesToShopify } from '../domain/shopify'
 import { DocPaper, Empty, eur, fmtDate, Head, Tabs, TextField } from '../ui/kit'
 import { Archive } from './Archive'
 import { Deliverable } from './Deliverable'
@@ -47,6 +49,8 @@ export function InvoiceList({ kassa = false }: { kassa?: boolean }) {
   // Kassa: per bedrijf een eigen lijst (HDB valt buiten de boekhouding van Bella).
   const [issuer, setIssuer] = useNavUi<Issuer>('issuer', 'bella')
   const report = invoiceReport(s, from, to, kassa, kassa ? issuer : undefined)
+  // HDB: kolom met de stand in Shopify (alleen op het scherm, niet op het afgedrukte overzicht).
+  const shopify = kassa && issuer === 'hdb'
   const options: [ReportPeriod, string][] = [['maand', tx("Deze maand")], ['kwartaal', tx("Laatste 3 maanden")], ['jaar', tx("Dit jaar (YTD)")], ['vrij', tx("Van t/m")]]
   const company = s.settings[0]
   // Op het scherm altijd de schermtaal; het afgedrukte document de taal uit Instellingen (standaard ook de schermtaal).
@@ -75,7 +79,7 @@ export function InvoiceList({ kassa = false }: { kassa?: boolean }) {
     <>
       {report.rows.length === 0 && <Empty>{t.empty}</Empty>}
       {report.rows.length > 0 && <div className={paper ? 'table-wrap flush' : 'table-wrap'}><table className={paper ? 'report-table report-doc' : 'report-table'}>
-        <thead><tr><th>{t.number}</th><th>{t.date}</th><th>{t.order}</th><th>{t.customer}</th>{kassa && <th>{t.method}</th>}<th className="num">{t.base}</th><th className="num">{t.vat}</th><th className="num">{t.total}</th></tr></thead>
+        <thead><tr><th>{t.number}</th><th>{t.date}</th><th>{t.order}</th><th>{t.customer}</th>{kassa && <th>{t.method}</th>}{shopify && !paper && <th>Shopify</th>}<th className="num">{t.base}</th><th className="num">{t.vat}</th><th className="num">{t.total}</th></tr></thead>
         <tbody>
           {report.rows.map(({ invoice: i, order, customer }) => (
           <tr key={i.id}>
@@ -84,13 +88,14 @@ export function InvoiceList({ kassa = false }: { kassa?: boolean }) {
             <td>{order?.number}</td>
             <td className="report-customer">{kassa && isPosCustomer(i.customer_id) ? t.noCustomer : customer}</td>
             {kassa && <td>{methodOf(i.id).map((m) => t.methods[m] ?? m).join(', ')}</td>}
+            {shopify && !paper && <td>{goesToShopify(i) && <ShopifyStatus invoiceId={i.id} compact />}</td>}
             <td className="num">{eur(i.base_amount)}</td>
             <td className="num">{eur(i.vat_amount)}</td>
             <td className="num">{eur(i.total)}</td>
           </tr>
           ))}
           <tr className="report-total">
-            <td colSpan={kassa ? 5 : 4}>{t.sum(report.rows.length)}</td>
+            <td colSpan={(kassa ? 5 : 4) + (shopify && !paper ? 1 : 0)}>{t.sum(report.rows.length)}</td>
             <td className="num">{eur(report.base)}</td>
             <td className="num">{eur(report.vat)}</td>
             <td className="num">{eur(report.total)}</td>
@@ -119,6 +124,7 @@ export function InvoiceList({ kassa = false }: { kassa?: boolean }) {
           <TextField label={tx("T/m")} type="date" value={customTo} onChange={setCustomTo} />
         </div>}
       </section>
+      {shopify && <ShopifyBacklog />}
       {/* Op het scherm: een gewone lijst in de stijl van de site, in de schermtaal. */}
       <section className="panel no-print">
         <div className="report-screen-head">

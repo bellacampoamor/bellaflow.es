@@ -49,6 +49,11 @@ export class SupabaseDriver implements Driver {
     if (error) throw new Error(error.message)
     return 'sent' as const
   }
+  async pushShopifyOrders(ids: string[]) {
+    const { error } = await this.sb.functions.invoke('hdb-shopify', { body: ids.length ? { ids } : { pending: true } })
+    if (error) throw new Error(error.message)
+    return 'sent' as const
+  }
   async searchArticles(q: ArticleQuery) {
     if (!q.q.trim()) return []
     const { data, error } = await this.sb.rpc('search_catalog_articles', { p_q: q.q, p_suppliers: q.supplierIds ?? null, p_limit: q.limit ?? 30 })
