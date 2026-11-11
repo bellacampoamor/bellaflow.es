@@ -51,7 +51,7 @@ export class LocalDriver implements Driver {
   clear() { this.data = emptySnapshot(); this.articles = new ArticleStore(); this.save() }
   async searchArticles(q: ArticleQuery) { return this.articles.search(q) }
   async listArticles(f: CatalogListQuery) { return this.articles.list(f) }
-  async findArticles(f: { ids?: string[]; numbers?: string[]; supplierId?: string; skus?: string[] }) { return this.articles.find(f) }
+  async findArticles(f: { ids?: string[]; numbers?: string[]; supplierId?: string; skus?: string[]; skuPrefix?: string; limit?: number }) { return this.articles.find(f) }
   async articleElements(parentId: string) { return this.articles.elements(parentId) }
   async articleParents(elementId: string) { return this.articles.parentsOf(elementId) }
   async articleCounts() { return this.articles.counts() }

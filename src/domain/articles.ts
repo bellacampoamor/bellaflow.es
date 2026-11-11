@@ -277,7 +277,13 @@ export class ArticleStore {
     const rows = found.slice(f.offset, f.offset + f.limit).map((a) => ({ ...this.hit(a), supplier_stock: null, supplier_stock_at: null }))
     return { rows, total: found.length, categories: f.withCategories ? countCategories(own.map((a) => a.category_code)) : undefined }
   }
-  find(f: { ids?: string[]; numbers?: string[]; supplierId?: string; skus?: string[] }) {
+  find(f: { ids?: string[]; numbers?: string[]; supplierId?: string; skus?: string[]; skuPrefix?: string; limit?: number }) {
+    if (f.skuPrefix) {
+      const pre = f.skuPrefix.trim().toLowerCase()
+      if (!pre) return []
+      return this.articles.filter((a) => a.supplier_sku.toLowerCase().startsWith(pre) && (!f.supplierId || a.supplier_id === f.supplierId))
+        .sort((a, b) => a.supplier_sku.localeCompare(b.supplier_sku)).slice(0, f.limit ?? 500).map((a) => structuredClone(a))
+    }
     if (f.numbers) { const want = new Set(f.numbers); return this.articles.filter((a) => want.has(a.article_number)).map((a) => structuredClone(a)) }
     if (f.ids) return f.ids.map((id) => this.byId.get(id)).filter((i): i is number => i !== undefined).map((i) => structuredClone(this.articles[i]))
     if (f.supplierId && f.skus) return f.skus.map((sku) => this.bySku.get(skuKey(f.supplierId!, sku))).filter((i): i is number => i !== undefined).map((i) => structuredClone(this.articles[i]))

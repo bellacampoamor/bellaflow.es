@@ -90,7 +90,16 @@ export class SupabaseDriver implements Driver {
     }
     return { rows, total: count ?? rows.length, categories }
   }
-  async findArticles(f: { ids?: string[]; numbers?: string[]; supplierId?: string; skus?: string[] }) {
+  async findArticles(f: { ids?: string[]; numbers?: string[]; supplierId?: string; skus?: string[]; skuPrefix?: string; limit?: number }) {
+    if (f.skuPrefix) {
+      const pre = f.skuPrefix.trim()
+      if (!pre) return []
+      let query = this.sb.from('catalog_articles').select(ARTICLE_COLUMNS).ilike('supplier_sku', `${pre.replace(/[\\%_]/g, '\\$&')}%`)
+      if (f.supplierId) query = query.eq('supplier_id', f.supplierId)
+      const { data, error } = await query.order('supplier_sku').limit(f.limit ?? 500)
+      if (error) throw new Error(error.message)
+      return ((data ?? []) as unknown as Record<string, unknown>[]).map(toNumbers) as unknown as CatalogArticle[]
+    }
     const out: CatalogArticle[] = []
     const keys = f.ids ?? f.numbers ?? f.skus ?? []
     for (let i = 0; i < keys.length; i += 200) {

@@ -3,9 +3,29 @@ import {
   adjustPrice, CODE128_PATTERNS, code128Modules, code128Values, DEFAULT_PRINTER, dymoJob, labelBasePrice, labelToRaster,
   parseLabelCommand, shortLabelName, singularQuery,
 } from '../src/domain/labels'
+import { ArticleStore } from '../src/domain/articles'
 import type { CatalogArticle, Product, Supplier } from '../src/data/types'
 
 describe('etiketten: opdracht lezen', () => {
+  it('leest een batch uit een gewone vraag, zonder losse zoekwoorden', () => {
+    const c = parseLabelCommand('Kun je ook bijv alle etiketten van de batch FU2602 als ik dat vraag')
+    expect(c.batches).toEqual(['FU2602'])
+    expect(c.codes).toEqual([])
+    expect(c.query).toBe('')
+    expect(parseLabelCommand('partij nr. fu2602 +10%').batches).toEqual(['FU2602'])
+    expect(parseLabelCommand('imprime el lote FU2602 2x').batches).toEqual(['FU2602'])
+    expect(parseLabelCommand('print batch FU2602 en batch HC1234').batches).toEqual(['FU2602', 'HC1234'])
+  })
+  it('vindt een batch op het begin van het artikelnummer leverancier, ook inactieve artikelen', () => {
+    const art = (n: number, sku: string, active = true): CatalogArticle => ({
+      id: `a${n}`, article_number: `HDB-TAF-${String(n).padStart(10, '0')}`, supplier_id: 's1', supplier_sku: sku, ean: '', name: `Voorbeeld ${n}`,
+      category_code: 'TAF', series: '', price: 100, currency: 'EUR', image_url: '', source: 'webshop', active, created_at: '',
+    } as CatalogArticle)
+    const store = new ArticleStore()
+    store.save([art(1, 'FU26020010'), art(2, 'FU26020014', false), art(3, 'FU2603001'), art(4, 'XFU26020')], [])
+    expect(store.find({ skuPrefix: 'fu2602' }).map((a) => a.supplier_sku)).toEqual(['FU26020010', 'FU26020014'])
+    expect(store.find({ skuPrefix: '' })).toEqual([])
+  })
   it('leest categorie, percentage en afronding', () => {
     const c = parseLabelCommand('print alle tafels +10% afronden ,95')
     expect(c.query).toBe('tafels')

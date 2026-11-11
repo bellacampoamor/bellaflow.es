@@ -26,7 +26,8 @@ export interface Driver {
   /** De actieve artikelen van één leverancier, per pagina, gesorteerd op naam. Voor het scherm Catalogi. */
   listArticles(f: CatalogListQuery): Promise<CatalogListPage>
   /** Artikelen op id, of per leverancier op artikelnummer van de leverancier. */
-  findArticles(f: { ids?: string[]; numbers?: string[]; supplierId?: string; skus?: string[] }): Promise<CatalogArticle[]>
+  /** skuPrefix: alle artikelen (ook inactief) waarvan het artikelnummer leverancier zo begint, zoals een batch (FU2602 vindt FU26020010). */
+  findArticles(f: { ids?: string[]; numbers?: string[]; supplierId?: string; skus?: string[]; skuPrefix?: string; limit?: number }): Promise<CatalogArticle[]>
   /** De elementen van een artikel, in de volgorde van de leverancier. */
   articleElements(parentId: string): Promise<ArticleHit[]>
   /** Het artikel of de artikelen waar dit artikel element van is. */

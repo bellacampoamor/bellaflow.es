@@ -75,33 +75,49 @@ export function LabelAgent() {
       return
     }
     // Alleen een prijsregel: toepassen op de laatste printlijst.
-    if (!cmd.codes.length && !cmd.query && !ruleIsEmpty(cmd.rule) && lastListId) {
+    if (!cmd.codes.length && !cmd.batches.length && !cmd.query && !ruleIsEmpty(cmd.rule) && lastListId) {
       const prev = lists[lastListId]
       const list: PrintList = { ...prev, id: id(), at: new Date().toISOString(), rule: cmd.rule, rows: prev.rows.map((r) => ({ ...r, price: r.base === null ? null : adjustPrice(r.base, cmd.rule) })) }
       setLists((l) => ({ ...l, [list.id]: list }))
       say(tx("Aangepast: {0}. Dit geldt alleen voor het etiket.", ruleText(cmd.rule)), list.id)
       return
     }
-    if (!cmd.codes.length && !cmd.query) {
-      say(tx("Dat begreep ik niet. Noem een artikelnummer, een EAN of een categorie of serie, eventueel met een prijsaanpassing. Bijvoorbeeld: \"LOL-TSE-0000000012 2x\" of \"alle tafels +10% afronden ,95\"."))
+    if (!cmd.codes.length && !cmd.batches.length && !cmd.query) {
+      say(tx("Dat begreep ik niet. Noem een artikelnummer, een EAN, een batch of een categorie of serie, eventueel met een prijsaanpassing. Bijvoorbeeld: \"LOL-TSE-0000000012 2x\", \"batch FU2602\" of \"alle tafels +10% afronden ,95\"."))
       return
     }
     const rows: Row[] = []
     const missing: string[] = []
+    const notes: string[] = []
+    let capped = false
+    const add = (a: CatalogArticle) => { if (rows.length >= MAX_LABEL_ROWS) { capped = true; return } if (!rows.some((r) => r.key === a.id)) rows.push(rowFor(a, cmd.rule, qty)) }
+    // Batch: alle artikelen waarvan het artikelnummer leverancier zo begint. Inactieve artikelen krijgen geen etiket.
+    const batch = async (code: string, explicit: boolean) => {
+      const all = await db.findArticles({ skuPrefix: code, limit: 500 })
+      if (!all.length) return false
+      const active = all.filter((a) => a.active)
+      active.forEach(add)
+      const off = all.length - active.length
+      if (off && !active.length) notes.push(tx("Batch {0}: {1} artikelen gevonden, maar ze staan allemaal op inactief in de catalogus en krijgen geen etiket.", code, off))
+      else if (off) notes.push(tx("Batch {0}: {1} actieve artikelen; {2} inactieve artikelen overgeslagen.", code, active.length, off))
+      else if (explicit || active.length > 1) notes.push(tx("Batch {0}: {1} artikelen.", code, active.length))
+      return true
+    }
+    for (const code of cmd.batches) if (!(await batch(code, true))) missing.push(code)
     for (const code of cmd.codes) {
       const a = await findCode(code)
-      if (a) rows.push(rowFor(a, cmd.rule, qty)); else missing.push(code)
+      if (a) add(a)
+      else if (!(await batch(code, false))) missing.push(code)
     }
-    let capped = false
     if (cmd.query) {
       let hits = await db.searchArticles({ q: singularQuery(cmd.query), limit: MAX_LABEL_ROWS })
       if (!hits.length) hits = await db.searchArticles({ q: cmd.query, limit: MAX_LABEL_ROWS })
       if (!hits.length) missing.push(cmd.query)
-      capped = hits.length >= MAX_LABEL_ROWS
-      for (const a of hits) if (!rows.some((r) => r.key === a.id)) rows.push(rowFor(a, cmd.rule, qty))
+      if (hits.length >= MAX_LABEL_ROWS) capped = true
+      hits.forEach(add)
     }
     if (!rows.length) {
-      say(tx("Niets gevonden voor {0}. Controleer het nummer of probeer een ander woord.", missing.join(', ')))
+      say([...notes, missing.length ? tx("Niets gevonden voor {0}. Controleer het nummer of probeer een ander woord.", missing.join(', ')) : ''].filter(Boolean).join(' '))
       return
     }
     const list: PrintList = { id: id(), at: new Date().toISOString(), user: userName, rule: cmd.rule, rows, missing, capped }
@@ -110,6 +126,7 @@ export function LabelAgent() {
     const parts = [rows.length === 1 ? tx("Klaar: 1 etiket, {0} stuks", pieces) : tx("Klaar: {0} etiketten, {1} stuks", rows.length, pieces)]
     if (!ruleIsEmpty(cmd.rule)) parts[0] += ` ${tx("met {0}", ruleText(cmd.rule))}`
     parts[0] += '.'
+    parts.push(...notes)
     if (missing.length) parts.push(tx("{0} niet gevonden.", missing.join(', ')))
     if (capped) parts.push(tx("Ik toon de eerste {0}; maak de opdracht specifieker voor de rest.", MAX_LABEL_ROWS))
     if (rows.some((r) => r.price === null)) parts.push(tx("Bij een artikel zonder prijs vul je de prijs zelf in."))
@@ -147,8 +164,8 @@ export function LabelAgent() {
   const dialogPrint = (rows: Row[]) => printViaDialog(rows.filter((r) => r.qty > 0 && r.price !== null).map((r) => ({ data: { name: r.name, price: r.price, articleNumber: r.articleNumber, test: r.key === 'test' }, qty: r.qty })))
 
   const greeting = userName
-    ? tx("Hoi {0}! Ik zet prijsetiketten klaar voor de DYMO: per artikel, meerdere artikelen tegelijk of een hele categorie of serie, met of zonder prijsaanpassing. Wat wil je printen?", userName)
-    : tx("Hoi! Ik zet prijsetiketten klaar voor de DYMO: per artikel, meerdere artikelen tegelijk of een hele categorie of serie, met of zonder prijsaanpassing. Wat wil je printen?")
+    ? tx("Hoi {0}! Ik zet prijsetiketten klaar voor de DYMO: per artikel, meerdere artikelen tegelijk, een hele batch (bijv. \"batch FU2602\") of een hele categorie of serie, met of zonder prijsaanpassing. Wat wil je printen?", userName)
+    : tx("Hoi! Ik zet prijsetiketten klaar voor de DYMO: per artikel, meerdere artikelen tegelijk, een hele batch (bijv. \"batch FU2602\") of een hele categorie of serie, met of zonder prijsaanpassing. Wat wil je printen?")
 
   return (
     <div className="lab">

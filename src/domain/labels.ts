@@ -14,6 +14,8 @@ export interface PriceRule { pct: number; rounding: Rounding | null }
 export interface LabelCommand {
   /** Artikelnummers, artikelnummers van de leverancier of EAN's die letterlijk zijn genoemd. */
   codes: string[]
+  /** Batches: begin van het artikelnummer leverancier ("batch FU2602" vindt FU26020010, FU26020014, ...). */
+  batches: string[]
   /** Overige zoekwoorden, zoals een categorie of serie ("alle tafels", "serie Lisboa"). */
   query: string
   rule: PriceRule
@@ -28,13 +30,21 @@ const FILLER = new Set([
   'etiket', 'etiketten', 'label', 'labels', 'prijs', 'prijzen', 'prijsetiket', 'prijsetiketten', 'artikel', 'artikelen', 'artikelnummer',
   'artikelnummers', 'verhogen', 'verlagen', 'verhoogd', 'erbij', 'plus', 'min', 'graag', 'aub', 'svp', 'ook', 'nog', 'op', 'serie',
   'categorie', 'uit', 'stuks', 'stuk', 'keer', 'x', 'afronden', 'afgerond', 'rond', 'af', 'korting', 'per', 'in', 'alles',
+  'batch', 'batches', 'partij', 'partijen', 'reeks', 'nummer', 'nr',
+  // Gewone vraagwoorden, zodat "kun je ook alle etiketten van batch FU2602 printen" geen zoekwoorden oplevert
+  'kun', 'kunt', 'kan', 'je', 'jij', 'u', 'bijv', 'bijvoorbeeld', 'als', 'ik', 'dat', 'dit', 'deze', 'die', 'vraag', 'vragen', 'wil', 'wilt',
+  'willen', 'mag', 'zou', 'zouden', 'me', 'mij', 'even', 'hier', 'is', 'zijn', 'er', 'geef', 'klaarzetten', 'zet', 'klaar', 'hoi', 'hallo', 'dank', 'bedankt',
   // Engels
+  'can', 'could', 'would', 'you', 'i', 'if', 'ask', 'want', 'also', 'make', 'number', 'lot',
   'please', 'all', 'the', 'for', 'of', 'and', 'with', 'price', 'prices', 'labels', 'items', 'item', 'round', 'rounded', 'to', 'series', 'category', 'pcs', 'times',
   // Spaans
+  'puedes', 'puede', 'si', 'te', 'pido', 'quiero', 'tambien', 'también', 'por', 'favor', 'lote', 'lotes', 'número', 'numero', 'hola', 'gracias',
   'imprime', 'imprimir', 'todas', 'todos', 'las', 'los', 'el', 'la', 'del', 'para', 'con', 'etiqueta', 'etiquetas', 'precio', 'precios', 'redondear', 'redondeado', 'serie', 'y', 'uds', 'unidades',
 ])
 
 const OWN_NUMBER = /\b[A-Z]{3}-[A-Z]{3}-\d{10}\b/gi
+/** "batch FU2602", "partij FU2602", "lote FU2602", "batch nr. FU2602": het woord na batch is het begin van het artikelnummer leverancier. */
+const BATCH = /\b(?:batch(?:es)?|partij(?:en)?|lotes?|lot)\s*(?:(?:nummer|nr|number|no|número|numero|n[ºo°])\.?\s*)?[:#]?\s*([A-Za-z0-9][A-Za-z0-9-]{1,})/gi
 /** Een code bevat cijfers en is minstens vier tekens: 12345, 4-4071-B, 8712345678906. Geen bedrag of percentage. */
 const looksLikeCode = (w: string) => w.length >= 4 && /\d/.test(w) && /^[A-Za-z0-9][A-Za-z0-9._/-]*[A-Za-z0-9]$/.test(w) && !/^\d+[.,]\d{1,2}$/.test(w)
 
@@ -65,6 +75,10 @@ export function parseLabelCommand(input: string): LabelCommand {
   const q = t.match(/\b(\d{1,3})\s*(?:x|×|stuks|stuk|keer|etiketten|labels|uds|unidades|pcs|times)\b|\b(?:x|×)\s*(\d{1,3})\b/i)
   if (q) { qty = Number(q[1] ?? q[2]); t = t.replace(q[0], ' ') }
 
+  const batches: string[] = []
+  for (const m of t.matchAll(BATCH)) if (/\d/.test(m[1]) || m[1].length >= 3) batches.push(m[1].toUpperCase())
+  t = t.replace(BATCH, (all, code: string) => (/\d/.test(code) || code.length >= 3 ? ' ' : all))
+
   const codes: string[] = []
   for (const m of t.matchAll(OWN_NUMBER)) codes.push(m[0].toUpperCase())
   t = t.replace(OWN_NUMBER, ' ')
@@ -76,7 +90,7 @@ export function parseLabelCommand(input: string): LabelCommand {
     if (looksLikeCode(w)) codes.push(w)
     else if (!FILLER.has(w.toLowerCase()) && !/^\d+$/.test(w)) words.push(w)
   }
-  return { codes: [...new Set(codes)], query: test ? '' : words.join(' '), rule: { pct, rounding }, qty, test }
+  return { codes: [...new Set(codes)], batches: [...new Set(batches)], query: test ? '' : words.join(' '), rule: { pct, rounding }, qty, test }
 }
 
 /** Zoekwoorden in enkelvoud, zodat "tafels" ook "tuintafel" vindt en "stoelen" ook "stoel". */
