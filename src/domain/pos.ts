@@ -75,4 +75,24 @@ export function posShortfalls(s: Snapshot, lines: { product_id: string; qty: num
   return out
 }
 
+/**
+ * Voorraadverschil op een verkooporder (besluit Rick 11 november 2026): wat de klant meeneemt maar volgens het
+ * systeem niet vrij ligt op het gekozen magazijn. Per product en magazijn hoeveel er bijgeboekt moet worden, zodat
+ * de verkoop niet wordt opgehouden zolang de voorraad in Bella Flow nog niet klopt.
+ */
+export function takeNowShortfalls(s: Snapshot, lines: { product_id: string; qty: number; take_now: boolean; warehouse_id: string | null }[]) {
+  const need = new Map<string, number>()
+  for (const l of lines) if (l.take_now && l.warehouse_id && l.product_id) {
+    const k = stockKey(l.product_id, l.warehouse_id)
+    need.set(k, (need.get(k) ?? 0) + l.qty)
+  }
+  const out: { product_id: string; warehouse_id: string; qty: number; free: number }[] = []
+  for (const [k, n] of need) {
+    const [product_id, warehouse_id] = k.split('|')
+    const free = Math.max(0, freeAt(s, product_id, warehouse_id))
+    if (n > free) out.push({ product_id, warehouse_id, qty: n - free, free })
+  }
+  return out
+}
+
 export { stockKey }

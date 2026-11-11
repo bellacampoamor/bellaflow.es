@@ -16,7 +16,7 @@ import { ISSUER_SERIES, issuerOf, tradeName, type Issuer } from './issuers'
 import { goesToShopify, shopifyBacklog, shopifyCompletes, shopifyOrderOf } from './shopify'
 import { creditableAmount, creditableLines, creditSeries, creditSettlement, isCredit } from './credit'
 import { cashCount, closingOn, closingsOf, countedTotal, DENOMINATIONS, denomKey, kassaDay, openingFloat, type CashCounts } from './cashClosing'
-import { DUMMY_SKU, missingCustomerData, POS_CUSTOMER_NOTE, posShortfalls, posTotals, posWarehouse, SIMPLIFIED_LIMIT, type PosLine } from './pos'
+import { DUMMY_SKU, missingCustomerData, POS_CUSTOMER_NOTE, posShortfalls, posTotals, posWarehouse, SIMPLIFIED_LIMIT, takeNowShortfalls, type PosLine } from './pos'
 import { isSendable, PURCHASE_MAIL, purchaseJsonFileName, purchaseOrdersJson, toBase64 } from './purchaseExport'
 import { articleSources, categoryName, priceWithSurcharge, finishArticleSync, missingSupplierCodes, planArticleSync } from './articles'
 import { DETAIL_COLUMNS, SHOWROOM_COLUMNS, showroomDetailFromCsv, showroomItemFromCsv } from './showroom'
@@ -369,7 +369,7 @@ export interface OrderInput {
   deposit?: { amount: number; method: Payment['method']; reference: string }
 }
 
-function validateOrder(s: Snapshot, input: OrderInput, opts: { checkTakeNow: boolean; requireCustomer?: boolean } = { checkTakeNow: true }) {
+function validateOrder(s: Snapshot, input: OrderInput, opts: { checkTakeNow: boolean; requireCustomer?: boolean; allowShortfall?: boolean } = { checkTakeNow: true }) {
   const h = input.header
   if (opts.requireCustomer !== false && !h.customer_id) fail(tx("Kies of maak een klant."))
   if (!h.salesperson_id) fail(tx("Kies een verkoper."))
@@ -383,7 +383,8 @@ function validateOrder(s: Snapshot, input: OrderInput, opts: { checkTakeNow: boo
   if (input.deposit && input.deposit.amount < 0) fail(tx("Een vooruitbetaling kan niet negatief zijn."))
   const total = round2(input.lines.reduce((n, l) => n + lineTotal(l), 0))
   if (input.deposit && input.deposit.amount > total) fail(tx("De vooruitbetaling is hoger dan het totaal van de verkooporder."))
-  if (opts.checkTakeNow) {
+  // Voorraadverschil toegestaan (besluit Rick 11 november 2026): het tekort wordt bijgeboekt in plaats van geweigerd.
+  if (opts.checkTakeNow && !opts.allowShortfall) {
     const need = new Map<string, number>()
     for (const l of input.lines.filter((x) => x.take_now)) {
       const k = stockKey(l.product_id, l.warehouse_id!)
@@ -399,16 +400,18 @@ function validateOrder(s: Snapshot, input: OrderInput, opts: { checkTakeNow: boo
 
 export async function createOrder(db: Driver, raw: OrderInput, opts: NewOrderOptions = {}) {
   const s = await loadSnapshot(db)
-  validateOrder(s, withPlaceholders(raw))
+  validateOrder(s, withPlaceholders(raw), { checkTakeNow: true, allowShortfall: opts.allowShortfall })
   checkInvoiceEmail(opts)
   const input = await resolveArticleLines(db, raw)
   const id = newId()
   const number = await nextDocumentNumber(db, 'VO', 'prefix_sales_order', yearOf(input.header.order_date))
   const allTaken = input.lines.every((l) => l.take_now)
+  const shortfalls = opts.allowShortfall ? await bookShortfalls(db, await loadSnapshot(db), input.lines, number, input.header.order_date) : []
   await db.insert('sales_orders', [{ ...input.header, order_type: allTaken ? 'direct' : 'bestelling', fulfilment: allTaken ? 'meenemen' : input.header.fulfilment, id, number, status: 'open' }])
   const lines = input.lines.map((l) => ({ ...l, id: newId(), sales_order_id: id }))
   await db.insert('sales_order_lines', lines)
   await db.insert('order_events', [event(id, 'aangemaakt', `Verkooporder ${number} aangemaakt.`)])
+  await logShortfalls(db, id, shortfalls)
   await finishNewOrder(db, id, input, lines, opts)
   await syncPurchaseProformas(db)
   await autoMailSalesOrder(db, id, opts.invoiceNow === true && allTaken)
@@ -420,7 +423,31 @@ export async function createOrder(db: Driver, raw: OrderInput, opts: NewOrderOpt
  * invoiceNow: afrekenen aan de kassa (POS). Neemt de klant alles direct mee, dan ontstaat meteen de factuur (datum vandaag)
  * in plaats van alleen een proforma. invoiceEmail: daar gaat de factuur als pdf naartoe; leeg = niet mailen.
  */
-export interface NewOrderOptions { autoDeliverDate?: string; invoiceNow?: boolean; invoiceEmail?: string; invoiceDate?: string; simplified?: boolean; issuer?: Issuer }
+export interface NewOrderOptions {
+  autoDeliverDate?: string; invoiceNow?: boolean; invoiceEmail?: string; invoiceDate?: string; simplified?: boolean; issuer?: Issuer
+  /**
+   * Voorraadverschil toestaan (besluit Rick 11 november 2026): neemt de klant iets mee dat volgens Bella Flow niet vrij
+   * ligt, dan wordt het tekort als correctie op dat magazijn bijgeboekt en gaat de verkoop gewoon door.
+   */
+  allowShortfall?: boolean
+}
+
+/** Boekt het tekort van wat de klant meeneemt bij als correctie (referentie VO-nummer). */
+async function bookShortfalls(db: Driver, s: Snapshot, lines: OrderLineInput[], number: string, date: string) {
+  const list = takeNowShortfalls(s, lines.map((l) => ({ product_id: l.product_id, qty: l.qty, take_now: l.take_now, warehouse_id: l.warehouse_id })))
+  if (list.length) await db.insert('stock_movements', list.map((x) => ({
+    id: newId(), product_id: x.product_id, warehouse_id: x.warehouse_id, qty: x.qty, kind: 'correctie' as const, ref_id: number, moved_at: date,
+    note: `Voorraadverschil bij meegeven: ${x.free} vrij, ${x.free + x.qty} meegegeven`,
+  })))
+  return list
+}
+
+async function logShortfalls(db: Driver, orderId: string, list: { product_id: string; warehouse_id: string; qty: number }[]) {
+  if (!list.length) return
+  const s = await loadSnapshot(db)
+  const text = list.map((x) => `${s.products.find((p) => p.id === x.product_id)?.name ?? ''} +${x.qty} op ${s.warehouses.find((w) => w.id === x.warehouse_id)?.name ?? ''}`).join(', ')
+  await db.insert('order_events', [event(orderId, 'voorraad', `Voorraadverschil bijgeboekt: ${text}.`)])
+}
 
 function checkInvoiceEmail(opts: NewOrderOptions) {
   if (opts.invoiceEmail?.trim() && !isEmail(opts.invoiceEmail)) fail(tx("Vul een geldig e-mailadres in voor de factuur."))
@@ -683,10 +710,11 @@ export async function confirmProforma(db: Driver, id: string, raw: OrderInput, o
   const order = proformaOf(s, id)
   checkInvoiceEmail(opts)
   const free = withoutOwnLines(s, id)
-  validateOrder(free, withPlaceholders(raw))
+  validateOrder(free, withPlaceholders(raw), { checkTakeNow: true, allowShortfall: opts.allowShortfall })
   const input = await resolveArticleLines(db, raw)
   const rows = await replaceLines(db, s, id, splitLinesForStock(await loadSnapshot(db).then((x) => withoutOwnLines(x, id)), input.lines))
   const number = await nextDocumentNumber(db, 'VO', 'prefix_sales_order', yearOf(input.header.order_date))
+  if (opts.allowShortfall) await logShortfalls(db, id, await bookShortfalls(db, await loadSnapshot(db).then((x) => withoutOwnLines(x, id)), rows, number, input.header.order_date))
   const allTaken = rows.every((l) => l.take_now)
   await db.update('sales_orders', id, {
     ...input.header, number, status: 'open', delivery_latitude: null, delivery_longitude: null,

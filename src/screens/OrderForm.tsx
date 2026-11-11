@@ -43,6 +43,7 @@ export function OrderForm({ id }: { id?: string }) {
   const [elementsFor, setElementsFor] = useState<CatalogArticle | null>(null)
   // Catalogusartikelen achter de producten op de regels, voor het artikelnummer van de leverancier en de elementen.
   const [arts, setArts] = useState<Map<string, CatalogArticle>>(new Map())
+  const [allowShort, setAllowShort] = useState(true)
   const today = todayISO()
   const existing = id ? s.sales_orders.find((o) => o.id === id) : undefined
   // Een proforma uit de winkel wordt hier afgerond: klant erbij, afhandeling per regel en eventueel een vooruitbetaling.
@@ -143,7 +144,8 @@ export function OrderForm({ id }: { id?: string }) {
     const missing = firstMissing()
     if (missing) return toast(missing, true)
     const payload = lines.map(({ key: _k, ...l }) => (id ? l : (({ id: _i, ...r }) => r)(l as Line & { id?: string })) as OrderLineInput)
-    const pos = allTaken ? { invoiceNow: true, invoiceEmail: mailTo } : {}
+    // Voorraadverschil (besluit Rick 11 november 2026): standaard wordt het tekort bijgeboekt en gaat de verkoop door.
+    const pos = { ...(allTaken ? { invoiceNow: true, invoiceEmail: mailTo } : {}), allowShortfall: allowShort }
     if (isProforma) {
       const ok = await run((db) => confirmProforma(db, id!, { header: h, lines: payload, deposit: deposit > 0 ? { amount: deposit, method: depositMethod, reference: depositRef } : undefined }, pos), allTaken ? undefined : tx("Proforma bevestigd, de verkooporder heeft nu zijn VO-nummer"))
       if (ok && allTaken) return afterCheckout(id!)
@@ -198,6 +200,8 @@ export function OrderForm({ id }: { id?: string }) {
   }
 
   const allTaken = lines.length > 0 && lines.every((l) => l.take_now)
+  // Wat de klant meeneemt maar volgens Bella Flow niet vrij ligt (een nieuw catalogusartikel heeft nog nooit voorraad).
+  const takenShort = fresh ? lines.filter((l) => l.take_now && (!l.product_id || (!!l.warehouse_id && l.qty > freeFor(l, l.warehouse_id)))) : []
   const someTaken = lines.some((l) => l.take_now)
   const needsAddress = !allTaken && h.fulfilment !== 'meenemen'
   const customer = s.customers.find((c) => c.id === h.customer_id)
@@ -328,6 +332,14 @@ export function OrderForm({ id }: { id?: string }) {
               {lines.length > 0 && <div className="muted small"><span>{tx("Marge excl. IVA")}</span><span>{eur(margin)}</span></div>}
             </div>
           </section>
+          {takenShort.length > 0 && (
+            <section className="panel">
+              <h2>{tx("Voorraadverschil")}</h2>
+              <p className="small muted" style={{ marginTop: 0 }}>{tx("Volgens Bella Flow ligt niet alles vrij wat de klant meeneemt: {0}.", takenShort.map((l) => l.description).join(', '))}</p>
+              <Check label={tx("Voorraadverschil bijboeken en toch meegeven")} checked={allowShort} onChange={setAllowShort} />
+              <p className="small muted" style={{ marginBottom: 0 }}>{allowShort ? tx("Het tekort wordt als correctie op het magazijn bijgeboekt (zie Voorraad, mutaties) en de verkoop gaat door.") : tx("Uit: de verkoop wordt geweigerd tot de voorraad klopt.")}</p>
+            </section>
+          )}
           {fresh && allTaken && (
             <section className="panel">
               <h2><Mail size={16} style={{ verticalAlign: -2, marginRight: 6 }} />{tx("Factuur")}</h2>

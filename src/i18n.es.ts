@@ -1697,4 +1697,9 @@ export const es: Record<string, string> = {
   "De catalogus kon niet worden geladen: {0}": "No se pudo cargar el catálogo: {0}",
   "Catalogus laden...": "Cargando catálogo...",
   "Voor deze leverancier staan nog geen artikelen in de database.": "Aún no hay artículos de este proveedor en la base de datos.",
+  "Voorraadverschil": "Diferencia de stock",
+  "Volgens Bella Flow ligt niet alles vrij wat de klant meeneemt: {0}.": "Según Bella Flow, no todo lo que se lleva el cliente está disponible: {0}.",
+  "Voorraadverschil bijboeken en toch meegeven": "Registrar la diferencia de stock y entregar de todos modos",
+  "Het tekort wordt als correctie op het magazijn bijgeboekt (zie Voorraad, mutaties) en de verkoop gaat door.": "La diferencia se registra como corrección en el almacén (ver Stock, movimientos) y la venta continúa.",
+  "Uit: de verkoop wordt geweigerd tot de voorraad klopt.": "Desactivado: la venta se rechaza hasta que el stock sea correcto.",
 }

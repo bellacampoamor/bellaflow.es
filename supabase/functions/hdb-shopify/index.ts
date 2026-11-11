@@ -103,6 +103,7 @@ async function push(db: SupabaseClient, rowId: string, call: ReturnType<typeof g
     .eq('id', rowId).eq('status', row.status).select('*').maybeSingle()
   if (!claimed) return row
 
+  const notes: string[] = []
   try {
     const sale = await loadSale(db, row.invoice_id)
     let draft: Draft | null = row.shopify_draft_id ? { id: row.shopify_draft_id, name: row.shopify_draft_name, order: row.shopify_order_id ? { id: row.shopify_order_id, name: row.shopify_order_name } : null } : null
@@ -120,15 +121,22 @@ async function push(db: SupabaseClient, rowId: string, call: ReturnType<typeof g
 
     if (row.complete_order && !draft.order) {
       // Omzetten naar een bestelling, als betaald: Shopify geeft het volgende ordernummer. Afhandelen doet HDB zelf.
-      const r = await call<{ draftOrderComplete: { draftOrder: Draft | null; userErrors: { field: string[]; message: string }[] } }>(DRAFT_ORDER_COMPLETE, { id: draft.id })
-      const order = r.draftOrderComplete.draftOrder?.order
-      if (!order) throw new ShopifyError(`Conceptorder ${draft.name} staat in Shopify, maar omzetten naar een bestelling lukte niet: ${userErrorText(r.draftOrderComplete.userErrors)}`)
-      draft.order = order
+      // Lukt omzetten niet (bijv. te weinig voorraad in Shopify), dan blijft de conceptorder staan en zet HDB hem zelf om.
+      // De kassaverkoop wordt nooit opgehouden door een voorraadverschil (besluit Rick 11 november 2026).
+      let reason = ''
+      try {
+        const r = await call<{ draftOrderComplete: { draftOrder: Draft | null; userErrors: { field: string[]; message: string }[] } }>(DRAFT_ORDER_COMPLETE, { id: draft.id })
+        const order = r.draftOrderComplete.draftOrder?.order
+        if (order) draft.order = order
+        else reason = userErrorText(r.draftOrderComplete.userErrors) || 'onbekende reden'
+      } catch (e) { reason = e instanceof Error ? e.message : String(e) }
+      if (reason) notes.push(`Conceptorder ${draft.name} staat in Shopify, maar omzetten naar een bestelling lukte niet (${reason}). Zet hem in Shopify zelf om.`)
     }
     const unlinked = sale.lines.filter((l) => !l.variant_id && l.article_number !== 'DIVERSEN').map((l) => l.article_number)
+    if (unlinked.length) notes.push(`Zonder koppeling aan een Shopify-artikel (los artikel, geen voorraad bijgewerkt): ${unlinked.join(', ')}`)
     const done = {
       status: 'aangemaakt', shopify_order_id: draft.order?.id ?? '', shopify_order_name: draft.order?.name ?? '', sent_at: new Date().toISOString(),
-      error: unlinked.length ? `Zonder koppeling aan een Shopify-artikel (los artikel, geen voorraad bijgewerkt): ${unlinked.join(', ')}` : '',
+      error: notes.join(' '),
     }
     await db.from('hdb_shopify_orders').update(done).eq('id', rowId)
     return { ...row, ...done, shopify_draft_id: draft.id, shopify_draft_name: draft.name }

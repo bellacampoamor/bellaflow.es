@@ -1697,4 +1697,9 @@ export const en: Record<string, string> = {
   "De catalogus kon niet worden geladen: {0}": "The catalogue could not be loaded: {0}",
   "Catalogus laden...": "Loading catalogue...",
   "Voor deze leverancier staan nog geen artikelen in de database.": "There are no items for this supplier in the database yet.",
+  "Voorraadverschil": "Stock discrepancy",
+  "Volgens Bella Flow ligt niet alles vrij wat de klant meeneemt: {0}.": "According to Bella Flow, not everything the customer takes is available: {0}.",
+  "Voorraadverschil bijboeken en toch meegeven": "Book the stock discrepancy and hand over anyway",
+  "Het tekort wordt als correctie op het magazijn bijgeboekt (zie Voorraad, mutaties) en de verkoop gaat door.": "The shortfall is booked as a correction on the warehouse (see Stock, movements) and the sale goes ahead.",
+  "Uit: de verkoop wordt geweigerd tot de voorraad klopt.": "Off: the sale is refused until the stock is correct.",
 }
