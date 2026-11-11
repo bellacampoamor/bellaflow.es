@@ -1,8 +1,8 @@
 import { useLayoutEffect, useRef, useState } from 'react'
 import type { Customer, Invoice, InvoiceLine, Language, Payment } from '../data/types'
 import type { IssuerInfo } from '../domain/issuers'
-import { imageSrc, legalLine } from '../domain/issuers'
-import { receiptLines, receiptPayments, RECEIPT_TEXT } from '../domain/receipt'
+import { imageSrc } from '../domain/issuers'
+import { receiptLegalLine, receiptLines, receiptPayments, RECEIPT_TEXT } from '../domain/receipt'
 import { brandFile, eur, fmtDate } from '../ui/kit'
 
 /**
@@ -10,6 +10,7 @@ import { brandFile, eur, fmtDate } from '../ui/kit'
  * op een thermische bonprinter. Bedrukbare breedte 72 mm, zwart op wit, lengte volgt de inhoud.
  * Bevat wat een factura simplificada moet hebben: nummer en reeks, datum, naam en CIF van het uitgevende bedrijf,
  * omschrijving, IVA-tarief met "IVA incluido" en het totaal; boven € 1.000 ook de klant.
+ * 11 november 2026 (Rick): geen adres van het bedrijf op de bon; omschrijving in het Spaans; artikelnummer op een eigen regel.
  */
 export function ReceiptPaper(p: {
   language: Language; t: Record<string, string>; title: string; inv: Invoice; issuer: IssuerInfo; base: string
@@ -18,7 +19,7 @@ export function ReceiptPaper(p: {
 }) {
   const r = RECEIPT_TEXT[p.language]
   const { t, inv, issuer } = p
-  const rows = receiptLines(p.lines.map((l) => ({ ...l, article_number: l.article_number || p.articleOf(l) })), eur)
+  const rows = receiptLines(p.lines.map((l) => ({ ...l, article_number: l.article_number || p.articleOf(l) })), eur, p.language)
   const payments = receiptPayments(p.pays)
   // Op de thermische printer: 80 mm breed, zonder marge. De lengte van de pagina volgt de bon (gemeten), zodat de
   // printer niet een A4-lengte doorvoert. Op het scherm en op papier is de inhoud even breed (72 mm).
@@ -38,7 +39,7 @@ export function ReceiptPaper(p: {
       <style>{`@media print { @page { size: 80mm ${mm}mm; margin: 0; } }`}</style>
       <div className="receipt-head">
         {issuer.logo ? <img className="receipt-logo" src={imageSrc(issuer.logo, p.base)} alt={issuer.name} /> : <div className="receipt-name">{issuer.name}</div>}
-        <div>{legalLine(issuer)}</div>
+        <div>{receiptLegalLine(issuer)}</div>
         {(issuer.phone || issuer.email) && <div>{[issuer.phone, issuer.email].filter(Boolean).join(' · ')}</div>}
       </div>
       <div className="receipt-rule" />
@@ -56,7 +57,8 @@ export function ReceiptPaper(p: {
       {rows.map((l, n) => (
         <div className="receipt-line" key={n}>
           <div className="receipt-desc">{l.description}</div>
-          <div className="receipt-kv small"><span>{[l.code, l.detail].filter(Boolean).join('  ')}</span><span>{eur(l.total)}</span></div>
+          {l.code && <div className="small">{r.ref} {l.code}</div>}
+          <div className="receipt-kv small"><span>{l.detail}</span><span>{eur(l.total)}</span></div>
         </div>
       ))}
       <div className="receipt-rule" />
