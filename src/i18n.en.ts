@@ -997,7 +997,6 @@ export const en: Record<string, string> = {
   "Geen leverancier bij dit artikel": "No supplier for this item",
   "Toeslag op de prijs van de leverancier voor transport en distributie naar Spanje. In de verkooporder zit de toeslag onzichtbaar in de prijs van een catalogusartikel. Een artikel dat al eens verkocht is, houdt zijn verkoopprijs.": "Surcharge on the supplier's price for transport and distribution to Spain. On a sales order it is included, unseen, in the price of a catalogue item. An item that has been sold before keeps its sales price.",
   "Dit bestand is geen export van de showroom (supplier_showroom_items of supplier_showroom_details).": "This file is not a showroom export (supplier_showroom_items or supplier_showroom_details).",
-  "De showroom van elke leverancier, zoals de leverancier die aanbiedt. Klik op een artikel voor de artikelkaart.": "Each supplier's showroom, as the supplier offers it. Click an item for its item card.",
   "prijs {0}{1}%": "price {0}{1}%",
   "afgerond op ,{0}": "rounded to .{0}",
   "TESTETIKET BELLA FLOW": "BELLA FLOW TEST LABEL",
@@ -1692,4 +1691,10 @@ export const en: Record<string, string> = {
   "In Shopify": "In Shopify",
   "Shopify mislukt": "Shopify failed",
   "Testversie: niet naar Shopify": "Test version: not sent to Shopify",
+  "De catalogus van elke leverancier, zoals de leverancier die aanbiedt. Klik op een artikel voor de artikelkaart.": "Each supplier's catalogue, as the supplier offers it. Click an item for its item card.",
+  "{0} op voorraad": "{0} in stock",
+  "Voorraad leverancier": "Supplier stock",
+  "De catalogus kon niet worden geladen: {0}": "The catalogue could not be loaded: {0}",
+  "Catalogus laden...": "Loading catalogue...",
+  "Voor deze leverancier staan nog geen artikelen in de database.": "There are no items for this supplier in the database yet.",
 }

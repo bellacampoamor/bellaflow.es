@@ -369,3 +369,25 @@ describe('database', () => {
     expect(num.n).toBe(1)
   }, 300000)
 })
+
+describe('Catalogi uit de database (leveranciers met een koppeling, zoals HomeDecoBali)', () => {
+  const art = (i: number, supplier_id: string, name: string, category_code: string, active = true): CatalogArticle => ({
+    id: `c${i}`, article_number: formatArticleNumber('TST', category_code, i), supplier_id, supplier_sku: `T-${i}`, ean: '', name, category_code,
+    series: '', price: 10 + i, currency: 'EUR', image_url: '', source: 'webshop', active, created_at: TODAY,
+  })
+  it('toont alleen actieve artikelen van de gekozen leverancier, op naam, per pagina, met categorieën', () => {
+    const store = new ArticleStore()
+    store.save([
+      art(1, 'hdb', 'Rieten mand 40 cm', 'ACC'), art(2, 'hdb', 'Bamboe lamp', 'VER'), art(3, 'hdb', 'Rieten mand 36 cm', 'ACC'),
+      art(4, 'hdb', 'Pre-order mand', 'ACC', false), art(5, 'hac', 'Rieten stoel', 'STO'),
+    ], [])
+    const page = store.list({ supplierId: 'hdb', offset: 0, limit: 2, withCategories: true })
+    expect(page.total).toBe(3)
+    expect(page.rows.map((r) => r.name)).toEqual(['Bamboe lamp', 'Rieten mand 36 cm'])
+    expect(page.categories).toEqual([{ code: 'ACC', n: 2 }, { code: 'VER', n: 1 }])
+    expect(store.list({ supplierId: 'hdb', offset: 2, limit: 2 }).rows.map((r) => r.name)).toEqual(['Rieten mand 40 cm'])
+    expect(store.list({ supplierId: 'hdb', q: 'rieten 40', offset: 0, limit: 50 }).rows.map((r) => r.supplier_sku)).toEqual(['T-1'])
+    expect(store.list({ supplierId: 'hdb', category: 'VER', offset: 0, limit: 50 }).total).toBe(1)
+    expect(store.list({ supplierId: 'hdb', q: 'stoel', offset: 0, limit: 50 }).total).toBe(0)
+  })
+})

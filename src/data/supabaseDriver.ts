@@ -1,6 +1,6 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import type { Driver } from './driver'
-import type { ArticleHit, ArticleQuery, CatalogArticle, CatalogArticleElement, EmailAttachment, Snapshot, TableName } from './types'
+import type { ArticleHit, ArticleQuery, CatalogArticle, CatalogListItem, CatalogListQuery, CatalogArticleElement, EmailAttachment, Snapshot, TableName } from './types'
 
 const PAGE = 1000
 const ARTICLE_COLUMNS = 'id, article_number, supplier_id, supplier_sku, ean, name, category_code, series, price, currency, image_url, source, active, created_at'
@@ -59,6 +59,36 @@ export class SupabaseDriver implements Driver {
     const { data, error } = await this.sb.rpc('search_catalog_articles', { p_q: q.q, p_suppliers: q.supplierIds ?? null, p_limit: q.limit ?? 30 })
     if (error) throw new Error(error.message)
     return (data ?? []).map(toNumbers) as ArticleHit[]
+  }
+  async listArticles(f: CatalogListQuery) {
+    const words = (f.q ?? '').trim().toLowerCase().split(/\s+/).filter(Boolean)
+    let query = this.sb.from('catalog_articles').select(`${ARTICLE_COLUMNS}, supplier_stock, supplier_stock_at`, { count: 'exact' })
+      .eq('supplier_id', f.supplierId).eq('active', true)
+    // search_text is de kleine-letterversie van nummer, artikelnummer leverancier, EAN, naam en serie (zoals search_catalog_articles)
+    for (const w of words) query = query.like('search_text', `%${w.replace(/[\\%_]/g, '\\$&')}%`)
+    if (f.category) query = query.eq('category_code', f.category)
+    const { data, count, error } = await query.order('name').order('article_number').range(f.offset, f.offset + f.limit - 1)
+    if (error) throw new Error(error.message)
+    const arts = ((data ?? []) as unknown as Record<string, unknown>[]).map(toNumbers) as unknown as Omit<CatalogListItem, 'element_count'>[]
+    const counts = new Map<string, number>()
+    if (arts.length) {
+      const { data: sub, error: e2 } = await this.sb.from('catalog_article_elements').select('parent_id').in('parent_id', arts.map((a) => a.id))
+      if (e2) throw new Error(e2.message)
+      for (const r of (sub ?? []) as { parent_id: string }[]) counts.set(r.parent_id, (counts.get(r.parent_id) ?? 0) + 1)
+    }
+    const rows: CatalogListItem[] = arts.map((a) => ({ ...a, element_count: counts.get(a.id) ?? 0 }))
+    let categories: { code: string; n: number }[] | undefined
+    if (f.withCategories) {
+      const m = new Map<string, number>()
+      for (let from = 0; ; from += PAGE) {
+        const { data: c, error: e3 } = await this.sb.from('catalog_articles').select('category_code').eq('supplier_id', f.supplierId).eq('active', true).order('id').range(from, from + PAGE - 1)
+        if (e3) throw new Error(e3.message)
+        for (const r of (c ?? []) as { category_code: string }[]) if (r.category_code) m.set(r.category_code, (m.get(r.category_code) ?? 0) + 1)
+        if (!c || c.length < PAGE) break
+      }
+      categories = [...m.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([code, n]) => ({ code, n }))
+    }
+    return { rows, total: count ?? rows.length, categories }
   }
   async findArticles(f: { ids?: string[]; numbers?: string[]; supplierId?: string; skus?: string[] }) {
     const out: CatalogArticle[] = []

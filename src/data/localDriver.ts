@@ -1,7 +1,7 @@
 import type { Driver } from './driver'
 import { tx } from '../i18n'
 import { ArticleStore } from '../domain/articles'
-import { TABLES, type ArticleQuery, type CatalogArticle, type CatalogArticleElement, type EmailAttachment, type Snapshot, type TableName } from './types'
+import { TABLES, type ArticleQuery, type CatalogArticle, type CatalogListQuery, type CatalogArticleElement, type EmailAttachment, type Snapshot, type TableName } from './types'
 
 const KEY = 'bella-flow-v1'
 /** Catalogi zijn groot en komen uit de bestanden van de leverancier. Ze blijven in het geheugen en gaan niet in de browseropslag. */
@@ -50,6 +50,7 @@ export class LocalDriver implements Driver {
   }
   clear() { this.data = emptySnapshot(); this.articles = new ArticleStore(); this.save() }
   async searchArticles(q: ArticleQuery) { return this.articles.search(q) }
+  async listArticles(f: CatalogListQuery) { return this.articles.list(f) }
   async findArticles(f: { ids?: string[]; numbers?: string[]; supplierId?: string; skus?: string[] }) { return this.articles.find(f) }
   async articleElements(parentId: string) { return this.articles.elements(parentId) }
   async articleParents(elementId: string) { return this.articles.parentsOf(elementId) }

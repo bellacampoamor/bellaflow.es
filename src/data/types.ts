@@ -100,6 +100,14 @@ export interface CatalogArticle {
 /** Koppeling artikel en element (subartikel), op de eigen id's. */
 export interface CatalogArticleElement { parent_id: string; element_id: string; position: number }
 export interface ArticleHit extends CatalogArticle { element_count: number }
+/** Een regel in de lijst van Catalogi: artikel met de voorraad die de leverancier opgeeft (bij HDB: de voorraad in Magazijn Campoamor). */
+export interface CatalogListItem extends ArticleHit { supplier_stock: number | null; supplier_stock_at: string | null }
+export interface CatalogListQuery {
+  supplierId: string; q?: string; category?: string; offset: number; limit: number
+  /** Ook de categorieën met aantallen (voor het filter); alleen nodig bij de eerste pagina. */
+  withCategories?: boolean
+}
+export interface CatalogListPage { rows: CatalogListItem[]; total: number; categories?: { code: string; n: number }[] }
 export interface ArticleQuery {
   q: string
   /** Alleen deze leveranciers; null of weglaten is alle catalogi. */

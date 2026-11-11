@@ -5,7 +5,7 @@ import { loadSnapshot, newId, type Driver } from '../data/driver'
 import type {
   EmailStatus, Language,
   Delivery, Fulfilment, InboundShipment, InvoiceLine, OrderType, Payment, Product, PurchaseLabel, SalesOrder, Settings,
-  SalesOrderLine, Salesperson, Snapshot, StockMovement, CatalogArticle, Supplier, ArticleQuery, SupplierShowroomDetail, SupplierShowroomItem, TableName,
+  SalesOrderLine, Salesperson, Snapshot, StockMovement, CatalogArticle, CatalogListQuery, Supplier, ArticleQuery, SupplierShowroomDetail, SupplierShowroomItem, TableName,
 } from '../data/types'
 import { parseCsv, sameName } from './catalog'
 import { articleNumberFromScan } from './scan'
@@ -1340,6 +1340,8 @@ export const catalogArticlesByNumber = (db: Driver, numbers: string[]) => (numbe
 export const catalogArticleElements = (db: Driver, parentId: string) => db.articleElements(parentId)
 export const catalogArticleParents = (db: Driver, elementId: string) => db.articleParents(elementId)
 export const catalogArticleCounts = (db: Driver) => db.articleCounts()
+/** Eén pagina artikelen van een leverancier voor Catalogi (leveranciers zonder showroom-export, zoals HA-CO en HomeDecoBali). */
+export const catalogArticlePage = (db: Driver, f: CatalogListQuery) => db.listArticles({ ...f, limit: Math.min(Math.max(f.limit, 1), 200), offset: Math.max(f.offset, 0) })
 
 /**
  * Het product onder Instellingen voor een catalogusartikel. Bestaat het nog niet, dan wordt het aangemaakt met het eigen

@@ -1,7 +1,7 @@
 // Eigen artikelnummers voor alle catalogusartikelen van alle leveranciers, inclusief elementen (subartikelen).
 // Opbouw LLL-CCC-0000000000: afkorting leverancier, afkorting categorie, tiencijferig volgnummer dat uniek is over alle leveranciers.
 // Een toegekend nummer wijzigt nooit. Dit bestand bevat alleen rekenwerk; opslaan loopt via de Driver.
-import type { ArticleHit, ArticleQuery, CatalogArticle, CatalogArticleElement, Snapshot, Supplier } from '../data/types'
+import type { ArticleHit, ArticleQuery, CatalogArticle, CatalogListPage, CatalogListQuery, CatalogArticleElement, Snapshot, Supplier } from '../data/types'
 import { sameName } from './catalog'
 import { showroomCategories, showroomParts } from './showroom'
 
@@ -190,6 +190,13 @@ export function missingSupplierCodes(suppliers: Supplier[], ids: Iterable<string
   return out
 }
 
+/** Categorieën met aantallen, op volgorde van code. */
+export function countCategories(codes: string[]) {
+  const m = new Map<string, number>()
+  for (const c of codes) if (c) m.set(c, (m.get(c) ?? 0) + 1)
+  return [...m.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([code, n]) => ({ code, n }))
+}
+
 // Zoeken in het geheugen (browserversie en tests). De database doet hetzelfde met search_catalog_articles. ---------
 
 const hayOf = (a: CatalogArticle) => `${a.article_number} ${a.supplier_sku} ${a.ean} ${a.name} ${a.series}`.toLowerCase()
@@ -253,6 +260,22 @@ export class ArticleStore {
     }
     return found.sort((x, y) => x.rank - y.rank || x.a.name.localeCompare(y.a.name) || x.a.article_number.localeCompare(y.a.article_number))
       .slice(0, limit).map((x) => this.hit(x.a))
+  }
+  /** De actieve artikelen van één leverancier voor Catalogi: alle woorden moeten voorkomen, gesorteerd op naam. */
+  list(f: CatalogListQuery): CatalogListPage {
+    const words = (f.q ?? '').trim().toLowerCase().split(/\s+/).filter(Boolean)
+    const own: CatalogArticle[] = []
+    const found: CatalogArticle[] = []
+    for (let i = 0; i < this.articles.length; i++) {
+      const a = this.articles[i]
+      if (!a.active || a.supplier_id !== f.supplierId) continue
+      own.push(a)
+      if (f.category && a.category_code !== f.category) continue
+      if (words.every((w) => this.hay[i].includes(w))) found.push(a)
+    }
+    found.sort((x, y) => x.name.localeCompare(y.name) || x.article_number.localeCompare(y.article_number))
+    const rows = found.slice(f.offset, f.offset + f.limit).map((a) => ({ ...this.hit(a), supplier_stock: null, supplier_stock_at: null }))
+    return { rows, total: found.length, categories: f.withCategories ? countCategories(own.map((a) => a.category_code)) : undefined }
   }
   find(f: { ids?: string[]; numbers?: string[]; supplierId?: string; skus?: string[] }) {
     if (f.numbers) { const want = new Set(f.numbers); return this.articles.filter((a) => want.has(a.article_number)).map((a) => structuredClone(a)) }
