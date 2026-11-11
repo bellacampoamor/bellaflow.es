@@ -172,6 +172,7 @@ export function InvoiceDetail({ id, autoPrint = false }: { id: string; autoPrint
       {!inv.simplified && !hasTaxId(nif) && <div className="note warn no-print" style={{ marginBottom: 12 }}>{tx("De QR-code op deze factuur klopt pas als het CIF is ingevuld onder Instellingen.")}</div>}
       {receipt && issuer ? (
         <ReceiptPaper language={language} t={t} title={invoiceTitle(t, inv)} inv={inv} issuer={issuer} base={base} lines={lines} articleOf={(l) => articleOf(l.delivery_line_id)}
+          productOf={(code) => s.products.find((x) => x.sku === code || x.catalog_article_number === code)}
           rates={b.rates} customer={c.notes !== POS_CUSTOMER_NOTE ? c : null} orderNumber={o.number} seller={s.salespeople.find((x) => x.id === o.salesperson_id)?.name ?? ''}
           original={original} pays={pays} balance={balance} credit={credit} />
       ) : (

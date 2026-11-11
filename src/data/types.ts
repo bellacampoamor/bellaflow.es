@@ -57,6 +57,8 @@ export interface Product {
   sale_price: number; vat_rate: number; supplier_id: string | null; min_stock: number; is_active: boolean; volume_m3: number
   /** Eigen artikelnummer van het catalogusartikel waar dit product uit komt. */
   catalog_article_number?: string | null
+  /** Spaanse naam van de leverancier (HomeDecoBali), gevuld door de database (migratie 20261111090000). */
+  name_es?: string | null
 }
 /** Artikel uit de dealershowroom van een leverancier, op variantniveau. Kolommen gelijk aan supplier_showroom_items. */
 export interface SupplierShowroomItem {

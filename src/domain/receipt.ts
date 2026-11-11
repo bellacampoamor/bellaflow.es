@@ -20,22 +20,39 @@ export const RECEIPT_TEXT: Record<Language, Record<string, string>> = {
   en: { vat_incl: 'VAT included', paid_with: 'Paid by', pin: 'Card', contant: 'Cash', overboeking: 'Bank transfer', online: 'Online', verrekening: 'Settled', refunded_with: 'Refunded by', thanks: 'Thank you for your purchase', seller: 'Served by', customer: 'Customer', ref: 'Item no.' },
 }
 
-export interface ReceiptLineIn { article_number?: string | null; description: string; qty: number; unit_price: number; discount_pct: number; vat_rate: number; line_total: number }
+export interface ReceiptLineIn {
+  article_number?: string | null; description: string
+  /** Naam van het product en de Spaanse naam van de leverancier (HDB), als die er is. */
+  product_name?: string | null; name_es?: string | null
+  qty: number; unit_price: number; discount_pct: number; vat_rate: number; line_total: number
+}
 export interface ReceiptLineOut { description: string; code: string; detail: string; total: number; vat_rate: number }
 
 /**
  * Regels op de bon: op 72 mm past geen tabel met zeven kolommen. Per artikel de omschrijving, eronder het
  * artikelnummer en daaronder "aantal x prijs" (met korting) met rechts het regeltotaal.
- * Op een Spaanse bon wordt de omschrijving naar het Spaans vertaald (besluit Rick 11 november 2026, zie spanish.ts).
+ * Op een Spaanse bon komt de omschrijving in het Spaans (besluit Rick 11 november 2026): de Spaanse naam van de
+ * leverancier als die er is (HomeDecoBali), anders vertaald met de woordenlijst (spanish.ts).
  */
 export function receiptLines(lines: ReceiptLineIn[], money: (n: number) => string, language: Language = 'es'): ReceiptLineOut[] {
   return lines.map((l) => ({
-    description: language === 'es' ? spanishDescription(l.description) : l.description,
+    description: language === 'es' ? spanishLine(l.description, l.product_name, l.name_es) : l.description,
     code: l.article_number ?? '',
     detail: `${l.qty} x ${money(l.unit_price)}${l.discount_pct ? ` -${l.discount_pct}%` : ''}`,
     total: l.line_total,
     vat_rate: l.vat_rate,
   }))
+}
+
+/**
+ * Spaanse omschrijving van een regel. Met een Spaanse naam van de leverancier: die naam, plus wat er op de regel
+ * achter de productnaam staat (bijv. gekozen eigenschappen). Zonder: de woordenlijst.
+ */
+export function spanishLine(description: string, productName?: string | null, nameEs?: string | null): string {
+  const es = nameEs?.trim()
+  if (!es) return spanishDescription(description)
+  if (productName && description.startsWith(productName)) return es + description.slice(productName.length)
+  return description === productName || !productName ? es : spanishDescription(description)
 }
 
 /** Kop van de bon: naam en CIF van het uitgevende bedrijf, zonder adres (besluit Rick 11 november 2026). */

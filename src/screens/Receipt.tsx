@@ -1,5 +1,5 @@
 import { useLayoutEffect, useRef, useState } from 'react'
-import type { Customer, Invoice, InvoiceLine, Language, Payment } from '../data/types'
+import type { Customer, Invoice, InvoiceLine, Language, Payment, Product } from '../data/types'
 import type { IssuerInfo } from '../domain/issuers'
 import { imageSrc } from '../domain/issuers'
 import { receiptLegalLine, receiptLines, receiptPayments, RECEIPT_TEXT } from '../domain/receipt'
@@ -10,16 +10,20 @@ import { brandFile, eur, fmtDate } from '../ui/kit'
  * op een thermische bonprinter. Bedrukbare breedte 72 mm, zwart op wit, lengte volgt de inhoud.
  * Bevat wat een factura simplificada moet hebben: nummer en reeks, datum, naam en CIF van het uitgevende bedrijf,
  * omschrijving, IVA-tarief met "IVA incluido" en het totaal; boven € 1.000 ook de klant.
- * 11 november 2026 (Rick): geen adres van het bedrijf op de bon; omschrijving in het Spaans; artikelnummer op een eigen regel.
+ * 11 november 2026 (Rick): geen adres van het bedrijf op de bon; omschrijving in het Spaans (Spaanse naam van HDB, anders de woordenlijst); artikelnummer op een eigen regel.
  */
 export function ReceiptPaper(p: {
   language: Language; t: Record<string, string>; title: string; inv: Invoice; issuer: IssuerInfo; base: string
-  lines: InvoiceLine[]; articleOf: (l: InvoiceLine) => string; rates: { rate: number; vat: number }[]
+  lines: InvoiceLine[]; articleOf: (l: InvoiceLine) => string; productOf: (articleNumber: string) => Product | undefined; rates: { rate: number; vat: number }[]
   customer: Customer | null; orderNumber: string; seller: string; original: Invoice | null; pays: Payment[]; balance: number; credit: boolean
 }) {
   const r = RECEIPT_TEXT[p.language]
   const { t, inv, issuer } = p
-  const rows = receiptLines(p.lines.map((l) => ({ ...l, article_number: l.article_number || p.articleOf(l) })), eur, p.language)
+  const rows = receiptLines(p.lines.map((l) => {
+    const code = l.article_number || p.articleOf(l)
+    const product = code ? p.productOf(code) : undefined
+    return { ...l, article_number: code, product_name: product?.name, name_es: product?.name_es }
+  }), eur, p.language)
   const payments = receiptPayments(p.pays)
   // Op de thermische printer: 80 mm breed, zonder marge. De lengte van de pagina volgt de bon (gemeten), zodat de
   // printer niet een A4-lengte doorvoert. Op het scherm en op papier is de inhoud even breed (72 mm).
