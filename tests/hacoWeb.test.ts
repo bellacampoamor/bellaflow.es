@@ -115,4 +115,28 @@ describe('HA-CO webwinkel in de database', () => {
     expect(base.images).toEqual(['https://shop.test/n1.jpg'])
     expect((await pg.query(`select 1 from catalog_articles where variant_of is not null`)).rows).toEqual([])
   }, 60000)
+
+  it('bundelt artikelen met dezelfde naam vóór " | " tot één serie met uitvoeringen', async () => {
+    const pg = await migrated()
+    for (const [sku, name, docs] of [
+      ['0099011', 'Testbank Rio | 2 zits', []],
+      ['0099012', 'Testbank Rio | Element | Hoek', [{ name: 'hoek.jpg', url: 'https://mos.test/uploads/Product/hoek.jpg' }]],
+      ['0099013', 'Testkast Solo | Wit', []],
+    ] as const) {
+      await pg.query(`insert into supplier_haco_items (supplier_name, supplier_sku, name, categories, price, documents, manufacturer_name, stock_type)
+        values ($1, $2, $3, 'Bankstellen', 100, $4, 'Testfabriek', 'V')`, [HACO, sku, name, JSON.stringify(docs)])
+    }
+    const r = (await pg.query<{ r: Record<string, number> }>('select sync_catalog_articles_haco($1) as r', [HACO])).rows[0].r
+    expect(r).toMatchObject({ series: 1, in_series: 2 })
+    const rows = (await pg.query<{ id: string; supplier_sku: string; name: string; price: string | null; image_url: string; variant_of: string | null }>(
+      'select id, supplier_sku, name, price, image_url, variant_of from catalog_articles order by supplier_sku')).rows
+    const by = Object.fromEntries(rows.map((a) => [a.supplier_sku, a]))
+    // Het serie-artikel: naam vóór " | ", geen prijs, foto van de eerste uitvoering met foto.
+    expect(by['SERIE Testbank Rio']).toMatchObject({ name: 'Testbank Rio', price: null, image_url: 'https://mos.test/uploads/Product/hoek.jpg' })
+    expect(by['0099011'].variant_of).toBe(by['SERIE Testbank Rio'].id)
+    expect(by['0099012'].variant_of).toBe(by['SERIE Testbank Rio'].id)
+    // Eén artikel met een " | " is geen serie.
+    expect(by['0099013'].variant_of).toBeNull()
+    expect(by['SERIE Testkast Solo']).toBeUndefined()
+  }, 60000)
 })
