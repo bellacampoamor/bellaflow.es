@@ -143,12 +143,13 @@ export class SupabaseDriver implements Driver {
     if (error) throw new Error(error.message)
     return this.findArticles({ ids: ((data ?? []) as { parent_id: string }[]).map((r) => r.parent_id) })
   }
+  // Varianten tellen niet apart mee: ze staan bij hun verzamelartikel.
   async articleCounts() {
     const out: { supplier_id: string; n: number }[] = []
     const { data, error } = await this.sb.from('suppliers').select('id')
     if (error) throw new Error(error.message)
     for (const { id } of (data ?? []) as { id: string }[]) {
-      const { count, error: e2 } = await this.sb.from('catalog_articles').select('id', { count: 'exact', head: true }).eq('supplier_id', id).eq('active', true)
+      const { count, error: e2 } = await this.sb.from('catalog_articles').select('id', { count: 'exact', head: true }).eq('supplier_id', id).eq('active', true).is('variant_of', null)
       if (e2) throw new Error(e2.message)
       if (count) out.push({ supplier_id: id, n: count })
     }
