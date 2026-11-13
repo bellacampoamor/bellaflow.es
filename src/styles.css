@@ -924,7 +924,9 @@ tr.close-hist.on td { background: var(--selected); color: var(--on-selected); }
 .receipt-credit { display: flex; justify-content: center; align-items: center; gap: 1.5mm; margin-top: 3mm; font-size: 7pt; }
 .receipt-credit img { height: 3.5mm; width: auto; filter: grayscale(1); }
 @media print {
-  .receipt { width: 72mm; margin: 0 4mm; padding: 2mm 0 8mm; border: 0; border-radius: 0; }
+  /* Gecentreerd op het papier: de zijruimte van .wrap en main valt weg, de bon staat met gelijke marges in het midden. */
+  .receipt { width: 72mm; margin: 0 auto; padding: 2mm 0 8mm; border: 0; border-radius: 0; }
+  body:has(.receipt) :has(.receipt) { padding-left: 0 !important; padding-right: 0 !important; margin-left: 0 !important; margin-right: 0 !important; max-width: none !important; }
 }
 
 /* Factuur op losse A4-bladen (besluit Rick 9 november 2026). Op het scherm en afgedrukt dezelfde maat:
