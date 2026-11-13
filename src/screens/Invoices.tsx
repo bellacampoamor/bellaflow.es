@@ -161,7 +161,7 @@ export function InvoiceDetail({ id, autoPrint = false }: { id: string; autoPrint
   return (
     <>
       <Head title={inv.number} sub={<>{c.company || c.name} <Pill tone={tone}>{tx(label)}</Pill>{issuer?.key === 'hdb' && <> <Pill tone="info">HDB</Pill></>}</>} back={{ href: '#facturatie', label: tx("Facturatie") }}>
-        <a className="btn" href={`#orders-${o.id}`}>{tx("Naar")} {o.number}</a>
+        {!inv.simplified && <a className="btn" href={`#orders-${o.id}`}>{tx("Naar")} {o.number}</a>}
         {canPrint && <button className="btn" onClick={() => window.print()}>{receipt ? tx("Bon afdrukken") : tx("Afdrukken of PDF")}</button>}
         <button className="btn" onClick={() => setMailTo(mail?.to_email || c.email || '')}><Mail size={15} style={{ verticalAlign: -2, marginRight: 4 }} />{mail ? tx("Opnieuw mailen") : tx("Mailen")}</button>
         {!credit && canCredit(s, inv) && <a className="btn" href={`#facturatie-crediteren-${inv.id}`}>{tx("Crediteren of retour")}</a>}
@@ -177,7 +177,7 @@ export function InvoiceDetail({ id, autoPrint = false }: { id: string; autoPrint
       {receipt && issuer ? (
         <ReceiptPaper language={language} t={t} title={invoiceTitle(t, inv)} inv={inv} issuer={issuer} base={base} lines={lines} articleOf={(l) => articleOf(l.delivery_line_id)}
           productOf={(code) => s.products.find((x) => x.sku === code || x.catalog_article_number === code)}
-          rates={b.rates} customer={c.notes !== POS_CUSTOMER_NOTE ? c : null} orderNumber={o.number} seller={s.salespeople.find((x) => x.id === o.salesperson_id)?.name ?? ''}
+          rates={b.rates} customer={c.notes !== POS_CUSTOMER_NOTE ? c : null} seller={s.salespeople.find((x) => x.id === o.salesperson_id)?.name ?? ''}
           original={original} pays={pays} balance={balance} credit={credit} />
       ) : (
       <PagedDoc language={language} cols={7} onReady={() => setSheetsReady(true)}
@@ -206,7 +206,7 @@ export function InvoiceDetail({ id, autoPrint = false }: { id: string; autoPrint
           <div style={{ textAlign: 'right' }}>
             <h1 style={{ fontSize: '1.45rem' }}>{invoiceTitle(t, inv)}</h1>
             <div className="strong">{inv.number}</div>
-            <div className="small muted">{t.date}: {fmtDate(inv.invoice_date)}<br />{!inv.simplified && <>{t.due}: {fmtDate(inv.due_date)}<br /></>}{t.order}: {o.number}{o.customer_reference ? ` (${o.customer_reference})` : ''}</div>
+            <div className="small muted">{t.date}: {fmtDate(inv.invoice_date)}<br />{!inv.simplified && <>{t.due}: {fmtDate(inv.due_date)}<br /></>}{!inv.simplified && <>{t.order}: {o.number}{o.customer_reference ? ` (${o.customer_reference})` : ''}</>}</div>
           </div>
         </div>
         {original && <p className="small" style={{ margin: '0 0 18px' }}><strong>{t.corrects} {original.number}</strong> {t.of_date} {fmtDate(original.invoice_date)}. {t.reason}: {inv.credit_reason}</p>}

@@ -2,7 +2,7 @@ import { useRef, useState, type MouseEvent, type PointerEvent } from 'react'
 import { CalendarClock, Check as CheckIcon, ChevronDown, ChevronUp, ClipboardCheck, FileText, GripVertical, Map as MapIcon, PackageCheck, Route, Smartphone, Truck } from 'lucide-react'
 import { geocodeAddress, travelMatrix, type TravelMatrix } from '../data/geo'
 import type { Delivery, SalesOrder } from '../data/types'
-import { articleNo, deliveryIsOpen, onHandMap, stockKey, todayISO } from '../domain/calc'
+import { articleNo, deliveryIsOpen, onHandMap, posOrderIds, stockKey, todayISO } from '../domain/calc'
 import { googleMapsRouteUrl, MAPS_MAX_WAYPOINTS, optimizeRoute, tourCost, type Point } from '../domain/route'
 import { cancelDelivery, markDeliveriesReady, markDelivered, rescheduleDelivery, saveRouteOrder, setDeliveryInTransit, setOrderCoordinates } from '../domain/services'
 import { go, useApp } from '../ui/app-context'
@@ -35,7 +35,9 @@ export function Deliveries({ focus }: { focus?: string }) {
   const [manual, setManual] = useState<Record<string, string>>({})
   const today = todayISO()
   const planning = s.deliveries.filter(deliveryIsOpen)
-  const done = s.deliveries.filter((d) => d.status === 'delivered' || d.status === 'cancelled').sort((a, b) => (b.delivered_at ?? b.planned_date).localeCompare(a.delivered_at ?? a.planned_date))
+  // Kassaverkopen (meegenomen op de kassabon) staan niet bij de leveringen.
+  const posIds = posOrderIds(s)
+  const done = s.deliveries.filter((d) => (d.status === 'delivered' || d.status === 'cancelled') && !posIds.has(d.sales_order_id)).sort((a, b) => (b.delivered_at ?? b.planned_date).localeCompare(a.delivered_at ?? a.planned_date))
   const days = [...new Set(planning.map((d) => d.planned_date))].sort()
   const hand = onHandMap(s)
   const origin = s.warehouses.find((w) => w.is_route_origin && w.latitude != null && w.longitude != null)

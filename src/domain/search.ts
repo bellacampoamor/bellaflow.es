@@ -2,6 +2,7 @@
 // afleverbonnen en transporten uit de gegevens zelf; artikelen uit de catalogi zoekt de opslag (Driver.searchArticles).
 import type { Snapshot } from '../data/types'
 import { POS_CUSTOMER_NOTE } from './pos'
+import { posOrderIds } from './calc'
 
 export type HitKind = 'verkooporder' | 'inkooporder' | 'klant' | 'factuur' | 'levering' | 'transport' | 'artikel'
 
@@ -64,7 +65,10 @@ export function globalSearch(s: Snapshot, raw: string, perKind = 6): SearchHit[]
     const score = scoreOf(fields, q)
     if (score > 0) hits.push({ kind, id, title, sub, href, score })
   }
+  // Kassaverkopen zijn geen verkooporder en geen levering: ze worden gevonden als factuur (kassabon).
+  const pos = posOrderIds(s)
   for (const o of s.sales_orders) {
+    if (pos.has(o.id)) continue
     const c = customer(o.customer_id)
     add('verkooporder', o.id, o.number, [custName(o.customer_id), o.delivery_city || c?.city, dmy(o.order_date)].filter(Boolean).join(' · '), `orders-${o.id}`,
       [o.number, c?.name, c?.company, o.customer_reference, o.delivery_name, o.delivery_city, c?.phone])
@@ -83,6 +87,7 @@ export function globalSearch(s: Snapshot, raw: string, perKind = 6): SearchHit[]
       [p.number, supplier(p.supplier_id), p.supplier_reference])
   }
   for (const d of s.deliveries) {
+    if (pos.has(d.sales_order_id)) continue
     const o = s.sales_orders.find((x) => x.id === d.sales_order_id)
     add('levering', d.id, d.number, [o?.number, custName(o?.customer_id ?? null), dmy(d.planned_date)].filter(Boolean).join(' · '), `levering-${d.id}`,
       [d.number, d.proforma_number])

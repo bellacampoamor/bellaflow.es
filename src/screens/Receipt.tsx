@@ -14,7 +14,7 @@ import { brandFile, eur, fmtDate } from '../ui/kit'
 export function ReceiptPaper(p: {
   language: Language; t: Record<string, string>; title: string; inv: Invoice; issuer: IssuerInfo; base: string
   lines: InvoiceLine[]; articleOf: (l: InvoiceLine) => string; productOf: (articleNumber: string) => Product | undefined; rates: { rate: number; vat: number }[]
-  customer: Customer | null; orderNumber: string; seller: string; original: Invoice | null; pays: Payment[]; balance: number; credit: boolean
+  customer: Customer | null; seller: string; original: Invoice | null; pays: Payment[]; balance: number; credit: boolean
 }) {
   const r = RECEIPT_TEXT[p.language]
   const { t, inv, issuer } = p
@@ -36,7 +36,6 @@ export function ReceiptPaper(p: {
       <div className="receipt-rule" />
       <div className="receipt-title">{p.title}</div>
       <div className="receipt-kv"><span>{inv.number}</span><span>{fmtDate(inv.invoice_date)}</span></div>
-      <div className="receipt-kv"><span>{t.order}</span><span>{p.orderNumber}</span></div>
       {p.seller && <div className="receipt-kv"><span>{r.seller}</span><span>{p.seller}</span></div>}
       {p.original && <div className="receipt-note">{t.corrects} {p.original.number} {t.of_date} {fmtDate(p.original.invoice_date)}. {t.reason}: {inv.credit_reason}</div>}
       {p.customer && <div className="receipt-note">

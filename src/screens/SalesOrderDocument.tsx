@@ -1,13 +1,21 @@
 import { SALES_ORDER_TEXT } from '../domain/noteText'
 import { tradeName } from '../domain/issuers'
-import { articleNo, depositPaid, documentLanguage, lineTotal, orderLines, orderTotal, vatBreakdown } from '../domain/calc'
+import { articleNo, depositPaid, documentLanguage, posInvoiceOf, lineTotal, orderLines, orderTotal, vatBreakdown } from '../domain/calc'
 import { useApp, useAutoPrint } from '../ui/app-context'
 import { eur, fmtDate, Head, DocPaper } from '../ui/kit'
 import { tx } from '../i18n'
+import { useEffect } from 'react'
 
 
-/** Afdrukbare verkooporder. Dit is geen factuur. */
+/** Afdrukbare verkooporder. Dit is geen factuur. Bij een kassaverkoop is er geen verkooporder: dan de kassabon. */
 export function SalesOrderDocument({ id }: { id: string }) {
+  const { s } = useApp()
+  const inv = posInvoiceOf(s, id)
+  useEffect(() => { if (inv) location.replace(`#facturatie-print-${inv.id}`) }, [inv])
+  return inv ? null : <SalesOrderPaper id={id} />
+}
+
+function SalesOrderPaper({ id }: { id: string }) {
   const { s } = useApp()
   const o = s.sales_orders.find((x) => x.id === id)
   useAutoPrint(true, !!o, 'orders')

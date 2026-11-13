@@ -1,7 +1,7 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { CalendarClock, Copy, FileText, Mail, Pencil, Plus, ReceiptText, Truck, UserPlus } from 'lucide-react'
 import type { Delivery, Payment, SalesOrder } from '../data/types'
-import { articleNo, flowCounts, linePurchaseStatus, linesToPurchase, depositAvailable, depositPaid, invoiceBalance, lineTotal, onHandMap, orderLines, orderOutstanding, orderStage, orderTotal, plannedQty, shippedQty, stockKey, todayISO, uninvoicedDeliveries } from '../domain/calc'
+import { articleNo, flowCounts, linePurchaseStatus, linesToPurchase, depositAvailable, depositPaid, invoiceBalance, lineTotal, onHandMap, orderLines, orderOutstanding, orderStage, orderTotal, plannedQty, posInvoiceOf, posOrderIds, shippedQty, stockKey, todayISO, uninvoicedDeliveries } from '../domain/calc'
 import { addOrderPayment, cancelOrder, createDelivery, defaultMethod, mailSalesOrder, rescheduleOrder, setLineWarehouse } from '../domain/services'
 import { go, useApp } from '../ui/app-context'
 import { Check, Empty, eur, fmtDate, Head, Modal, NumberField, NumInput, Pill, SelectField, Sku, Tabs, TextField, type Tone } from '../ui/kit'
@@ -24,8 +24,9 @@ export function Orders({ tab = 'opvolgen', phase: initialPhase = null }: { tab?:
   const setPhase = (p: PhaseKey | null) => { setPhaseState(p); remember(filter, p) }
   const [q, setQ] = useNavUi('zoek', '')
   const today = todayISO()
-  const rows = useMemo(() => s.sales_orders.map((o) => ({ o, flow: orderFlow(s, o, today), cust: s.customers.find((c) => c.id === o.customer_id) }))
-    .sort((a, b) => followRank(a.flow.follow) - followRank(b.flow.follow) || b.o.order_date.localeCompare(a.o.order_date) || b.o.number.localeCompare(a.o.number)), [s, today])
+  // Een kassaverkoop is alleen een kassabon (Facturatie), geen verkooporder.
+  const rows = useMemo(() => { const pos = posOrderIds(s); return s.sales_orders.filter((o) => !pos.has(o.id)).map((o) => ({ o, flow: orderFlow(s, o, today), cust: s.customers.find((c) => c.id === o.customer_id) }))
+    .sort((a, b) => followRank(a.flow.follow) - followRank(b.flow.follow) || b.o.order_date.localeCompare(a.o.order_date) || b.o.number.localeCompare(a.o.number)) }, [s, today])
   const t = q.trim().toLowerCase()
   const matches = (r: typeof rows[number]) => !t || `${r.o.number} ${r.cust?.name ?? ''} ${r.cust?.company ?? ''} ${r.o.customer_reference}`.toLowerCase().includes(t)
   const inTab = rows.filter((r) => inOrdersTab(filter, r.flow.follow) && matches(r))
@@ -91,7 +92,16 @@ export function Orders({ tab = 'opvolgen', phase: initialPhase = null }: { tab?:
   )
 }
 
+/** Een kassaverkoop heeft geen verkooporder: de link opent de kassabon. */
 export function OrderDetail({ id }: { id: string }) {
+  const { s } = useApp()
+  const inv = posInvoiceOf(s, id)
+  // Een oude link naar het interne record gaat door naar de kassabon onder Facturatie.
+  useEffect(() => { if (inv) location.replace(`#facturatie-${inv.id}`) }, [inv])
+  return inv ? null : <SalesOrderDetail id={id} />
+}
+
+function SalesOrderDetail({ id }: { id: string }) {
   const { s, run, toast } = useApp()
   const o = s.sales_orders.find((x) => x.id === id)
   const [modal, setModal] = useState<'date' | 'plan' | 'pay' | 'cancel' | null>(null)

@@ -101,7 +101,7 @@ export async function invoicePdf(s: Snapshot, invoiceId: string) {
   text(inv.number, right, top - 34, { font: bold, size: 11, right: true })
   text(`${t.date}: ${ymd(inv.invoice_date)}`, right, top - 48, { color: MUTED, right: true })
   if (!inv.simplified && !isCr) text(`${t.due}: ${ymd(inv.due_date)}`, right, top - 60, { color: MUTED, right: true })
-  text(`${t.order}: ${o.number}${o.customer_reference ? ` (${o.customer_reference})` : ''}`, right, top - 72, { color: MUTED, right: true })
+  if (!inv.simplified) text(`${t.order}: ${o.number}${o.customer_reference ? ` (${o.customer_reference})` : ''}`, right, top - 72, { color: MUTED, right: true })
   y = Math.min(leftEnd, top - 80) - 22
 
   // Klant (niet bij een kassaverkoop zonder klantgegevens)

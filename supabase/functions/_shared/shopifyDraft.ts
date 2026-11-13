@@ -99,10 +99,12 @@ export function draftOrderInput(sale: ShopifySale) {
   const pays = sale.payments.filter((p) => p.amount !== 0)
   const methods = [...new Set(pays.map((p) => methodLabel(p.method)))]
   const c = sale.customer
+  const hasOrder = !!sale.order_number && sale.order_number !== sale.invoice_number
   const note = [
     'Kassaverkoop Bella Campoamor (Bella Flow)',
     `Factuur: ${sale.invoice_number} van ${sale.invoice_date.slice(0, 10).split('-').reverse().join('-')}`,
-    `Verkooporder: ${sale.order_number}`,
+    // Kassaverkoop: geen verkooporder (besluit Rick 13 november 2026); oude verkopen hadden er nog een.
+    hasOrder ? `Verkooporder: ${sale.order_number}` : '',
     sale.salesperson ? `Verkoper: ${sale.salesperson}` : '',
     pays.length ? `Betaald: ${pays.map((p) => `${methodLabel(p.method)} ${eur(p.amount)}`).join(', ')}` : '',
     `Totaal: ${eur(sale.total)}`,
@@ -111,7 +113,7 @@ export function draftOrderInput(sale: ShopifySale) {
 
   const customAttributes = [
     { key: 'Factuur', value: sale.invoice_number },
-    { key: 'Verkooporder', value: sale.order_number },
+    ...(hasOrder ? [{ key: 'Verkooporder', value: sale.order_number }] : []),
     ...(sale.salesperson ? [{ key: 'Verkoper', value: sale.salesperson }] : []),
     ...(methods.length ? [{ key: 'Betaalwijze', value: methods.join(', ') }] : []),
   ]

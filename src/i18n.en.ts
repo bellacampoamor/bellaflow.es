@@ -1417,7 +1417,7 @@ export const en: Record<string, string> = {
   "Artikel met eigen omschrijving, artikelnummer {0}": "Item with your own description, item number {0}",
   "Diversen": "Miscellaneous",
   "Afgerekend: factuur {0}": "Paid: invoice {0}",
-  "Verkooporder {0}, afgeleverd en betaald.": "Sales order {0}, delivered and paid.",
+  "Afgeleverd en betaald.": "Delivered and paid.",
   "Wisselgeld": "Change",
   "Voorraadverschil bijgeboekt voor {0} artikel(en); zie Voorraad, mutaties.": "Stock difference booked for {0} item(s); see Stock, movements.",
   "Factuur afdrukken": "Print invoice",

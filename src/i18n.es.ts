@@ -1417,7 +1417,7 @@ export const es: Record<string, string> = {
   "Artikel met eigen omschrijving, artikelnummer {0}": "Artículo con descripción propia, referencia {0}",
   "Diversen": "Varios",
   "Afgerekend: factuur {0}": "Cobrado: factura {0}",
-  "Verkooporder {0}, afgeleverd en betaald.": "Pedido de venta {0}, entregado y pagado.",
+  "Afgeleverd en betaald.": "Entregado y pagado.",
   "Wisselgeld": "Cambio",
   "Voorraadverschil bijgeboekt voor {0} artikel(en); zie Voorraad, mutaties.": "Diferencia de stock registrada para {0} artículo(s); ver Stock, movimientos.",
   "Factuur afdrukken": "Imprimir factura",

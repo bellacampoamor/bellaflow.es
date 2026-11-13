@@ -36,7 +36,7 @@ const checkout = (lines: PosLine[], extra: Partial<Parameters<typeof posCheckout
   posCheckout(db, { salesperson_id: seller, customer_id: null, date: TODAY, lines, payment: { method: 'pin', reference: '' }, ...extra })
 
 describe('Kassa (POS)', () => {
-  it('maakt verkooporder, factuur van vandaag en betaling in één keer', async () => {
+  it('maakt kassabon (eenvoudige factuur) van vandaag, aflevering en betaling in één keer', async () => {
     const pid = await productForArticle(db, table)
     await db.insert('stock_movements', [{ id: newId(), product_id: pid, warehouse_id: shopId, qty: 2, kind: 'correctie', ref_id: '', note: 'test', moved_at: TODAY }])
     const r = await checkout([line({ qty: 2 })])

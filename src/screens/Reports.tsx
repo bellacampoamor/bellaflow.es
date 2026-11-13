@@ -79,13 +79,13 @@ export function InvoiceList({ kassa = false }: { kassa?: boolean }) {
     <>
       {report.rows.length === 0 && <Empty>{t.empty}</Empty>}
       {report.rows.length > 0 && <div className={paper ? 'table-wrap flush' : 'table-wrap'}><table className={paper ? 'report-table report-doc' : 'report-table'}>
-        <thead><tr><th>{t.number}</th><th>{t.date}</th><th>{t.order}</th><th>{t.customer}</th>{kassa && <th>{t.method}</th>}{shopify && !paper && <th>Shopify</th>}<th className="num">{t.base}</th><th className="num">{t.vat}</th><th className="num">{t.total}</th></tr></thead>
+        <thead><tr><th>{t.number}</th><th>{t.date}</th>{!kassa && <th>{t.order}</th>}<th>{t.customer}</th>{kassa && <th>{t.method}</th>}{shopify && !paper && <th>Shopify</th>}<th className="num">{t.base}</th><th className="num">{t.vat}</th><th className="num">{t.total}</th></tr></thead>
         <tbody>
           {report.rows.map(({ invoice: i, order, customer }) => (
           <tr key={i.id}>
             <td>{paper ? i.number : <a className="rowlink" href={`#facturatie-${i.id}`}>{i.number}</a>}</td>
             <td>{fmtDate(i.invoice_date)}</td>
-            <td>{order?.number}</td>
+            {!kassa && <td>{order?.number}</td>}
             <td className="report-customer">{kassa && isPosCustomer(i.customer_id) ? t.noCustomer : customer}</td>
             {kassa && <td>{methodOf(i.id).map((m) => t.methods[m] ?? m).join(', ')}</td>}
             {shopify && !paper && <td>{goesToShopify(i) && <ShopifyStatus invoiceId={i.id} compact />}</td>}
@@ -95,7 +95,7 @@ export function InvoiceList({ kassa = false }: { kassa?: boolean }) {
           </tr>
           ))}
           <tr className="report-total">
-            <td colSpan={(kassa ? 5 : 4) + (shopify && !paper ? 1 : 0)}>{t.sum(report.rows.length)}</td>
+            <td colSpan={4 + (shopify && !paper ? 1 : 0)}>{t.sum(report.rows.length)}</td>
             <td className="num">{eur(report.base)}</td>
             <td className="num">{eur(report.vat)}</td>
             <td className="num">{eur(report.total)}</td>

@@ -404,13 +404,14 @@ export async function createOrder(db: Driver, raw: OrderInput, opts: NewOrderOpt
   checkInvoiceEmail(opts)
   const input = await resolveArticleLines(db, raw)
   const id = newId()
-  const number = await nextDocumentNumber(db, 'VO', 'prefix_sales_order', yearOf(input.header.order_date))
+  // Kassaverkoop: geen verkooporder en geen VO-nummer. Het record krijgt straks het nummer van de kassabon.
+  const number = opts.simplified ? posTempNumber(id) : await nextDocumentNumber(db, 'VO', 'prefix_sales_order', yearOf(input.header.order_date))
   const allTaken = input.lines.every((l) => l.take_now)
   const shortfalls = opts.allowShortfall ? await bookShortfalls(db, await loadSnapshot(db), input.lines, number, input.header.order_date) : []
   await db.insert('sales_orders', [{ ...input.header, order_type: allTaken ? 'direct' : 'bestelling', fulfilment: allTaken ? 'meenemen' : input.header.fulfilment, id, number, status: 'open' }])
   const lines = input.lines.map((l) => ({ ...l, id: newId(), sales_order_id: id }))
   await db.insert('sales_order_lines', lines)
-  await db.insert('order_events', [event(id, 'aangemaakt', `Verkooporder ${number} aangemaakt.`)])
+  await db.insert('order_events', [event(id, 'aangemaakt', opts.simplified ? 'Kassaverkoop aangemaakt.' : `Verkooporder ${number} aangemaakt.`)])
   await logShortfalls(db, id, shortfalls)
   await finishNewOrder(db, id, input, lines, opts)
   await syncPurchaseProformas(db)
@@ -462,11 +463,13 @@ async function finishNewOrder(db: Driver, id: string, input: OrderInput, lines: 
   const taken = lines.filter((l) => l.take_now)
   if (taken.length) {
     const date = opts.autoDeliverDate ?? input.header.order_date
-    const did = await createDelivery(db, { sales_order_id: id, method: 'meenemen', planned_date: date, carrier: '', notes: '', lines: taken.map((l) => ({ sales_order_line_id: l.id, qty: l.qty })) })
-    await markDelivered(db, did, { date, signed_by: input.header.delivery_name || '' })
+    const pos = !!opts.simplified
+    const did = await createDelivery(db, { sales_order_id: id, method: 'meenemen', planned_date: date, carrier: '', notes: '', lines: taken.map((l) => ({ sales_order_line_id: l.id, qty: l.qty })), number: pos ? posTempNumber(id) : undefined })
+    await markDelivered(db, did, { date, signed_by: input.header.delivery_name || '', proforma_number: pos ? posTempNumber(id) : undefined })
     // Afrekenen aan de kassa: alles gaat mee, dus meteen factureren en eventueel mailen.
     if (opts.invoiceNow && taken.length === lines.length) {
       const [invoiceId] = await invoiceProformas(db, { delivery_ids: [did], invoice_date: opts.invoiceDate ?? todayISO(), simplified: opts.simplified, issuer: opts.issuer })
+      if (pos) await renumberPosSale(db, id, did, invoiceId)
       const to = opts.invoiceEmail?.trim() ?? ''
       // Mailen per document onder Instellingen: staat het uit, dan gaat de factuur niet automatisch de deur uit.
       const co = (await db.list('settings'))[0]
@@ -478,6 +481,25 @@ async function finishNewOrder(db: Driver, id: string, input: OrderInput, lines: 
         await mailInvoice(db, invoiceId, to)
       }
     }
+  }
+}
+
+/** Tijdelijk intern nummer van een kassaverkoop, tot de kassabon zijn nummer heeft. Verbruikt geen VO-, LV- of PF-nummer. */
+const posTempNumber = (orderId: string) => `KASSA-${orderId}`
+
+/**
+ * Besluit Rick 13 november 2026: een kassabon (factura simplificada) is niet meer dan dat, met de eigen reeks uit
+ * Instellingen (FS-BELLA, FS-HDB). Het interne record van de verkoop en de aflevering dragen het nummer van de bon.
+ */
+async function renumberPosSale(db: Driver, orderId: string, deliveryId: string, invoiceId: string) {
+  const inv = (await db.list('invoices')).find((i) => i.id === invoiceId)
+  if (!inv) return
+  const temp = posTempNumber(orderId)
+  await db.update('sales_orders', orderId, { number: inv.number })
+  await db.update('deliveries', deliveryId, { number: inv.number, proforma_number: inv.number })
+  for (const m of (await db.list('stock_movements')).filter((x) => x.ref_id === temp)) await db.update('stock_movements', m.id, { ref_id: inv.number })
+  for (const e of (await db.list('order_events')).filter((x) => x.sales_order_id === orderId && x.message.includes(temp))) {
+    await db.update('order_events', e.id, { message: e.message.split(temp).join(inv.number) })
   }
 }
 
@@ -520,7 +542,7 @@ export async function ensurePosCustomer(db: Driver) {
   return id
 }
 
-/** Afrekenen aan de kassa: verkooporder, direct afgeleverd, factuur van vandaag en de betaling erop. Geeft verkooporder en factuur terug. */
+/** Afrekenen aan de kassa: kassabon (eenvoudige factuur) van vandaag, direct afgeleverd en betaald. Geen verkooporder. */
 export async function posCheckout(db: Driver, input: PosInput) {
   if (!input.salesperson_id) fail(tx("Kies eerst de medewerker."))
   if (!input.lines.length) fail(tx("Scan of voeg minimaal één artikel toe."))
@@ -812,7 +834,7 @@ export interface DeliveryInput {
   lines: { sales_order_line_id: string; qty: number }[]
 }
 
-export async function createDelivery(db: Driver, input: DeliveryInput) {
+export async function createDelivery(db: Driver, input: DeliveryInput & { number?: string }) {
   const s = await loadSnapshot(db)
   const rows = input.lines.filter((l) => l.qty > 0)
   if (!rows.length) fail(tx("Vul bij minimaal één regel een aantal in."))
@@ -826,7 +848,7 @@ export async function createDelivery(db: Driver, input: DeliveryInput) {
   })
   const id = newId()
   const sequence = s.deliveries.filter((d) => d.sales_order_id === input.sales_order_id).length + 1
-  const number = await nextDocumentNumber(db, 'LV', 'prefix_delivery', yearOf(input.planned_date))
+  const number = input.number ?? await nextDocumentNumber(db, 'LV', 'prefix_delivery', yearOf(input.planned_date))
   await db.insert('deliveries', [{ id, number, sales_order_id: input.sales_order_id, sequence, method: input.method, planned_date: input.planned_date, carrier: input.carrier, status: 'planned', proforma_number: null, signature_data: null, signed_at: null, delivered_at: null, signed_by: '', notes: input.notes, ready_at: null, approved_by: '', note_printed_at: null, signed_note_received: false, route_position: null }])
   await db.insert('delivery_lines', lines.map((l) => ({ ...l, delivery_id: id })))
   return id
@@ -909,7 +931,7 @@ export async function cancelDelivery(db: Driver, id: string) {
   await db.insert('order_events', [event(d.sales_order_id, 'levering', `${d.number} geannuleerd. De artikelen kunnen opnieuw worden gepland.`)])
 }
 
-export async function markDelivered(db: Driver, id: string, input: { date: string; signed_by: string; signed_note_received?: boolean }) {
+export async function markDelivered(db: Driver, id: string, input: { date: string; signed_by: string; signed_note_received?: boolean; proforma_number?: string }) {
   const s = await loadSnapshot(db)
   const d = s.deliveries.find((x) => x.id === id) ?? (fail(tx("Levering niet gevonden.")) as never)
   if (d.status === 'delivered') fail(tx("Deze levering is al afgerond."))
@@ -924,7 +946,7 @@ export async function markDelivered(db: Driver, id: string, input: { date: strin
     id: newId(), product_id: productOf(l.sales_order_line_id).product_id, warehouse_id: l.warehouse_id, qty: -l.qty,
     kind: 'levering' as const, ref_id: d.number, note: '', moved_at: input.date,
   })))
-  await db.update('deliveries', id, { status: 'delivered', delivered_at: input.date, signed_by: input.signed_by, signed_note_received: input.signed_note_received ?? false, proforma_number: await nextDocumentNumber(db, 'PF', 'prefix_proforma', yearOf(input.date)) })
+  await db.update('deliveries', id, { status: 'delivered', delivered_at: input.date, signed_by: input.signed_by, signed_note_received: input.signed_note_received ?? false, proforma_number: input.proforma_number ?? await nextDocumentNumber(db, 'PF', 'prefix_proforma', yearOf(input.date)) })
   await db.insert('order_events', [event(d.sales_order_id, 'levering', `${d.number} geleverd.`)])
 }
 

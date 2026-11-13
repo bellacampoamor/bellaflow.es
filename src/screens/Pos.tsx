@@ -254,7 +254,7 @@ export function Pos() {
               <div className="pos-done-icon"><CheckIcon size={28} /></div>
               <div style={{ flex: 1 }}>
                 <h2 style={{ margin: 0 }}>{tx("Afgerekend: factura simplificada {0}", done.invoiceNumber)}</h2>
-                <div className="small muted">{tx("Factuur van {0}.", done.issuer)} {tx("Verkooporder {0}, afgeleverd en betaald.", done.orderNumber)} {done.note}</div>
+                <div className="small muted">{tx("Factuur van {0}.", done.issuer)} {tx("Afgeleverd en betaald.")} {done.note}</div>
                 {done.shop && <div className={done.shopBad ? 'small warn-text' : 'small muted'}>{done.shopBad && <AlertTriangle size={13} />} {done.shop}</div>}
                 {done.change > 0 && <div className="pos-change">{tx("Wisselgeld")}: {eur(done.change)}</div>}
                 {done.corrected > 0 && <div className="small warn-text"><AlertTriangle size={13} /> {tx("Voorraadverschil bijgeboekt voor {0} artikel(en); zie Voorraad, mutaties.", done.corrected)}</div>}

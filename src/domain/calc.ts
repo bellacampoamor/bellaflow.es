@@ -388,3 +388,11 @@ export const visibleToDriver = (d: Delivery) => d.method === 'eigen_team' && (d.
 export const driverStops = (s: Snapshot, day: string) => s.deliveries
   .filter((d) => d.planned_date === day && visibleToDriver(d))
   .sort((a, b) => (a.route_position ?? 999) - (b.route_position ?? 999) || a.number.localeCompare(b.number))
+
+/** De eenvoudige factuur (kassabon) van een kassaverkoop, of undefined bij een gewone verkooporder. */
+/** Kassaverkopen: intern record zonder verkooporder voor de gebruiker (besluit Rick 13 november 2026). */
+export const posOrderIds = (s: Pick<Snapshot, 'invoices'>) =>
+  new Set(s.invoices.filter((i) => i.simplified && i.kind !== 'creditfactuur').map((i) => i.sales_order_id))
+
+export const posInvoiceOf = (s: Pick<Snapshot, 'invoices'>, orderId: string): Invoice | undefined =>
+  s.invoices.find((i) => i.sales_order_id === orderId && i.simplified && i.kind !== 'creditfactuur')
