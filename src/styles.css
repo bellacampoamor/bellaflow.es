@@ -909,7 +909,7 @@ tr.close-hist.on td { background: var(--selected); color: var(--on-selected); }
 .receipt .small { font-size: 8pt; }
 .receipt .strong, .receipt strong { font-weight: 700; }
 .receipt-head { text-align: center; font-size: 8pt; display: grid; gap: 1mm; }
-.receipt-logo { display: block; margin: 0 auto 1mm; max-width: 52mm; max-height: 22mm; object-fit: contain; filter: grayscale(1) brightness(1.5) contrast(8); }
+.receipt-logo { display: block; margin: 0 auto 1mm; max-width: 52mm; max-height: 22mm; object-fit: contain; filter: grayscale(1) brightness(.7) contrast(3); }
 .receipt-name { font-size: 12pt; font-weight: 700; }
 .receipt-title { text-align: center; font-weight: 700; font-size: 11pt; text-transform: uppercase; letter-spacing: .03em; margin-bottom: 1.5mm; }
 .receipt-rule { border-top: 1px dashed #000; margin: 2.5mm 0; }
@@ -922,7 +922,8 @@ tr.close-hist.on td { background: var(--selected); color: var(--on-selected); }
 .receipt-total { font-size: 13pt; font-weight: 700; margin-top: 1mm; }
 .receipt-center { text-align: center; margin-top: 1mm; }
 .receipt-credit { display: flex; justify-content: center; align-items: center; gap: 1.5mm; margin-top: 3mm; font-size: 7pt; }
-.receipt-credit img { height: 3.5mm; width: auto; filter: grayscale(1); }
+.receipt-credit img { height: 3.5mm; width: auto; filter: grayscale(1) brightness(.7) contrast(3); }
+/* Logo en beeldmerk: grijze lijnen worden zwart, wit blijft wit. Een thermische printer laat lichtgrijs anders weg. */
 @media print {
   /* Gecentreerd op het papier: de zijruimte van .wrap en main valt weg, de bon staat met gelijke marges in het midden. */
   .receipt { width: 72mm; margin: 0 auto; padding: 2mm 0 8mm; border: 0; border-radius: 0; }
