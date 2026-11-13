@@ -65,8 +65,8 @@ export async function saveSettings(db: Driver, patch: Partial<Settings>) {
     if (v !== undefined && !(v.length <= 12 && /^[A-Za-z0-9]+(-[A-Za-z0-9]+)*$/.test(v))) fail(tx("Een voorvoegsel bestaat uit maximaal 12 letters of cijfers, zonder spaties; een streepje mag ertussen (zoals FS-BELLA)."))
   }
   if (patch.shop_email && !isEmail(patch.shop_email)) fail(tx("Vul een geldig winkel e-mailadres in."))
-  // Het boekjaar wijzigt alleen via de jaarafsluiting, nooit via Opslaan.
-  const { fiscal_year: _fy, ...rest } = patch
+  // Het boekjaar wijzigt alleen via de jaarafsluiting, live en testperiode alleen via hun eigen knoppen; nooit via Opslaan.
+  const { fiscal_year: _fy, live_since: _ls, test_wiped_at: _wa, test_wiped_by: _wb, ...rest } = patch
   await db.update('settings', 'default', rest)
 }
 
@@ -1632,4 +1632,23 @@ export async function rollbackYearClosing(db: Driver, input: { id: string; by: s
   if (blocker) fail(blocker)
   await db.update('year_closings', closing.id, { rolled_back_at: new Date().toISOString(), rolled_back_by: input.by.trim() })
   await db.update('settings', co.id, { fiscal_year: closing.year })
+}
+
+// Testperiode -----------------------------------------------------------------------
+// Opdracht Rick 13 november 2026: tot Bella Flow echt live gaat in de winkel (eerst de kassa) moet alles wat tijdens het
+// testen ontstond een paar keer gewist kunnen worden, zodat de nummering weer bij 0001 begint. Live zetten sluit dat af.
+
+export async function wipeTestData(db: Driver, input: { confirm: string; by: string; customers: boolean }) {
+  const co = (await db.list('settings'))[0] ?? (fail(tx("Instellingen niet gevonden.")) as never)
+  if (co.live_since) fail(tx("Bella Flow is live: testgegevens wissen kan niet meer."))
+  if (input.confirm.trim().toUpperCase() !== 'WISSEN') fail(tx("Typ WISSEN om te bevestigen."))
+  if (!input.by.trim()) fail(tx("Vul in wie de testgegevens wist."))
+  return db.wipeTestData(input.by.trim(), input.customers)
+}
+
+export async function goLive(db: Driver, input: { confirm: string; date: string }) {
+  const co = (await db.list('settings'))[0] ?? (fail(tx("Instellingen niet gevonden.")) as never)
+  if (co.live_since) fail(tx("Bella Flow is al live sinds {0}.", co.live_since))
+  if (input.confirm.trim().toUpperCase() !== 'LIVE') fail(tx("Typ LIVE om te bevestigen."))
+  await db.update('settings', co.id, { live_since: input.date })
 }

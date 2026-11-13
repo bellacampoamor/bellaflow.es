@@ -60,6 +60,23 @@ export class LocalDriver implements Driver {
   async articleIndex() { return { articles: structuredClone(this.articles.articles), links: structuredClone(this.articles.links) } }
   async saveArticles(articles: CatalogArticle[], links: CatalogArticleElement[]) { this.articles.save(articles, links) }
   async reserveArticleNumbers(count: number) { return this.articles.reserve(count) }
+  async wipeTestData(by: string, customers: boolean) {
+    this.sync()
+    if (this.data.settings.some((s) => s.live_since)) throw new Error(tx("Bella Flow is live: testgegevens wissen kan niet meer."))
+    const out: Record<string, number> = {}
+    const count: [TableName, string][] = [['hdb_shopify_orders', 'shopify'], ['email_outbox', 'mails'], ['payments', 'betalingen'], ['invoices', 'facturen'], ['deliveries', 'leveringen'], ['goods_receipts', 'ontvangsten'], ['purchase_orders', 'inkooporders'], ['transports', 'transporten'], ['sales_orders', 'verkooporders'], ['cash_closings', 'dagafsluitingen'], ['stock_movements', 'mutaties'], ['products', 'producten']]
+    for (const [t, k] of count) out[k] = this.data[t].length
+    const wipe: TableName[] = ['hdb_shopify_orders', 'email_outbox', 'payments', 'invoice_lines', 'invoices', 'delivery_lines', 'deliveries', 'goods_receipt_lines', 'goods_receipts', 'inbound_shipment_lines', 'inbound_shipments', 'purchase_order_dispatches', 'purchase_order_lines', 'purchase_orders', 'transports', 'sales_order_lines', 'order_events', 'sales_orders', 'cash_closings', 'stock_movements', 'products', 'year_closings', 'number_series']
+    for (const t of wipe) this.data[t] = [] as never
+    if (customers) {
+      const keep = this.data.customers.filter((c) => c.notes === 'Vaste klant voor kassaverkopen zonder klantgegevens (Bella Flow).')
+      out.klanten = this.data.customers.length - keep.length
+      this.data.customers = keep
+    }
+    for (const s of this.data.settings) Object.assign(s, { fiscal_year: new Date().getFullYear(), test_wiped_at: new Date().toISOString(), test_wiped_by: by })
+    this.save()
+    return out
+  }
   async list<T extends TableName>(table: T) {
     this.sync();
     return structuredClone(this.data[table]) as Snapshot[T]

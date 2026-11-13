@@ -10,6 +10,7 @@ import { AreaField, BackToTop, Check, Empty, eur, Head, Modal, NumberField, Page
 import { CustomerFields } from './OrderForm'
 import { tx } from '../i18n'
 import { YearClosingPanel } from './YearClosingPanel'
+import { TestPeriodPanel } from './TestPeriodPanel'
 import { isSpanishSupplier, todayISO } from '../domain/calc'
 import { openYear } from '../domain/yearClosing'
 import { ROLE_LABEL, roleOf, STAFF_ROLES } from '../domain/staff'
@@ -181,6 +182,7 @@ export function Admin({ param = '' }: { param?: string }) {
           ))}
         </div>
         </section>
+        <TestPeriodPanel />
         <YearClosingPanel />
         <div className="sticky-save"><button className="btn primary" onClick={() => { const { id: _i, ...patch } = co; run((db) => saveSettings(db, patch), tx("Bedrijfsgegevens opgeslagen")) }}>{tx("Opslaan")}</button></div>
       </div>}

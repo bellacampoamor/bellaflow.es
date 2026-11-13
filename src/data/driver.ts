@@ -42,6 +42,11 @@ export interface Driver {
   saveArticles(articles: CatalogArticle[], links: CatalogArticleElement[]): Promise<void>
   /** Reserveert een blok volgnummers en geeft het eerste. */
   reserveArticleNumbers(count: number): Promise<number>
+  /**
+   * Testperiode: wist alle documenten en bewegingen (verkoop, kassa, inkoop, transport, ontvangst, betalingen, voorraad,
+   * dagafsluitingen, producten, tellers) en optioneel de klanten. Geeft per soort het aantal gewiste rijen.
+   */
+  wipeTestData(by: string, customers: boolean): Promise<Record<string, number>>
 }
 
 export async function loadSnapshot(db: Driver): Promise<Snapshot> {

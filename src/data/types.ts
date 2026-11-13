@@ -4,6 +4,10 @@ export interface Settings {
   id: string; company_name: string; tax_id: string; address: string; postal_code: string; city: string
   /** Open boekjaar (jaarafsluiting, besluit Rick 13 november 2026): het jaar in elk nieuw documentnummer. Leeg = jaar van de datum. */
   fiscal_year?: number | null
+  /** Testperiode (13 november 2026): leeg = nog niet live; testgegevens wissen kan dan. Datum = live sinds. */
+  live_since?: string | null
+  /** Laatste keer testgegevens gewist, en door wie. */
+  test_wiped_at?: string | null; test_wiped_by?: string
   province: string; phone: string; email: string; iban: string
   /** Handelsnaam (besluit Rick 10 november 2026): de naam op documenten en in klantmails. company_name is de juridische naam (razón social), voor de juridische regel en het CIF. Leeg = de juridische naam. */
   trade_name?: string

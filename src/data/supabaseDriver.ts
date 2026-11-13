@@ -1,4 +1,5 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
+import { tx } from '../i18n'
 import type { Driver } from './driver'
 import type { ArticleHit, ArticleQuery, CatalogArticle, CatalogListItem, CatalogListQuery, CatalogArticleElement, EmailAttachment, Snapshot, TableName } from './types'
 
@@ -181,6 +182,11 @@ export class SupabaseDriver implements Driver {
       const { error } = await this.sb.from('catalog_article_elements').upsert(links.slice(i, i + 1000) as never, { onConflict: 'parent_id,element_id', ignoreDuplicates: true })
       if (error) throw new Error(error.message)
     }
+  }
+  async wipeTestData(by: string, customers: boolean) {
+    const { data, error } = await this.sb.rpc('wipe_test_data', { p_by: by, p_customers: customers })
+    if (error) throw new Error(/wipe_test_data/.test(error.message) ? tx("Voer eerst de migratie voor de testperiode uit (20261113120000_testperiode.sql).") : error.message)
+    return (data ?? {}) as Record<string, number>
   }
   async reserveArticleNumbers(count: number) {
     const { data, error } = await this.sb.rpc('reserve_article_numbers', { p_count: count })
