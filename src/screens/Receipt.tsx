@@ -1,4 +1,3 @@
-import { useLayoutEffect, useRef, useState } from 'react'
 import type { Customer, Invoice, InvoiceLine, Language, Payment, Product } from '../data/types'
 import type { IssuerInfo } from '../domain/issuers'
 import { imageSrc } from '../domain/issuers'
@@ -25,22 +24,12 @@ export function ReceiptPaper(p: {
     return { ...l, article_number: code, product_name: product?.name, name_es: product?.name_es }
   }), eur, p.language)
   const payments = receiptPayments(p.pays)
-  // Op de thermische printer: 80 mm breed, zonder marge. De lengte van de pagina volgt de bon (gemeten), zodat de
-  // printer niet een A4-lengte doorvoert. Op het scherm en op papier is de inhoud even breed (72 mm).
-  const ref = useRef<HTMLDivElement>(null)
-  const [mm, setMm] = useState(200)
-  useLayoutEffect(() => {
-    const el = ref.current
-    if (!el) return
-    const measure = () => setMm(Math.ceil((el.getBoundingClientRect().height * 25.4) / 96) + 4)
-    measure()
-    const ro = new ResizeObserver(measure)
-    ro.observe(el)
-    return () => ro.disconnect()
+  // Geen vaste paginamaat: de printer bepaalt het papier (kies in het stuurprogramma de rol van 80 mm, bv. 80(72.1) x 3276 mm).
+  // Met een vaste maat ging Chrome de bon schalen en verticaal centreren op het gekozen vel, zodat de bon even lang werd als dat vel.
+  return () => ro.disconnect()
   }, [])
   return (
-    <div className="receipt" ref={ref}>
-      <style>{`@media print { @page { size: 80mm ${mm}mm; margin: 0; } }`}</style>
+    <div className="receipt">
       <div className="receipt-head">
         {issuer.logo ? <img className="receipt-logo" src={imageSrc(issuer.logo, p.base)} alt={issuer.name} /> : <div className="receipt-name">{issuer.name}</div>}
         <div>{receiptLegalLine(issuer)}</div>
