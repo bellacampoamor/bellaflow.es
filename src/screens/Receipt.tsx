@@ -26,8 +26,6 @@ export function ReceiptPaper(p: {
   const payments = receiptPayments(p.pays)
   // Geen vaste paginamaat: de printer bepaalt het papier (kies in het stuurprogramma de rol van 80 mm, bv. 80(72.1) x 3276 mm).
   // Met een vaste maat ging Chrome de bon schalen en verticaal centreren op het gekozen vel, zodat de bon even lang werd als dat vel.
-  return () => ro.disconnect()
-  }, [])
   return (
     <div className="receipt">
       <div className="receipt-head">
