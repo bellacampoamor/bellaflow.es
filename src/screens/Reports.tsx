@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { Printer } from 'lucide-react'
 import { invoiceReport, periodRange, round2, todayISO, type ReportPeriod } from '../domain/calc'
 import { POS_CUSTOMER_NOTE } from '../domain/pos'
@@ -8,12 +8,15 @@ import { getLanguage, tx } from '../i18n'
 import { go, useApp } from '../ui/app-context'
 import { ShopifyBacklog, ShopifyStatus } from '../ui/ShopifyStatus'
 import { goesToShopify } from '../domain/shopify'
-import { DocPaper, Empty, eur, fmtDate, Head, Tabs, TextField } from '../ui/kit'
+import { BackToTop, DocPaper, Empty, eur, fmtDate, Head, Pager, Tabs, TextField } from '../ui/kit'
 import { Archive } from './Archive'
 import { Deliverable } from './Deliverable'
 import { useNavUi } from '../ui/nav'
 
 export type ReportTab = 'facturen' | 'leverbaar' | 'archief'
+
+/** Op het scherm 50 facturen per pagina (zoals Catalogi en Klanten); het afgedrukte overzicht toont ze allemaal. */
+const PAGE_SIZE = 50
 
 // Vaste teksten van de afgedrukte lijst, in de taal uit Instellingen.
 type ListText = { title: string; titleKassa: string; period: (from: string, to: string) => string; empty: string; number: string; date: string; order: string; customer: string; base: string; vat: string; total: string; sum: (n: number) => string; method: string; noCustomer: string; methods: Record<string, string>; perMethod: string }
@@ -49,6 +52,12 @@ export function InvoiceList({ kassa = false }: { kassa?: boolean }) {
   // Kassa: per bedrijf een eigen lijst (HDB valt buiten de boekhouding van Bella).
   const [issuer, setIssuer] = useNavUi<Issuer>('issuer', 'bella')
   const report = invoiceReport(s, from, to, kassa, kassa ? issuer : undefined)
+  // Paginering op het scherm; totalen en Per betaalwijze gaan altijd over de hele periode.
+  const [page, setPage] = useNavUi('pagina', 1)
+  const listTop = useRef<HTMLElement>(null)
+  const pages = Math.max(1, Math.ceil(report.rows.length / PAGE_SIZE))
+  const current = Math.min(page, pages)
+  const goPage = (p: number) => { setPage(p); listTop.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }) }
   // HDB: kolom met de stand in Shopify (alleen op het scherm, niet op het afgedrukte overzicht).
   const shopify = kassa && issuer === 'hdb'
   const options: [ReportPeriod, string][] = [['maand', tx("Deze maand")], ['kwartaal', tx("Laatste 3 maanden")], ['jaar', tx("Dit jaar (YTD)")], ['vrij', tx("Van t/m")]]
@@ -81,7 +90,7 @@ export function InvoiceList({ kassa = false }: { kassa?: boolean }) {
       {report.rows.length > 0 && <div className={paper ? 'table-wrap flush' : 'table-wrap'}><table className={paper ? 'report-table report-doc' : 'report-table'}>
         <thead><tr><th>{t.number}</th><th>{t.date}</th>{!kassa && <th>{t.order}</th>}<th>{t.customer}</th>{kassa && <th>{t.method}</th>}{shopify && !paper && <th>Shopify</th>}<th className="num">{t.base}</th><th className="num">{t.vat}</th><th className="num">{t.total}</th></tr></thead>
         <tbody>
-          {report.rows.map(({ invoice: i, order, customer }) => (
+          {(paper ? report.rows : report.rows.slice((current - 1) * PAGE_SIZE, current * PAGE_SIZE)).map(({ invoice: i, order, customer }) => (
           <tr key={i.id}>
             <td>{paper ? i.number : <a className="rowlink" href={`#facturatie-${i.id}`}>{i.number}</a>}</td>
             <td>{fmtDate(i.invoice_date)}</td>
@@ -114,25 +123,27 @@ export function InvoiceList({ kassa = false }: { kassa?: boolean }) {
     <div className="stack">
       <section className="panel no-print report-filter">
         <div className="chips">
-          {options.map(([value, label]) => <button key={value} className={`chip${period === value ? ' on' : ''}`} aria-pressed={period === value} onClick={() => setPeriod(value)}>{label}</button>)}
+          {options.map(([value, label]) => <button key={value} className={`chip${period === value ? ' on' : ''}`} aria-pressed={period === value} onClick={() => { setPeriod(value); setPage(1) }}>{label}</button>)}
         </div>
         {kassa && <div className="chips" style={{ marginTop: 10 }}>
-          {(['bella', 'hdb'] as Issuer[]).map((k) => <button key={k} className={`chip${issuer === k ? ' on' : ''}`} aria-pressed={issuer === k} onClick={() => setIssuer(k)}>{k === 'hdb' ? `HDB · ${issuerInfo(company, 'hdb').name}` : `Bella · ${company?.company_name ?? ''}`}</button>)}
+          {(['bella', 'hdb'] as Issuer[]).map((k) => <button key={k} className={`chip${issuer === k ? ' on' : ''}`} aria-pressed={issuer === k} onClick={() => { setIssuer(k); setPage(1) }}>{k === 'hdb' ? `HDB · ${issuerInfo(company, 'hdb').name}` : `Bella · ${company?.company_name ?? ''}`}</button>)}
         </div>}
         {period === 'vrij' && <div className="report-dates">
-          <TextField label={tx("Van")} type="date" value={customFrom} onChange={setCustomFrom} />
-          <TextField label={tx("T/m")} type="date" value={customTo} onChange={setCustomTo} />
+          <TextField label={tx("Van")} type="date" value={customFrom} onChange={(v) => { setCustomFrom(v); setPage(1) }} />
+          <TextField label={tx("T/m")} type="date" value={customTo} onChange={(v) => { setCustomTo(v); setPage(1) }} />
         </div>}
       </section>
       {shopify && <ShopifyBacklog />}
       {/* Op het scherm: een gewone lijst in de stijl van de site, in de schermtaal. */}
-      <section className="panel no-print">
+      <section className="panel no-print" ref={listTop}>
         <div className="report-screen-head">
           <h2>{kassa ? ts.titleKassa : ts.title}</h2>
           <span className="small muted">{name}{taxId ? ` · CIF ${taxId}` : ''} · {ts.period(from ? fmtDate(from) : '–', to ? fmtDate(to) : '–')}</span>
         </div>
         {table(ts, false)}
+        {report.rows.length > PAGE_SIZE && <Pager page={current} size={PAGE_SIZE} total={report.rows.length} onPage={goPage} />}
       </section>
+      <BackToTop />
       {/* Alleen bij afdrukken: het A4-document, in de taal uit Instellingen. */}
       <div className="print-only">
         <DocPaper language={docLanguage}>
