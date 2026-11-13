@@ -925,9 +925,9 @@ tr.close-hist.on td { background: var(--selected); color: var(--on-selected); }
 .receipt-credit img { height: 3.5mm; width: auto; filter: grayscale(1) brightness(.7) contrast(3); }
 /* Logo en beeldmerk: grijze lijnen worden zwart, wit blijft wit. Een thermische printer laat lichtgrijs anders weg. */
 @media print {
-  /* De printkop is 72 mm breed en begint links op de pagina van 80 mm: de bon staat links, 72 mm breed,
-     met 1,5 mm binnenmarge zodat de buitenste tekens niet wegvallen. Zo staat hij midden op de rol. */
-  .receipt { width: 72mm; margin: 0; padding: 2mm 1.5mm 8mm; border: 0; border-radius: 0; }
+  /* De POS-80C drukt in de praktijk ongeveer 68 mm af, gerekend vanaf de linkerkant van de pagina (getest 13 november 2026:
+     bij 72 mm viel rechts een teken weg). De bon staat daarom links, 66 mm breed met 1 mm binnenmarge. */
+  .receipt { width: 66mm; margin: 0; padding: 2mm 1mm 8mm; border: 0; border-radius: 0; }
   body:has(.receipt) :has(.receipt) { padding-left: 0 !important; padding-right: 0 !important; margin-left: 0 !important; margin-right: 0 !important; max-width: none !important; }
 }
 
