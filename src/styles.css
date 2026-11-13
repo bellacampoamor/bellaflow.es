@@ -925,8 +925,9 @@ tr.close-hist.on td { background: var(--selected); color: var(--on-selected); }
 .receipt-credit img { height: 3.5mm; width: auto; filter: grayscale(1) brightness(.7) contrast(3); }
 /* Logo en beeldmerk: grijze lijnen worden zwart, wit blijft wit. Een thermische printer laat lichtgrijs anders weg. */
 @media print {
-  /* Gecentreerd op het papier: de zijruimte van .wrap en main valt weg, de bon staat met gelijke marges in het midden. */
-  .receipt { width: 72mm; margin: 0 auto; padding: 2mm 0 8mm; border: 0; border-radius: 0; }
+  /* De printkop is 72 mm breed en begint links op de pagina van 80 mm: de bon staat links, 72 mm breed,
+     met 1,5 mm binnenmarge zodat de buitenste tekens niet wegvallen. Zo staat hij midden op de rol. */
+  .receipt { width: 72mm; margin: 0; padding: 2mm 1.5mm 8mm; border: 0; border-radius: 0; }
   body:has(.receipt) :has(.receipt) { padding-left: 0 !important; padding-right: 0 !important; margin-left: 0 !important; margin-right: 0 !important; max-width: none !important; }
 }
 
