@@ -2,6 +2,8 @@
 
 export interface Settings {
   id: string; company_name: string; tax_id: string; address: string; postal_code: string; city: string
+  /** Open boekjaar (jaarafsluiting, besluit Rick 13 november 2026): het jaar in elk nieuw documentnummer. Leeg = jaar van de datum. */
+  fiscal_year?: number | null
   province: string; phone: string; email: string; iban: string
   /** Handelsnaam (besluit Rick 10 november 2026): de naam op documenten en in klantmails. company_name is de juridische naam (razón social), voor de juridische regel en het CIF. Leeg = de juridische naam. */
   trade_name?: string
@@ -223,6 +225,15 @@ export interface Payment {
 }
 export interface NumberSeries { id: string; last_number: number }
 /** Dagafsluiting en kasopmaak van de kassa, per bedrijf en per dag. Na afsluiten niet meer te wijzigen. */
+/** Laatst gebruikte nummer van één reeks bij een jaarafsluiting. */
+export interface YearClosingNumber { series: string; label: string; last_number: number; last_document: string }
+
+/** Jaarafsluiting: het boekjaar gaat één verder, elke reeks begint weer bij 0001. Terugdraaien zet het boekjaar terug. */
+export interface YearClosing {
+  id: string; year: number; closed_at: string; closed_by: string; last_numbers: YearClosingNumber[]
+  rolled_back_at: string | null; rolled_back_by: string
+}
+
 export interface CashClosing {
   id: string; issuer: 'bella' | 'hdb'; business_date: string; salesperson_id: string
   /** Wisselgeld bij de start: wat bij de vorige afsluiting in de kas bleef. */
@@ -260,7 +271,7 @@ export interface Snapshot {
   deliveries: Delivery[]; delivery_lines: DeliveryLine[]; invoices: Invoice[]; invoice_lines: InvoiceLine[]
   payments: Payment[]; number_series: NumberSeries[]; email_outbox: OutgoingEmail[]
   purchase_order_dispatches: PurchaseOrderDispatch[]; cash_closings: CashClosing[]
-  hdb_shopify_orders: HdbShopifyOrder[]
+  hdb_shopify_orders: HdbShopifyOrder[]; year_closings: YearClosing[]
 }
 export type TableName = keyof Snapshot
 
@@ -269,5 +280,8 @@ export const TABLES: TableName[] = [
   'settings', 'warehouses', 'suppliers', 'customers', 'salespeople', 'products', 'supplier_showroom_items', 'supplier_showroom_details', 'sales_orders', 'sales_order_lines',
   'order_events', 'purchase_orders', 'purchase_order_lines', 'transports', 'inbound_shipments', 'inbound_shipment_lines',
   'goods_receipts', 'goods_receipt_lines', 'stock_movements', 'deliveries', 'delivery_lines', 'invoices',
-  'invoice_lines', 'payments', 'number_series', 'email_outbox', 'purchase_order_dispatches', 'cash_closings', 'hdb_shopify_orders',
+  'invoice_lines', 'payments', 'number_series', 'email_outbox', 'purchase_order_dispatches', 'cash_closings', 'hdb_shopify_orders', 'year_closings',
 ]
+
+/** Tabellen van een nieuwe migratie: ontbreken ze nog in de database, dan laadt de app gewoon (lege lijst). */
+export const OPTIONAL_TABLES = new Set<TableName>(['year_closings'])

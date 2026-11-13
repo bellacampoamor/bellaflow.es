@@ -9,7 +9,9 @@ import { fold } from '../domain/search'
 import { AreaField, BackToTop, Check, Empty, eur, Head, Modal, NumberField, Pager, Pill, SelectField, Tabs, TextField } from '../ui/kit'
 import { CustomerFields } from './OrderForm'
 import { tx } from '../i18n'
-import { isSpanishSupplier } from '../domain/calc'
+import { YearClosingPanel } from './YearClosingPanel'
+import { isSpanishSupplier, todayISO } from '../domain/calc'
+import { openYear } from '../domain/yearClosing'
 import { ROLE_LABEL, roleOf, STAFF_ROLES } from '../domain/staff'
 import { BELLA_DEFAULTS, HDB_DEFAULTS, imageSrc } from '../domain/issuers'
 import { mailsAutomatically } from '../domain/mailSettings'
@@ -175,10 +177,11 @@ export function Admin({ param = '' }: { param?: string }) {
         <p className="small muted">{tx("Nummers bestaan uit voorvoegsel, jaar en teller. Een nieuw voorvoegsel geldt voor nieuwe documenten en de teller loopt door. Bestaande documenten houden hun nummer.")}</p>
         <div className="form-grid">
           {([['prefix_purchase', tx("Inkooporders")], ['prefix_delivery', tx("Afleverbonnen")], ['prefix_proforma', tx("Proforma's")], ['prefix_invoice', tx("Facturen")], ['prefix_invoice_simplified', tx("Eenvoudige fact Bella")], ['prefix_invoice_simplified_hdb', tx("Eenvoudige fact HDB")], ['prefix_invoice_credit', tx("Creditfacturen")], ['prefix_invoice_credit_simplified', tx("Creditfact kassa Bella")], ['prefix_invoice_credit_simplified_hdb', tx("Creditfact kassa HDB")], ['prefix_sales_order', tx("Verkooporders")], ['prefix_receipt', tx("Goederenontvangsten")], ['prefix_transport', tx("Transporten")]] as [PrefixField, string][]).map(([field, label]) => (
-            <TextField key={field} label={label} value={co[field] ?? ''} onChange={(v) => setCo({ ...co, [field]: v.toUpperCase() })} hint={tx("Bijvoorbeeld {0}", `${co[field] || (field === 'prefix_proforma' ? 'PF' : field === 'prefix_invoice_simplified' ? 'FS-BELLA' : field === 'prefix_invoice_simplified_hdb' ? 'FS-HDB' : field === 'prefix_invoice_credit' ? 'FR' : field === 'prefix_invoice_credit_simplified' ? 'FRS-BELLA' : field === 'prefix_invoice_credit_simplified_hdb' ? 'FRS-HDB' : '…')}-${new Date().getFullYear()}-0001`)} />
+            <TextField key={field} label={label} value={co[field] ?? ''} onChange={(v) => setCo({ ...co, [field]: v.toUpperCase() })} hint={tx("Bijvoorbeeld {0}", `${co[field] || (field === 'prefix_proforma' ? 'PF' : field === 'prefix_invoice_simplified' ? 'FS-BELLA' : field === 'prefix_invoice_simplified_hdb' ? 'FS-HDB' : field === 'prefix_invoice_credit' ? 'FR' : field === 'prefix_invoice_credit_simplified' ? 'FRS-BELLA' : field === 'prefix_invoice_credit_simplified_hdb' ? 'FRS-HDB' : '…')}-${openYear(s.settings[0], todayISO())}-0001`)} />
           ))}
         </div>
         </section>
+        <YearClosingPanel />
         <div className="sticky-save"><button className="btn primary" onClick={() => { const { id: _i, ...patch } = co; run((db) => saveSettings(db, patch), tx("Bedrijfsgegevens opgeslagen")) }}>{tx("Opslaan")}</button></div>
       </div>}
 

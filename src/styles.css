@@ -968,3 +968,7 @@ tr.close-hist.on td { background: var(--selected); color: var(--on-selected); }
 .shopify-status { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
 .shopify-status .pill a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
 .shopify-status .linklike svg { vertical-align: -2px; }
+
+/* Jaarafsluiting (Instellingen > Bedrijf en factuur, 13 november 2026). */
+.year-open { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; margin: 8px 0 4px; }
+.year-open .note { flex: 1 1 280px; }

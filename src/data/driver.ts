@@ -1,4 +1,4 @@
-import { TABLES, type ArticleHit, type ArticleQuery, type CatalogArticle, type CatalogListItem, type CatalogListPage, type CatalogListQuery, type CatalogArticleElement, type EmailAttachment, type Snapshot, type TableName } from './types'
+import { OPTIONAL_TABLES, TABLES, type ArticleHit, type ArticleQuery, type CatalogArticle, type CatalogListItem, type CatalogListPage, type CatalogListQuery, type CatalogArticleElement, type EmailAttachment, type Snapshot, type TableName } from './types'
 
 // De enige plek waar de app met opslag praat. Schermen en bedrijfslogica kennen alleen dit contract,
 // dus overstappen van browseropslag naar Supabase raakt geen enkel scherm.
@@ -45,7 +45,7 @@ export interface Driver {
 }
 
 export async function loadSnapshot(db: Driver): Promise<Snapshot> {
-  const entries = await Promise.all(TABLES.map(async (t) => [t, await db.list(t)] as const))
+  const entries = await Promise.all(TABLES.map(async (t) => [t, OPTIONAL_TABLES.has(t) ? await db.list(t).catch(() => []) : await db.list(t)] as const))
   return Object.fromEntries(entries) as unknown as Snapshot
 }
 

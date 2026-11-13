@@ -5,7 +5,7 @@ import { loadSnapshot, newId, type Driver } from '../data/driver'
 import type {
   EmailStatus, Language,
   Delivery, Fulfilment, InboundShipment, InvoiceLine, OrderType, Payment, Product, PurchaseLabel, SalesOrder, Settings,
-  SalesOrderLine, Salesperson, Snapshot, StockMovement, CatalogArticle, CatalogListQuery, Supplier, ArticleQuery, SupplierShowroomDetail, SupplierShowroomItem, TableName,
+  SalesOrderLine, Salesperson, Snapshot, StockMovement, CatalogArticle, CatalogListQuery, Supplier, ArticleQuery, SupplierShowroomDetail, SupplierShowroomItem, TableName, YearClosing,
 } from '../data/types'
 import { parseCsv, sameName } from './catalog'
 import { articleNumberFromScan } from './scan'
@@ -13,6 +13,7 @@ import { INVOICE_MAIL, SALES_ORDER_MAIL } from './noteText'
 import { mailsAutomatically } from './mailSettings'
 import { isStaffRole } from './staff'
 import { ISSUER_SERIES, issuerOf, tradeName, type Issuer } from './issuers'
+import { activeClosings, closeBlocker, lastNumbers, numberYear, openYear, rollbackBlocker } from './yearClosing'
 import { goesToShopify, shopifyBacklog, shopifyCompletes, shopifyOrderOf } from './shopify'
 import { creditableAmount, creditableLines, creditSeries, creditSettlement, isCredit } from './credit'
 import { cashCount, closingOn, closingsOf, countedTotal, DENOMINATIONS, denomKey, kassaDay, openingFloat, type CashCounts } from './cashClosing'
@@ -40,11 +41,21 @@ export type PrefixField = 'prefix_sales_order' | 'prefix_purchase' | 'prefix_rec
   | 'prefix_invoice_credit' | 'prefix_invoice_credit_simplified' | 'prefix_invoice_credit_simplified_hdb'
 export const PREFIX_FIELDS: PrefixField[] = ['prefix_sales_order', 'prefix_purchase', 'prefix_receipt', 'prefix_delivery', 'prefix_invoice', 'prefix_transport', 'prefix_proforma', 'prefix_invoice_simplified', 'prefix_invoice_simplified_hdb', 'prefix_invoice_credit', 'prefix_invoice_credit_simplified', 'prefix_invoice_credit_simplified_hdb']
 
-/** De teller hoort bij de soort document, dus een ander voorvoegsel laat de nummers gewoon doorlopen. */
-async function nextDocumentNumber(db: Driver, series: string, field: PrefixField, year: number, fallback = series) {
+/**
+ * De teller hoort bij de soort document, dus een ander voorvoegsel laat de nummers gewoon doorlopen.
+ * Het jaar in het nummer is het open boekjaar (jaarafsluiting, besluit Rick 13 november 2026), niet het jaar van de datum.
+ */
+async function nextDocumentNumber(db: Driver, series: string, field: PrefixField, dateYear: number, fallback = series) {
+  const co = (await db.list('settings'))[0]
+  const year = numberYear(co, dateYear)
   const seq = (await db.nextNumber(series, year)).split('-').pop()
-  const prefix = (await db.list('settings'))[0]?.[field] || fallback
+  const prefix = co?.[field] || fallback
   return `${prefix}-${year}-${seq}`
+}
+
+/** Teller zonder instelbaar voorvoegsel (PIO, PRO), ook met het jaar van het open boekjaar. */
+async function nextPlainNumber(db: Driver, series: string, dateYear: number) {
+  return db.nextNumber(series, numberYear((await db.list('settings'))[0], dateYear))
 }
 
 export async function saveSettings(db: Driver, patch: Partial<Settings>) {
@@ -54,7 +65,9 @@ export async function saveSettings(db: Driver, patch: Partial<Settings>) {
     if (v !== undefined && !(v.length <= 12 && /^[A-Za-z0-9]+(-[A-Za-z0-9]+)*$/.test(v))) fail(tx("Een voorvoegsel bestaat uit maximaal 12 letters of cijfers, zonder spaties; een streepje mag ertussen (zoals FS-BELLA)."))
   }
   if (patch.shop_email && !isEmail(patch.shop_email)) fail(tx("Vul een geldig winkel e-mailadres in."))
-  await db.update('settings', 'default', patch)
+  // Het boekjaar wijzigt alleen via de jaarafsluiting, nooit via Opslaan.
+  const { fiscal_year: _fy, ...rest } = patch
+  await db.update('settings', 'default', rest)
 }
 
 // Inkoop -----------------------------------------------------------------------
@@ -148,7 +161,7 @@ export async function syncPurchaseProformas(db: Driver) {
     const order = s.sales_orders.find((o) => o.id === n.line.sales_order_id)!
     let po = proformas.find((p) => p.supplier_id === n.supplier_id && kept.some((l) => l.purchase_order_id === p.id && s.sales_order_lines.find((x) => x.id === l.sales_order_line_id)?.sales_order_id === order.id))
     if (!po) {
-      po = { id: newId(), number: await db.nextNumber('PIO', yearOf(order.order_date)), supplier_id: n.supplier_id, order_date: order.order_date, supplier_reference: '', notes: '', status: 'proforma', label: 'verkoop' }
+      po = { id: newId(), number: await nextPlainNumber(db, 'PIO', yearOf(order.order_date)), supplier_id: n.supplier_id, order_date: order.order_date, supplier_reference: '', notes: '', status: 'proforma', label: 'verkoop' }
       await db.insert('purchase_orders', [po])
       proformas.push(po)
     }
@@ -682,7 +695,7 @@ export async function createProformaOrder(db: Driver, input: { salesperson_id: s
     return lineFromProduct(p, { qty, source: wid ? 'voorraad' : 'bestelling', warehouse_id: wid })
   }))
   const id = newId()
-  const number = await db.nextNumber('PRO', yearOf(input.date))
+  const number = await nextPlainNumber(db, 'PRO', yearOf(input.date))
   await db.insert('sales_orders', [{
     id, number, status: 'proforma', customer_id: null, order_date: input.date, channel: 'winkel', salesperson_id: input.salesperson_id, customer_reference: '',
     order_type: 'bestelling', fulfilment: 'meenemen', requested_date: null, promised_date: null, delivery_name: '', delivery_phone: '', delivery_address: '',
@@ -1577,4 +1590,46 @@ export async function closeCashDay(db: Driver, input: CashCloseInput) {
     deposited, kept_in_drawer: calc.kept, note, created_at: new Date().toISOString(),
   }])
   return id
+}
+
+// Jaarafsluiting -------------------------------------------------------------------
+// Opdracht Rick 13 november 2026: bij een jaarwisseling begint de nummering van alle documenten weer bij 1. Dat gebeurt
+// niet vanzelf maar met de handmatige jaarafsluiting onder Instellingen, met een extra bevestiging. De laatst gebruikte
+// nummers liggen vast, zodat terugdraaien mogelijk blijft.
+
+/** Afsluitingen uit de opslag; ontbreekt de tabel nog (migratie niet uitgevoerd), dan null. */
+export async function listYearClosings(db: Driver): Promise<YearClosing[] | null> {
+  try { return await db.list('year_closings') } catch { return null }
+}
+
+export async function closeYear(db: Driver, input: { year: number; confirm: string; closed_by: string; today: string }) {
+  const co = (await db.list('settings'))[0] ?? (fail(tx("Instellingen niet gevonden.")) as never)
+  const year = openYear(co, input.today)
+  if (input.year !== year) fail(tx("Het open boekjaar is {0}, niet {1}.", year, input.year))
+  if (input.confirm.trim() !== String(year)) fail(tx("Typ {0} om de afsluiting te bevestigen.", year))
+  if (!input.closed_by.trim()) fail(tx("Vul in wie het jaar afsluit."))
+  const blocker = closeBlocker(year, input.today)
+  if (blocker) fail(blocker)
+  const closings = await listYearClosings(db)
+  if (closings === null) fail(tx("Voer eerst de migratie voor de jaarafsluiting uit (20261113110000_jaarafsluiting.sql)."))
+  if (activeClosings(closings!).some((c) => c.year === year)) fail(tx("Boekjaar {0} is al afgesloten.", year))
+  const series = await db.list('number_series')
+  const closing: YearClosing = {
+    id: newId(), year, closed_at: new Date().toISOString(), closed_by: input.closed_by.trim(),
+    last_numbers: lastNumbers(series, year, co), rolled_back_at: null, rolled_back_by: '',
+  }
+  await db.insert('year_closings', [closing])
+  await db.update('settings', co.id, { fiscal_year: year + 1 })
+  return closing
+}
+
+export async function rollbackYearClosing(db: Driver, input: { id: string; by: string }) {
+  if (!input.by.trim()) fail(tx("Vul in wie de afsluiting terugdraait."))
+  const co = (await db.list('settings'))[0] ?? (fail(tx("Instellingen niet gevonden.")) as never)
+  const closings = (await listYearClosings(db)) ?? []
+  const closing = closings.find((c) => c.id === input.id) ?? (fail(tx("Jaarafsluiting niet gevonden.")) as never)
+  const blocker = rollbackBlocker(closing, closings, await db.list('number_series'), co.fiscal_year)
+  if (blocker) fail(blocker)
+  await db.update('year_closings', closing.id, { rolled_back_at: new Date().toISOString(), rolled_back_by: input.by.trim() })
+  await db.update('settings', co.id, { fiscal_year: closing.year })
 }
