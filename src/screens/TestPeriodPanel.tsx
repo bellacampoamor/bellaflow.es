@@ -38,7 +38,9 @@ export function TestPeriodPanel() {
       <h2>{tx("Testperiode")}</h2>
       <div className="note warn">{tx("Bella Flow is nog niet live. Alles wat je nu invoert, kun je hier wissen om opnieuw te beginnen.")}</div>
       <p className="small muted">{tx("Testgegevens wissen haalt alle verkooporders, kassabonnen en facturen, betalingen, leveringen, inkooporders, transporten, ontvangsten, dagafsluitingen, voorraadmutaties en producten weg. Daarna is de voorraad leeg en begint elke reeks weer bij 0001. Instellingen, magazijnen, leveranciers, medewerkers en catalogi blijven staan. Klanten wissen is een keuze.")}</p>
-      <p className="small muted">{tx("Let op: een kassaverkoop van HDB gaat ook in de testperiode naar de Shopify van HomeDecoBali. Wissen haalt die bestellingen niet uit Shopify.")}</p>
+      {co?.hdb_shopify_enabled !== false
+        ? <p className="small muted">{tx("Let op: een kassaverkoop van HDB gaat ook in de testperiode naar de Shopify van HomeDecoBali. Wissen haalt die bestellingen niet uit Shopify. Uitzetten kan bij Kassa: HDB hierboven.")}</p>
+        : <p className="small muted">{tx("Versturen naar Shopify staat uit: kassaverkopen van HDB gaan niet naar Shopify.")}</p>}
       {co?.test_wiped_at && <p className="small">{tx("Laatst gewist op {0} door {1}.", fmtDate(co.test_wiped_at.slice(0, 10)), co.test_wiped_by || '–')}</p>}
       <div className="year-open">
         <button type="button" className="btn danger" onClick={() => open('wipe')}><Trash2 size={16} />{tx("Testgegevens wissen")}</button>

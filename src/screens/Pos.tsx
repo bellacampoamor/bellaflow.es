@@ -184,7 +184,8 @@ export function Pos() {
       note = !m ? '' : m.status === 'sent' ? tx("Gemaild naar {0}.", m.to_email) : m.status === 'demo' ? tx("Testversie: de mail naar {0} is niet echt verstuurd.", m.to_email) : tx("Mailen is mislukt: {0}", m.error)
       // HDB: stand in Shopify (conceptorder of bestelling met het nummer van Shopify).
       const sh = shopifyOrderOf(snap, result!.invoiceId)
-      if (sh) shop = sh.status === 'aangemaakt'
+      if (result!.shopify === 'uit') shop = tx("Niet naar Shopify: versturen staat uit.")
+      else if (sh) shop = sh.status === 'aangemaakt'
         ? (sh.shopify_order_name ? tx("In Shopify als bestelling {0}, nog niet afgehandeld.", sh.shopify_order_name) : tx("In Shopify als conceptorder {0}.", sh.shopify_draft_name))
         : sh.status === 'demo' ? tx("Testversie: niet naar Shopify gestuurd.")
         : tx("Nog niet in Shopify: {0} Opnieuw versturen kan onder Beheer > Kassa.", sh.error || tx("wacht op Shopify."))

@@ -1783,4 +1783,11 @@ export const es: Record<string, string> = {
   "Vul in wie de testgegevens wist.": "Indica quién borra los datos de prueba.",
   "Weet je het zeker? Alle testgegevens worden definitief gewist.": "¿Seguro? Todos los datos de prueba se borrarán definitivamente.",
   "Weet je het zeker? Vanaf vandaag ({0}) is Bella Flow live.": "¿Seguro? A partir de hoy ({0}) Bella Flow está en marcha.",
+  "Kassaverkopen van HDB naar Shopify sturen": "Enviar las ventas en caja de HDB a Shopify",
+  "Versturen naar Shopify staat uit (Instellingen > Bedrijf en factuur > Kassa: HDB).": "El envío a Shopify está desactivado (Ajustes > Empresa y factura > Caja: HDB).",
+  "Niet naar Shopify: versturen staat uit.": "No enviado a Shopify: el envío está desactivado.",
+  "Niet naar Shopify (staat uit)": "No a Shopify (desactivado)",
+  "Let op: een kassaverkoop van HDB gaat ook in de testperiode naar de Shopify van HomeDecoBali. Wissen haalt die bestellingen niet uit Shopify. Uitzetten kan bij Kassa: HDB hierboven.": "Atención: una venta de HDB en caja también se envía al Shopify de HomeDecoBali durante el periodo de prueba. Borrar no elimina esos pedidos de Shopify. Se puede desactivar en Caja: HDB, más arriba.",
+  "Versturen naar Shopify staat uit: kassaverkopen van HDB gaan niet naar Shopify.": "El envío a Shopify está desactivado: las ventas en caja de HDB no se envían a Shopify.",
+  "Uit": "Desactivado",
 }

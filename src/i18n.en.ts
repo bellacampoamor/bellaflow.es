@@ -1783,4 +1783,11 @@ export const en: Record<string, string> = {
   "Vul in wie de testgegevens wist.": "Enter who is deleting the test data.",
   "Weet je het zeker? Alle testgegevens worden definitief gewist.": "Are you sure? All test data will be deleted permanently.",
   "Weet je het zeker? Vanaf vandaag ({0}) is Bella Flow live.": "Are you sure? From today ({0}) Bella Flow is live.",
+  "Kassaverkopen van HDB naar Shopify sturen": "Send HDB till sales to Shopify",
+  "Versturen naar Shopify staat uit (Instellingen > Bedrijf en factuur > Kassa: HDB).": "Sending to Shopify is switched off (Settings > Company and invoice > Till: HDB).",
+  "Niet naar Shopify: versturen staat uit.": "Not sent to Shopify: sending is switched off.",
+  "Niet naar Shopify (staat uit)": "Not to Shopify (switched off)",
+  "Let op: een kassaverkoop van HDB gaat ook in de testperiode naar de Shopify van HomeDecoBali. Wissen haalt die bestellingen niet uit Shopify. Uitzetten kan bij Kassa: HDB hierboven.": "Note: an HDB till sale also goes to the HomeDecoBali Shopify during the test period. Deleting does not remove those orders from Shopify. You can switch this off under Till: HDB above.",
+  "Versturen naar Shopify staat uit: kassaverkopen van HDB gaan niet naar Shopify.": "Sending to Shopify is switched off: HDB till sales do not go to Shopify.",
+  "Uit": "Off",
 }

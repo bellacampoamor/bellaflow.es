@@ -9,6 +9,9 @@ import { isCredit } from './credit'
 export const goesToShopify = (inv: Pick<Invoice, 'simplified' | 'issuer' | 'kind' | 'credit_of'>) =>
   !!inv.simplified && inv.issuer === 'hdb' && !isCredit(inv)
 
+/** Versturen naar Shopify aan of uit (opdracht Rick 13 november 2026, voor de testperiode). Standaard aan. */
+export const shopifySendingOn = (co: Pick<Settings, 'hdb_shopify_enabled'> | undefined | null) => co?.hdb_shopify_enabled !== false
+
 /** Standaard aan: de conceptorder wordt meteen een bestelling met het ordernummer van Shopify. */
 export const shopifyCompletes = (co: Pick<Settings, 'hdb_shopify_complete'> | undefined | null) => co?.hdb_shopify_complete !== false
 

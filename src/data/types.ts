@@ -28,6 +28,8 @@ export interface Settings {
   hdb_province?: string; hdb_country?: string; hdb_phone?: string; hdb_email?: string
   /** Kassaverkoop van HDB in Shopify (11 november 2026): true (standaard) = de conceptorder wordt meteen een bestelling, als betaald, met het ordernummer van Shopify; false = blijft conceptorder. */
   hdb_shopify_complete?: boolean
+  /** Kassaverkopen van HDB naar Shopify sturen (aan/uit, 13 november 2026). Leeg = aan. */
+  hdb_shopify_enabled?: boolean
   /** Naam van de winkel in Shopify (admin.shopify.com/store/<naam>), alleen voor de links naar de bestelling. */
   hdb_shopify_store?: string
   /** Automatisch mailen aan de klant, per document (besluit Rick 8 november 2026). Ontbreekt een waarde, dan geldt MAIL_DEFAULTS. */

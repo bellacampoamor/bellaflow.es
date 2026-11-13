@@ -2,7 +2,7 @@
 import type { MouseEvent } from 'react'
 import { RefreshCw } from 'lucide-react'
 import { pushToShopify, sendSaleToShopify } from '../domain/services'
-import { SHOPIFY_STATE, shopifyAdminUrl, shopifyBacklog, shopifyNumber, shopifyOrderOf } from '../domain/shopify'
+import { SHOPIFY_STATE, shopifyAdminUrl, shopifyBacklog, shopifyNumber, shopifyOrderOf, shopifySendingOn } from '../domain/shopify'
 import { tx } from '../i18n'
 import { useApp } from './app-context'
 import { Pill } from './kit'
@@ -14,12 +14,14 @@ export function ShopifyStatus({ invoiceId, compact = false }: { invoiceId: strin
   const { s, run, toast } = useApp()
   const row = shopifyOrderOf(s, invoiceId)
   const store = s.settings[0]?.hdb_shopify_store ?? ''
+  const on = shopifySendingOn(s.settings[0])
   const send = async (e: MouseEvent) => {
     e.preventDefault(); e.stopPropagation()
     let r = ''
     if (await run(async (db) => { r = await sendSaleToShopify(db, invoiceId) })) toast(resultText(r), r === 'mislukt')
   }
-  if (!row) return <span className="shopify-status">{!compact && <Pill tone="warn">{tx("Nog niet naar Shopify")}</Pill>} <button className="linklike small" onClick={send}><RefreshCw size={13} /> {tx("Naar Shopify")}</button></span>
+  if (!row && compact && !on) return <span className="shopify-status small muted">{tx("Uit")}</span>
+  if (!row) return <span className="shopify-status">{!compact && <Pill tone={on ? 'warn' : 'info'}>{on ? tx("Nog niet naar Shopify") : tx("Niet naar Shopify (staat uit)")}</Pill>} {on && <button className="linklike small" onClick={send}><RefreshCw size={13} /> {tx("Naar Shopify")}</button>}</span>
   const [label, tone] = SHOPIFY_STATE[row.status]
   const num = shopifyNumber(row)
   const url = shopifyAdminUrl(row, store)
@@ -28,7 +30,7 @@ export function ShopifyStatus({ invoiceId, compact = false }: { invoiceId: strin
       {row.status === 'aangemaakt' && num
         ? <Pill tone={row.error ? 'warn' : 'good'}>Shopify {url ? <a href={url} target="_blank" rel="noreferrer">{num}</a> : num}{!row.shopify_order_name && ` (${tx("conceptorder")})`}</Pill>
         : <Pill tone={tone}>{tx(label)}</Pill>}
-      {(row.status === 'mislukt' || row.status === 'wachtrij' || row.status === 'demo') && <> <button className="linklike small" onClick={send}><RefreshCw size={13} /> {tx("Opnieuw versturen")}</button></>}
+      {on && (row.status === 'mislukt' || row.status === 'wachtrij' || row.status === 'demo') && <> <button className="linklike small" onClick={send}><RefreshCw size={13} /> {tx("Opnieuw versturen")}</button></>}
       {!compact && row.error && <span className="small muted"> {row.error}</span>}
     </span>
   )
@@ -38,7 +40,7 @@ export function ShopifyStatus({ invoiceId, compact = false }: { invoiceId: strin
 export function ShopifyBacklog() {
   const { s, run, toast } = useApp()
   const todo = shopifyBacklog(s)
-  if (!todo.length) return null
+  if (!todo.length || !shopifySendingOn(s.settings[0])) return null
   const failed = todo.filter((r) => r.status === 'mislukt')
   const send = async () => {
     let r = ''

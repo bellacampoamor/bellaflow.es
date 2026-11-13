@@ -168,6 +168,7 @@ export function Admin({ param = '' }: { param?: string }) {
         <h3 style={{ marginTop: 18 }}>{tx("Shopify van HomeDecoBali")}</h3>
         <p className="small muted">{tx("Elke kassaverkoop van HDB komt als conceptorder in Shopify, met artikelen, prijzen, korting, klant, verkoper, betaalwijze en factuurnummer. Op Afgehandeld zetten doe je zelf in Shopify, als laatste controle.")}</p>
         <div className="form-grid">
+          <Check label={tx("Kassaverkopen van HDB naar Shopify sturen")} checked={co.hdb_shopify_enabled !== false} onChange={(v) => setCo({ ...co, hdb_shopify_enabled: v })} />
           <Check label={tx("Conceptorder meteen omzetten naar een bestelling (betaald), met het ordernummer van Shopify")} checked={co.hdb_shopify_complete !== false} onChange={(v) => setCo({ ...co, hdb_shopify_complete: v })} />
           <TextField label={tx("Naam van de winkel in Shopify")} value={co.hdb_shopify_store ?? ''} onChange={(v) => setCo({ ...co, hdb_shopify_store: v.trim() })} hint={tx("Voor de links naar de bestelling: admin.shopify.com/store/{0}", co.hdb_shopify_store || '…')} />
         </div>

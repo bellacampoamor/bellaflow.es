@@ -6,7 +6,7 @@ import type { CatalogArticle } from '../src/data/types'
 import { seedDemo } from '../src/domain/demo'
 import type { PosLine } from '../src/domain/pos'
 import { importShowroom, posCheckout, pushToShopify, saveSettings, sendSaleToShopify, syncCatalogArticles } from '../src/domain/services'
-import { goesToShopify, shopifyAdminUrl, shopifyBacklog, shopifyCompletes, shopifyOrderOf } from '../src/domain/shopify'
+import { goesToShopify, shopifyAdminUrl, shopifyBacklog, shopifyCompletes, shopifyOrderOf, shopifySendingOn } from '../src/domain/shopify'
 import { countryCode, draftOrderInput, invoiceTag, splitName, type ShopifySale } from '../supabase/functions/_shared/shopifyDraft'
 
 const TODAY = '2026-11-11'
@@ -130,6 +130,23 @@ describe('Shopify: kassa en wachtrij', () => {
     expect(shopifyBacklog(db.data)).toHaveLength(0)
     const row = shopifyOrderOf(db.data, r.invoiceId)!
     expect(shopifyAdminUrl(row, 'homedecobali.myshopify.com')).toBe('https://admin.shopify.com/store/homedecobali/orders/6012345678')
+  })
+
+  it('versturen uit (testperiode): niets naar Shopify; weer aan, dan per factuur alsnog', async () => {
+    let pushed = 0
+    db.pushShopifyOrders = async () => { pushed++; return 'sent' }
+    await saveSettings(db, { hdb_shopify_enabled: false })
+    expect(shopifySendingOn(db.data.settings[0])).toBe(false)
+    const r = await checkout('hdb')
+    expect(r.shopify).toBe('uit')
+    expect(db.data.hdb_shopify_orders).toHaveLength(0)
+    expect(pushed).toBe(0)
+    await expect(sendSaleToShopify(db, r.invoiceId)).rejects.toThrow(/staat uit/)
+    await expect(pushToShopify(db)).rejects.toThrow(/staat uit/)
+    await saveSettings(db, { hdb_shopify_enabled: true })
+    await sendSaleToShopify(db, r.invoiceId)
+    expect(shopifyOrderOf(db.data, r.invoiceId)).toBeDefined()
+    expect(pushed).toBe(1)
   })
 
   it('creditfacturen gaan niet naar Shopify', () => {

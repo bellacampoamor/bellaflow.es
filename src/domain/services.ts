@@ -14,7 +14,7 @@ import { mailsAutomatically } from './mailSettings'
 import { isStaffRole } from './staff'
 import { ISSUER_SERIES, issuerOf, tradeName, type Issuer } from './issuers'
 import { activeClosings, closeBlocker, lastNumbers, numberYear, openYear, rollbackBlocker } from './yearClosing'
-import { goesToShopify, shopifyBacklog, shopifyCompletes, shopifyOrderOf } from './shopify'
+import { goesToShopify, shopifyBacklog, shopifyCompletes, shopifyOrderOf, shopifySendingOn } from './shopify'
 import { creditableAmount, creditableLines, creditSeries, creditSettlement, isCredit } from './credit'
 import { cashCount, closingOn, closingsOf, countedTotal, DENOMINATIONS, denomKey, kassaDay, openingFloat, type CashCounts } from './cashClosing'
 import { DUMMY_SKU, missingCustomerData, POS_CUSTOMER_NOTE, posShortfalls, posTotals, posWarehouse, SIMPLIFIED_LIMIT, takeNowShortfalls, type PosLine } from './pos'
@@ -620,7 +620,10 @@ export async function posCheckout(db: Driver, input: PosInput) {
   if (open > 0) await payInvoice(db, { invoice_id: invoice.id, amount: open, method: input.payment.method, paid_at: input.date, reference: input.payment.reference })
   // HDB: de verkoop gaat als conceptorder naar de Shopify van HomeDecoBali. Lukt dat niet, dan blijft de verkoop staan
   // en staat hij onder Beheer > Kassa klaar om opnieuw te versturen.
-  const shopify = goesToShopify(invoice) ? await sendSaleToShopify(db, invoice.id).catch(() => 'mislukt' as const) : null
+  // Staat versturen uit (Instellingen > Kassa: HDB), dan gaat er niets naar Shopify; later kan het per factuur alsnog.
+  const shopify = !goesToShopify(invoice) ? null
+    : !shopifySendingOn((await db.list('settings'))[0]) ? 'uit' as const
+    : await sendSaleToShopify(db, invoice.id).catch(() => 'mislukt' as const)
   return { orderId, orderNumber: order.number, invoiceId: invoice.id, invoiceNumber: invoice.number, corrections: shortfalls, shopify }
 }
 
@@ -633,6 +636,7 @@ export async function sendSaleToShopify(db: Driver, invoiceId: string) {
   const s = await loadSnapshot(db)
   const inv = s.invoices.find((i) => i.id === invoiceId) ?? (fail(tx("Factuur niet gevonden.")) as never)
   if (!goesToShopify(inv)) fail(tx("Alleen kassaverkopen van HDB gaan naar Shopify."))
+  if (!shopifySendingOn(s.settings[0])) fail(tx("Versturen naar Shopify staat uit (Instellingen > Bedrijf en factuur > Kassa: HDB)."))
   let row = shopifyOrderOf(s, invoiceId)
   if (!row) {
     row = {
@@ -648,6 +652,7 @@ export async function sendSaleToShopify(db: Driver, invoiceId: string) {
 /** Verstuurt wat in de wachtrij staat (of alleen deze rijen). Geeft de stand terug: 'demo' in de browserversie. */
 export async function pushToShopify(db: Driver, ids: string[] = []) {
   const s = await loadSnapshot(db)
+  if (!shopifySendingOn(s.settings[0])) fail(tx("Versturen naar Shopify staat uit (Instellingen > Bedrijf en factuur > Kassa: HDB)."))
   const todo = ids.length ? ids : shopifyBacklog(s).map((r) => r.id)
   if (!todo.length) return 'aangemaakt' as const
   try {
