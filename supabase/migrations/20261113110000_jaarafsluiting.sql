@@ -28,6 +28,5 @@ drop policy if exists year_closings_update on year_closings;
 create policy year_closings_select on year_closings for select to authenticated using ((select public.is_team_member()));
 create policy year_closings_insert on year_closings for insert to authenticated with check ((select public.is_team_member()));
 create policy year_closings_update on year_closings for update to authenticated using ((select public.is_team_member())) with check ((select public.is_team_member()));
--- Geen delete: de geschiedenis van afsluitingen blijft staan.
-revoke delete on year_closings from authenticated, anon;
+-- Geen delete-policy: met row level security kan niemand een afsluiting verwijderen; de geschiedenis blijft staan.
 grant select, insert, update on year_closings to authenticated;
