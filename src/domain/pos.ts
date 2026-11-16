@@ -1,5 +1,5 @@
 // Kassa (POS): snelle verkoop in de winkel. De klant neemt alles direct mee en betaalt meteen.
-import type { CatalogArticle, Customer, Product, Snapshot, Warehouse } from '../data/types'
+import type { CatalogArticle, Customer, Product, Snapshot, Supplier, Warehouse } from '../data/types'
 import { freeAt, lineTotal, round2, stockKey, vatBreakdown } from './calc'
 
 /** Vast artikelnummer voor een artikel met eigen omschrijving (diversen). Telt niet mee als voorraad. */
@@ -94,5 +94,30 @@ export function takeNowShortfalls(s: Snapshot, lines: { product_id: string; qty:
   }
   return out
 }
+
+/**
+ * Bij welk bedrijf hoort een kassaregel (besluit Rick 16 november 2026)? Een artikel van HomeDecoBali (catalogusbron
+ * hdb, of een product of artikel van de leverancier met afkorting HDB) mag alleen op een bon van HDB, elk ander
+ * artikel alleen op een bon van Bella. DIVERSEN hoort bij geen van beide en mag op beide bonnen.
+ */
+export const HDB_SUPPLIER_CODE = 'HDB'
+export const isHdbSupplier = (sup: Pick<Supplier, 'code' | 'name'> | undefined | null) =>
+  !!sup && ((sup.code ?? '').trim().toUpperCase() === HDB_SUPPLIER_CODE || sup.name.trim().toLowerCase() === 'homedecobali')
+
+export function posLineCompany(
+  l: Pick<PosLine, 'dummy' | 'article' | 'product_id' | 'code'>,
+  s: Pick<Snapshot, 'products' | 'suppliers'>,
+): 'bella' | 'hdb' | null {
+  if (l.dummy) return null
+  const sup = (id?: string | null) => (id ? s.suppliers.find((x) => x.id === id) : undefined)
+  if (l.article) return l.article.source === 'hdb' || isHdbSupplier(sup(l.article.supplier_id)) ? 'hdb' : 'bella'
+  const pr = s.products.find((p) => p.id === l.product_id) ?? s.products.find((p) => p.catalog_article_number === l.code)
+  if (pr?.sku === DUMMY_SKU) return null
+  return isHdbSupplier(sup(pr?.supplier_id)) ? 'hdb' : 'bella'
+}
+
+/** De eerste regel die niet bij het gekozen bedrijf hoort, of undefined. */
+export const wrongCompanyLine = <L extends Pick<PosLine, 'dummy' | 'article' | 'product_id' | 'code'>>(lines: L[], issuer: 'bella' | 'hdb', s: Pick<Snapshot, 'products' | 'suppliers'>) =>
+  lines.find((l) => { const c = posLineCompany(l, s); return c !== null && c !== issuer })
 
 export { stockKey }

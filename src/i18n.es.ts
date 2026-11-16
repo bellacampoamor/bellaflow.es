@@ -1790,4 +1790,10 @@ export const es: Record<string, string> = {
   "Let op: een kassaverkoop van HDB gaat ook in de testperiode naar de Shopify van HomeDecoBali. Wissen haalt die bestellingen niet uit Shopify. Uitzetten kan bij Kassa: HDB hierboven.": "Atención: una venta de HDB en caja también se envía al Shopify de HomeDecoBali durante el periodo de prueba. Borrar no elimina esos pedidos de Shopify. Se puede desactivar en Caja: HDB, más arriba.",
   "Versturen naar Shopify staat uit: kassaverkopen van HDB gaan niet naar Shopify.": "El envío a Shopify está desactivado: las ventas en caja de HDB no se envían a Shopify.",
   "Uit": "Desactivado",
+  "Geblokkeerd: {0} is een artikel van HomeDecoBali. Zet de kassa op {1} om het af te rekenen.": "Bloqueado: {0} es un artículo de HomeDecoBali. Cambia la caja a {1} para cobrarlo.",
+  "Geblokkeerd: {0} is geen artikel van HomeDecoBali en hoort niet op een bon van {1}.": "Bloqueado: {0} no es un artículo de HomeDecoBali y no puede ir en un ticket de {1}.",
+  "Omzetten kan niet: {0} hoort niet bij {1}. Verwijder eerst de regels van het andere bedrijf.": "No se puede cambiar: {0} no pertenece a {1}. Quita primero las líneas de la otra empresa.",
+  "{0} hoort niet bij {1}. Verwijder die regel of zet de kassa om.": "{0} no pertenece a {1}. Quita esa línea o cambia la caja.",
+  "{0} is geen artikel van HomeDecoBali en kan niet op een bon van HomeDecoBali.": "{0} no es un artículo de HomeDecoBali y no puede ir en un ticket de HomeDecoBali.",
+  "{0} is een artikel van HomeDecoBali. Zet de kassa op HomeDecoBali om het af te rekenen.": "{0} es un artículo de HomeDecoBali. Cambia la caja a HomeDecoBali para cobrarlo.",
 }

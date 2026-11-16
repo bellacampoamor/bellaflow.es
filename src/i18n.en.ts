@@ -1790,4 +1790,10 @@ export const en: Record<string, string> = {
   "Let op: een kassaverkoop van HDB gaat ook in de testperiode naar de Shopify van HomeDecoBali. Wissen haalt die bestellingen niet uit Shopify. Uitzetten kan bij Kassa: HDB hierboven.": "Note: an HDB till sale also goes to the HomeDecoBali Shopify during the test period. Deleting does not remove those orders from Shopify. You can switch this off under Till: HDB above.",
   "Versturen naar Shopify staat uit: kassaverkopen van HDB gaan niet naar Shopify.": "Sending to Shopify is switched off: HDB till sales do not go to Shopify.",
   "Uit": "Off",
+  "Geblokkeerd: {0} is een artikel van HomeDecoBali. Zet de kassa op {1} om het af te rekenen.": "Blocked: {0} is a HomeDecoBali item. Switch the till to {1} to sell it.",
+  "Geblokkeerd: {0} is geen artikel van HomeDecoBali en hoort niet op een bon van {1}.": "Blocked: {0} is not a HomeDecoBali item and does not belong on a {1} receipt.",
+  "Omzetten kan niet: {0} hoort niet bij {1}. Verwijder eerst de regels van het andere bedrijf.": "Cannot switch: {0} does not belong to {1}. Remove the other company's lines first.",
+  "{0} hoort niet bij {1}. Verwijder die regel of zet de kassa om.": "{0} does not belong to {1}. Remove that line or switch the till.",
+  "{0} is geen artikel van HomeDecoBali en kan niet op een bon van HomeDecoBali.": "{0} is not a HomeDecoBali item and cannot go on a HomeDecoBali receipt.",
+  "{0} is een artikel van HomeDecoBali. Zet de kassa op HomeDecoBali om het af te rekenen.": "{0} is a HomeDecoBali item. Switch the till to HomeDecoBali to sell it.",
 }

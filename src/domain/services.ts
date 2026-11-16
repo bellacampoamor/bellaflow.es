@@ -17,7 +17,7 @@ import { activeClosings, closeBlocker, lastNumbers, numberYear, openYear, rollba
 import { goesToShopify, shopifyBacklog, shopifyCompletes, shopifyOrderOf, shopifySendingOn } from './shopify'
 import { creditableAmount, creditableLines, creditSeries, creditSettlement, isCredit } from './credit'
 import { cashCount, closingOn, closingsOf, countedTotal, DENOMINATIONS, denomKey, kassaDay, openingFloat, type CashCounts } from './cashClosing'
-import { DUMMY_SKU, missingCustomerData, POS_CUSTOMER_NOTE, posShortfalls, posTotals, posWarehouse, SIMPLIFIED_LIMIT, takeNowShortfalls, type PosLine } from './pos'
+import { DUMMY_SKU, missingCustomerData, POS_CUSTOMER_NOTE, posShortfalls, posTotals, posWarehouse, SIMPLIFIED_LIMIT, takeNowShortfalls, wrongCompanyLine, type PosLine } from './pos'
 import { isSendable, PURCHASE_MAIL, purchaseJsonFileName, purchaseOrdersJson, toBase64 } from './purchaseExport'
 import { articleSources, categoryName, priceWithSurcharge, finishArticleSync, missingSupplierCodes, planArticleSync } from './articles'
 import { DETAIL_COLUMNS, SHOWROOM_COLUMNS, showroomDetailFromCsv, showroomItemFromCsv } from './showroom'
@@ -569,6 +569,12 @@ export async function posCheckout(db: Driver, input: PosInput) {
   checkInvoiceEmail(input)
   const s0 = await loadSnapshot(db)
   const shop = posWarehouse(s0.warehouses) ?? (fail(tx("Er is geen actieve winkel of magazijn onder Instellingen.")) as never)
+  // Een HDB-artikel alleen op een bon van HDB, een ander artikel alleen op een bon van Bella (besluit Rick 16 november 2026).
+  const posIssuer = input.issuer === 'hdb' ? 'hdb' : 'bella'
+  const wrong = wrongCompanyLine(input.lines, posIssuer, s0)
+  if (wrong) fail(posIssuer === 'hdb'
+    ? tx("{0} is geen artikel van HomeDecoBali en kan niet op een bon van HomeDecoBali.", wrong.description || wrong.code)
+    : tx("{0} is een artikel van HomeDecoBali. Zet de kassa op HomeDecoBali om het af te rekenen.", wrong.description || wrong.code))
   const chosen = input.customer_id ? s0.customers.find((c) => c.id === input.customer_id) ?? (fail(tx("Klant niet gevonden.")) as never) : null
   // Factura simplificada: boven de grens zijn naam, adres, woonplaats en NIE of paspoort van de klant verplicht.
   if (posTotals(input.lines).total > SIMPLIFIED_LIMIT) {

@@ -3,7 +3,7 @@ import { AlertTriangle, Banknote, Check as CheckIcon, CreditCard, Minus, PenLine
 import type { Customer, Payment } from '../data/types'
 import { freeAt, lineTotal, todayISO } from '../domain/calc'
 import { labelBasePrice } from '../domain/labels'
-import { addPosLine, DUMMY_SKU, isDummyCode, missingCustomerData, POS_CUSTOMER_NOTE, posTotals, posWarehouse, SIMPLIFIED_LIMIT, type PosLine } from '../domain/pos'
+import { addPosLine, DUMMY_SKU, isDummyCode, missingCustomerData, POS_CUSTOMER_NOTE, posLineCompany, posTotals, posWarehouse, SIMPLIFIED_LIMIT, wrongCompanyLine, type PosLine } from '../domain/pos'
 import { findArticleByCode, findInvoiceByNumber, posCheckout, saveRecord } from '../domain/services'
 import { canCredit, isCredit } from '../domain/credit'
 import { loadSnapshot } from '../data/driver'
@@ -27,6 +27,25 @@ const newKey = () => `${Date.now()}-${seq++}`
 
 const emptyCustomer: Omit<Customer, 'id'> = { kind: 'particulier', name: '', company: '', tax_id: '', email: '', phone: '', language: 'es', address: '', postal_code: '', city: '', province: 'Alicante', country: 'España', notes: '' }
 const editable = (el: Element | null) => !!el && (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || el instanceof HTMLSelectElement || (el as HTMLElement).isContentEditable)
+
+/** Korte, lage foutpiep (twee tonen) als een artikel niet bij het gekozen bedrijf hoort. Zonder geluid gaat het gewoon verder. */
+let audio: AudioContext | null = null
+function errorBeep() {
+  try {
+    audio ??= new AudioContext()
+    const ctx = audio
+    void ctx.resume()
+    ;[0, 0.22].forEach((at) => {
+      const o = ctx.createOscillator(), g = ctx.createGain()
+      o.type = 'square'; o.frequency.value = 330
+      g.gain.setValueAtTime(0.0001, ctx.currentTime + at)
+      g.gain.exponentialRampToValueAtTime(0.25, ctx.currentTime + at + 0.01)
+      g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + at + 0.18)
+      o.connect(g).connect(ctx.destination)
+      o.start(ctx.currentTime + at); o.stop(ctx.currentTime + at + 0.2)
+    })
+  } catch { /* geen geluid beschikbaar */ }
+}
 
 /**
  * Een bluetooth- of USB-handscanner typt de code razendsnel en sluit af met Enter. Staat de cursor niet in een
@@ -123,19 +142,47 @@ export function Pos() {
     setFocusKey(null)
   }, [focusKey, lines])
 
+  // Een HDB-artikel alleen op een bon van HomeDecoBali, een ander artikel alleen op een bon van Bella (besluit Rick 16 november 2026).
+  const blockWrong = (l: PosLine) => {
+    const c = posLineCompany(l, s)
+    if (c === null || c === (hdb ? 'hdb' : 'bella')) return false
+    errorBeep()
+    const name = `${l.code} ${l.description}`.trim()
+    setMessage(c === 'hdb'
+      ? tx("Geblokkeerd: {0} is een artikel van HomeDecoBali. Zet de kassa op {1} om het af te rekenen.", name, hdbLabel)
+      : tx("Geblokkeerd: {0} is geen artikel van HomeDecoBali en hoort niet op een bon van {1}.", name, hdbLabel))
+    refocus()
+    return true
+  }
+
   const addPick = (p: ArticlePick) => {
     setDone(null); setMessage('')
+    let line: PosLine
     if (p.kind === 'product') {
       const pr = p.product
       if (pr.sku === DUMMY_SKU) return addDummy()
-      setLines((v) => addPosLine(v, { key: newKey(), product_id: pr.id, code: pr.catalog_article_number || pr.sku, description: pr.name, qty: 1, unit_price: pr.sale_price, discount_pct: 0, vat_rate: pr.vat_rate }))
+      line = { key: newKey(), product_id: pr.id, code: pr.catalog_article_number || pr.sku, description: pr.name, qty: 1, unit_price: pr.sale_price, discount_pct: 0, vat_rate: pr.vat_rate }
     } else {
       const a = p.article
       const pr = s.products.find((x) => x.catalog_article_number === a.article_number)
-      setLines((v) => addPosLine(v, { key: newKey(), article: a, product_id: pr?.id, code: a.article_number, description: pr?.name ?? a.name, qty: 1, unit_price: labelBasePrice(a, s.products, s.suppliers) ?? 0, discount_pct: 0, vat_rate: pr?.vat_rate ?? 21 }))
+      line = { key: newKey(), article: a, product_id: pr?.id, code: a.article_number, description: pr?.name ?? a.name, qty: 1, unit_price: labelBasePrice(a, s.products, s.suppliers) ?? 0, discount_pct: 0, vat_rate: pr?.vat_rate ?? 21 }
     }
+    if (blockWrong(line)) return
+    setLines((v) => addPosLine(v, line))
     refocus()
   }
+
+  // Omzetten mag alleen als alle artikelen op de bon bij het nieuwe bedrijf horen.
+  const switchCompany = (toHdb: boolean) => {
+    if (toHdb === hdb) return scanRef.current?.focus()
+    const wrong = wrongCompanyLine(lines, toHdb ? 'hdb' : 'bella', s)
+    if (wrong) {
+      errorBeep()
+      setMessage(tx("Omzetten kan niet: {0} hoort niet bij {1}. Verwijder eerst de regels van het andere bedrijf.", `${wrong.code} ${wrong.description}`.trim(), toHdb ? hdbLabel : bellaLabel))
+    } else { setHdb(toHdb); setMessage('') }
+    scanRef.current?.focus()
+  }
+  const wrongInCart = wrongCompanyLine(lines, hdb ? 'hdb' : 'bella', s)
 
   async function lookup(raw: string) {
     const c = raw.trim()
@@ -168,6 +215,7 @@ export function Pos() {
 
   async function checkout() {
     if (!me) return toast(tx("Kies eerst de medewerker."), true)
+    if (wrongInCart) { errorBeep(); return toast(tx("{0} hoort niet bij {1}. Verwijder die regel of zet de kassa om.", wrongInCart.description || wrongInCart.code, hdb ? hdbLabel : bellaLabel), true) }
     const noPrice = lines.find((l) => l.unit_price <= 0)
     if (noPrice) return toast(tx("Vul bij {0} een prijs in.", noPrice.description || noPrice.code), true)
     const noDesc = lines.find((l) => l.dummy && !l.description.trim())
@@ -220,8 +268,8 @@ export function Pos() {
         <div className="pos-company">
           <span className="small muted" id="pos-company-label">{tx("Bon voor")}</span>
           <div className={`pos-company-toggle${hdb ? ' hdb' : ''}`} role="radiogroup" aria-labelledby="pos-company-label">
-            <button type="button" role="radio" aria-checked={!hdb} className={!hdb ? 'on' : ''} onClick={() => { setHdb(false); scanRef.current?.focus() }} title={bella.name}>{bellaLabel}</button>
-            <button type="button" role="radio" aria-checked={hdb} className={hdb ? 'on' : ''} onClick={() => { setHdb(true); scanRef.current?.focus() }} title={hdbInfo.name}>{hdbLabel}</button>
+            <button type="button" role="radio" aria-checked={!hdb} className={!hdb ? 'on' : ''} onClick={() => switchCompany(false)} title={bella.name}>{bellaLabel}</button>
+            <button type="button" role="radio" aria-checked={hdb} className={hdb ? 'on' : ''} onClick={() => switchCompany(true)} title={hdbInfo.name}>{hdbLabel}</button>
           </div>
         </div>
         <label className="pos-user">
@@ -247,7 +295,8 @@ export function Pos() {
               <button className="btn" type="button" onClick={addDummy} title={tx("Artikel met eigen omschrijving, artikelnummer {0}", DUMMY_SKU)}><PenLine size={16} />{tx("Diversen")}</button>
             </div>
             {busy && <div className="note">{tx("Even zoeken…")}</div>}
-            {message && <div className="note bad">{message}</div>}
+            {message && <div className="note bad" role="alert">{message}</div>}
+            {!message && wrongInCart && <div className="note bad" role="alert">{tx("{0} hoort niet bij {1}. Verwijder die regel of zet de kassa om.", wrongInCart.description || wrongInCart.code, hdb ? hdbLabel : bellaLabel)}</div>}
           </section>
 
           {done && (

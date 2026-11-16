@@ -4,7 +4,7 @@ import { LocalDriver } from '../src/data/localDriver'
 import type { CatalogArticle } from '../src/data/types'
 import { freeAt, onHandMap, stockKey } from '../src/domain/calc'
 import { seedDemo } from '../src/domain/demo'
-import { addPosLine, DUMMY_SKU, isDummyCode, missingCustomerData, POS_CUSTOMER_NOTE, posTotals, SIMPLIFIED_LIMIT, type PosLine } from '../src/domain/pos'
+import { addPosLine, DUMMY_SKU, posLineCompany, wrongCompanyLine, isDummyCode, missingCustomerData, POS_CUSTOMER_NOTE, posTotals, SIMPLIFIED_LIMIT, type PosLine } from '../src/domain/pos'
 import { importShowroom, posCheckout, saveSettings, productForArticle, saveRecord, syncCatalogArticles } from '../src/domain/services'
 import { invoiceReport } from '../src/domain/calc'
 import { HDB_DEFAULTS, issuerInfo, legalLine, settingsUpgrade } from '../src/domain/issuers'
@@ -238,5 +238,36 @@ describe('Bedragen met twee decimalen', () => {
     expect(showNum(187.4, 2)).toBe('187,40')
     expect(showNum(5, 2)).toBe('5,00')
     expect(showNum(187.4)).toBe('187,4')
+  })
+})
+
+describe('Kassa: HDB-artikelen alleen op een bon van HDB (besluit Rick 16 november 2026)', () => {
+  const hdbArticle = (): CatalogArticle => ({ ...table, id: newId(), article_number: 'HDB-00001', supplier_sku: 'HDB-SKU-1', source: 'hdb', name: 'Teakhouten kom' })
+
+  it('herkent per regel het bedrijf; DIVERSEN hoort bij beide', () => {
+    expect(posLineCompany(line({}), db.data)).toBe('bella')
+    expect(posLineCompany(line({ article: hdbArticle(), code: 'HDB-00001' }), db.data)).toBe('hdb')
+    expect(posLineCompany(dummy(5), db.data)).toBeNull()
+    expect(wrongCompanyLine([dummy(5), line({})], 'hdb', db.data)?.code).toBe(table.article_number)
+    expect(wrongCompanyLine([dummy(5), line({})], 'bella', db.data)).toBeUndefined()
+  })
+
+  it('herkent een HDB-artikel ook aan de leverancier met afkorting HDB', async () => {
+    const supId = newId()
+    await db.insert('suppliers', [{ ...db.data.suppliers[0], id: supId, name: 'Leverancier X', code: 'HDB' }])
+    const a = { ...table, id: newId(), supplier_id: supId, article_number: 'HDB-00002' }
+    expect(posLineCompany(line({ article: a, code: a.article_number }), db.data)).toBe('hdb')
+  })
+
+  it('weigert een HDB-artikel op een bon van Bella en een ander artikel op een bon van HDB', async () => {
+    const h = hdbArticle()
+    await expect(checkout([line({ article: h, code: h.article_number })])).rejects.toThrow(/HomeDecoBali/)
+    await expect(checkout([line({})], { issuer: 'hdb' })).rejects.toThrow(/HomeDecoBali/)
+    expect(db.data.invoices.filter((i) => i.simplified)).toHaveLength(0)
+  })
+
+  it('DIVERSEN mag op beide bonnen', async () => {
+    await expect(checkout([dummy(20)], { issuer: 'hdb' })).resolves.toBeTruthy()
+    await expect(checkout([dummy(20)])).resolves.toBeTruthy()
   })
 })
