@@ -68,6 +68,35 @@ function preloadBeep() {
     beepEl.load()
   } catch { /* geen geluid beschikbaar */ }
 }
+/**
+ * Geluidsuitvoer wakker houden zolang de Kassa open is: een onhoorbaar zacht signaal (30 Hz, heel lage sterkte), zodat
+ * Windows de speaker niet in slaap zet en de eerste piep niet wegvalt. Start pas na een klik of toets (eis van de browser),
+ * stopt bij het verlaten van de Kassa.
+ */
+let keepAwake: AudioContext | null = null
+function startKeepAwake() {
+  try {
+    if (keepAwake) { if (keepAwake.state === 'suspended') void keepAwake.resume(); return }
+    const ctx = new AudioContext()
+    const o = ctx.createOscillator(), g = ctx.createGain()
+    o.frequency.value = 30; g.gain.value = 0.001
+    o.connect(g).connect(ctx.destination)
+    o.start()
+    keepAwake = ctx
+  } catch { /* geen geluid beschikbaar */ }
+}
+function stopKeepAwake() {
+  try { void keepAwake?.close() } catch { /* al dicht */ }
+  keepAwake = null
+}
+function useKeepAudioAwake() {
+  useEffect(() => {
+    const on = () => startKeepAwake()
+    window.addEventListener('pointerdown', on, true)
+    window.addEventListener('keydown', on, true)
+    return () => { window.removeEventListener('pointerdown', on, true); window.removeEventListener('keydown', on, true); stopKeepAwake() }
+  }, [])
+}
 function errorBeep() {
   try {
     preloadBeep()
@@ -133,6 +162,7 @@ export function Pos() {
   const [hdb, setHdb] = useState(false)
   const scanRef = useRef<HTMLInputElement>(null)
   useEffect(preloadBeep, [])
+  useKeepAudioAwake()
 
   const shop = posWarehouse(s.warehouses)
   const bella = issuerInfo(s.settings[0], 'bella'), hdbInfo = issuerInfo(s.settings[0], 'hdb')
