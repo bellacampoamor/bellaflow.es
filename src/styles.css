@@ -283,6 +283,10 @@ td input.price { width: 104px; }
 .note { background: var(--surface-2); border-radius: 8px; padding: 9px 12px; font-size: .88rem; }
 .note.warn { background: var(--warn-bg); color: var(--warn); }
 .note.bad { background: var(--bad-bg); color: var(--bad); }
+/* Kassa: een geblokkeerd artikel laat de melding elke keer even oplichten. */
+.note.flash { animation: note-flash .5s ease-out 1; }
+@keyframes note-flash { 0%, 40% { box-shadow: 0 0 0 3px var(--bad); } 100% { box-shadow: 0 0 0 0 transparent; } }
+@media (prefers-reduced-motion: reduce) { .note.flash { animation: none; } }
 .toast { position: fixed; left: max(16px, env(safe-area-inset-left, 0px)); bottom: calc(16px + env(safe-area-inset-bottom, 0px)); z-index: 60; max-width: min(460px, calc(100vw - 32px)); padding: 11px 15px; border-radius: 9px; background: var(--good-bg); color: var(--good); font-weight: 600; box-shadow: var(--shadow); display: flex; gap: 12px; align-items: flex-start; }
 .toast.err { background: var(--bad-bg); color: var(--bad); }
 

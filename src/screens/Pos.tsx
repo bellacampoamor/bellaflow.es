@@ -28,22 +28,36 @@ const newKey = () => `${Date.now()}-${seq++}`
 const emptyCustomer: Omit<Customer, 'id'> = { kind: 'particulier', name: '', company: '', tax_id: '', email: '', phone: '', language: 'es', address: '', postal_code: '', city: '', province: 'Alicante', country: 'España', notes: '' }
 const editable = (el: Element | null) => !!el && (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || el instanceof HTMLSelectElement || (el as HTMLElement).isContentEditable)
 
-/** Korte, lage foutpiep (twee tonen) als een artikel niet bij het gekozen bedrijf hoort. Zonder geluid gaat het gewoon verder. */
-let audio: AudioContext | null = null
+/**
+ * Korte, lage foutpiep (twee tonen) als een artikel niet bij het gekozen bedrijf hoort. Eén keer een WAV-bestand in het
+ * geheugen gemaakt; elke piep speelt een nieuw audio-element af, zodat hij ook de tweede, derde ... keer klinkt
+ * (een gedeelde AudioContext kon na de eerste keer stil blijven). Zonder geluid gaat het gewoon verder.
+ */
+let beepUrl = ''
+function beepWav(): string {
+  const rate = 22050, tone = 0.18, gap = 0.06, n = Math.round(rate * (tone * 2 + gap))
+  const data = new DataView(new ArrayBuffer(44 + n * 2))
+  const str = (o: number, v: string) => { for (let i = 0; i < v.length; i++) data.setUint8(o + i, v.charCodeAt(i)) }
+  str(0, 'RIFF'); data.setUint32(4, 36 + n * 2, true); str(8, 'WAVE'); str(12, 'fmt ')
+  data.setUint32(16, 16, true); data.setUint16(20, 1, true); data.setUint16(22, 1, true)
+  data.setUint32(24, rate, true); data.setUint32(28, rate * 2, true); data.setUint16(32, 2, true); data.setUint16(34, 16, true)
+  str(36, 'data'); data.setUint32(40, n * 2, true)
+  for (let i = 0; i < n; i++) {
+    const t = i / rate, inSecond = t >= tone + gap, local = inSecond ? t - tone - gap : t
+    const on = local < tone && (inSecond || t < tone)
+    const fade = Math.min(1, local / 0.01, (tone - local) / 0.02)
+    const v = on ? (Math.sin(2 * Math.PI * 330 * t) >= 0 ? 1 : -1) * 0.3 * Math.max(0, fade) : 0
+    data.setInt16(44 + i * 2, Math.round(v * 32767), true)
+  }
+  let bin = ''
+  const bytes = new Uint8Array(data.buffer)
+  for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i])
+  return `data:audio/wav;base64,${btoa(bin)}`
+}
 function errorBeep() {
   try {
-    audio ??= new AudioContext()
-    const ctx = audio
-    void ctx.resume()
-    ;[0, 0.22].forEach((at) => {
-      const o = ctx.createOscillator(), g = ctx.createGain()
-      o.type = 'square'; o.frequency.value = 330
-      g.gain.setValueAtTime(0.0001, ctx.currentTime + at)
-      g.gain.exponentialRampToValueAtTime(0.25, ctx.currentTime + at + 0.01)
-      g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + at + 0.18)
-      o.connect(g).connect(ctx.destination)
-      o.start(ctx.currentTime + at); o.stop(ctx.currentTime + at + 0.2)
-    })
+    beepUrl ||= beepWav()
+    void new Audio(beepUrl).play().catch(() => { /* geen geluid toegestaan of beschikbaar */ })
   } catch { /* geen geluid beschikbaar */ }
 }
 
@@ -94,6 +108,8 @@ export function Pos() {
   const [code, setCode] = useState('')
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState('')
+  // Telt elke blokkade, zodat de melding ook bij dezelfde tekst opnieuw oplicht.
+  const [blocked, setBlocked] = useState(0)
   const [newCust, setNewCust] = useState<(Omit<Customer, 'id'> & { id?: string }) | null>(null)
   const [done, setDone] = useState<{ issuer: string; orderNumber: string; invoiceId: string; invoiceNumber: string; change: number; note: string; shop: string; shopBad: boolean; corrected: number } | null>(null)
   const [focusKey, setFocusKey] = useState<string | null>(null)
@@ -147,6 +163,7 @@ export function Pos() {
     const c = posLineCompany(l, s)
     if (c === null || c === (hdb ? 'hdb' : 'bella')) return false
     errorBeep()
+    setBlocked((n) => n + 1)
     const name = `${l.code} ${l.description}`.trim()
     setMessage(c === 'hdb'
       ? tx("Geblokkeerd: {0} is een artikel van HomeDecoBali. Zet de kassa op {1} om het af te rekenen.", name, hdbLabel)
@@ -178,6 +195,7 @@ export function Pos() {
     const wrong = wrongCompanyLine(lines, toHdb ? 'hdb' : 'bella', s)
     if (wrong) {
       errorBeep()
+      setBlocked((n) => n + 1)
       setMessage(tx("Omzetten kan niet: {0} hoort niet bij {1}. Verwijder eerst de regels van het andere bedrijf.", `${wrong.code} ${wrong.description}`.trim(), toHdb ? hdbLabel : bellaLabel))
     } else { setHdb(toHdb); setMessage('') }
     scanRef.current?.focus()
@@ -295,7 +313,7 @@ export function Pos() {
               <button className="btn" type="button" onClick={addDummy} title={tx("Artikel met eigen omschrijving, artikelnummer {0}", DUMMY_SKU)}><PenLine size={16} />{tx("Diversen")}</button>
             </div>
             {busy && <div className="note">{tx("Even zoeken…")}</div>}
-            {message && <div className="note bad" role="alert">{message}</div>}
+            {message && <div key={blocked} className={`note bad${blocked ? ' flash' : ''}`} role="alert">{message}</div>}
             {!message && wrongInCart && <div className="note bad" role="alert">{tx("{0} hoort niet bij {1}. Verwijder die regel of zet de kassa om.", wrongInCart.description || wrongInCart.code, hdb ? hdbLabel : bellaLabel)}</div>}
           </section>
 
