@@ -88,8 +88,12 @@ describe('Shopify: kassa en wachtrij', () => {
     table = (await db.searchArticles({ q: 'K-TAF' }))[0]
     seller = db.data.salespeople[0].id
   })
-  const line = (): PosLine => ({ key: newId(), code: table.article_number, article: table, description: table.name, qty: 1, unit_price: 187.4, discount_pct: 0, vat_rate: 21 })
-  const checkout = (issuer: 'bella' | 'hdb') => posCheckout(db, { salesperson_id: seller, customer_id: null, date: TODAY, lines: [line()], payment: { method: 'pin', reference: '' }, issuer })
+  // Een bon van HDB mag alleen HDB-artikelen bevatten (besluit Rick 16 november 2026): dan hetzelfde artikel als HDB-artikel.
+  const line = (issuer: 'bella' | 'hdb'): PosLine => {
+    const a: CatalogArticle = issuer === 'hdb' ? { ...table, source: 'hdb' } : table
+    return { key: newId(), code: a.article_number, article: a, description: a.name, qty: 1, unit_price: 187.4, discount_pct: 0, vat_rate: 21 }
+  }
+  const checkout = (issuer: 'bella' | 'hdb') => posCheckout(db, { salesperson_id: seller, customer_id: null, date: TODAY, lines: [line(issuer)], payment: { method: 'pin', reference: '' }, issuer })
 
   it('een kassaverkoop van HDB komt één keer in de wachtrij; in de browserversie als testversie', async () => {
     const r = await checkout('hdb')

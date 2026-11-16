@@ -26,6 +26,12 @@ const shopId = () => db.data.warehouses.find((w) => w.kind === 'winkel')!.id
 const shopProduct = () => db.data.products.find((p) => p.sku !== DUMMY_SKU && p.is_active)!
 async function sellAtPos(issuer: 'bella' | 'hdb' = 'bella', method: 'pin' | 'contant' = 'contant') {
   const p = shopProduct()
+  if (issuer === 'hdb') {
+    // Een bon van HDB mag alleen HDB-artikelen bevatten (besluit Rick 16 november 2026): het product komt dan van HomeDecoBali.
+    const supId = newId()
+    await db.insert('suppliers', [{ ...db.data.suppliers[0], id: supId, name: 'HomeDecoBali', code: 'HDB' }])
+    await db.update('products', p.id, { supplier_id: supId })
+  }
   const lines: PosLine[] = [
     { key: newId(), product_id: p.id, code: p.sku, description: p.name, qty: 2, unit_price: 100, discount_pct: 0, vat_rate: 21 },
     { key: newId(), dummy: true, code: DUMMY_SKU, description: 'Kussen', qty: 1, unit_price: 20, discount_pct: 0, vat_rate: 21 },
