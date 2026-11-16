@@ -29,13 +29,14 @@ const emptyCustomer: Omit<Customer, 'id'> = { kind: 'particulier', name: '', com
 const editable = (el: Element | null) => !!el && (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || el instanceof HTMLSelectElement || (el as HTMLElement).isContentEditable)
 
 /**
- * Korte, lage foutpiep (twee tonen) als een artikel niet bij het gekozen bedrijf hoort. Eén keer een WAV-bestand in het
- * geheugen gemaakt; elke piep speelt een nieuw audio-element af, zodat hij ook de tweede, derde ... keer klinkt
- * (een gedeelde AudioContext kon na de eerste keer stil blijven). Zonder geluid gaat het gewoon verder.
+ * Lage foutpiep (twee tonen) als een artikel niet bij het gekozen bedrijf hoort.
+ * Windows zet de geluidsuitvoer (vooral bluetooth- en HDMI-speakers) na een stille periode in slaap en kapt dan het
+ * begin van het eerste geluid af. Daarom begint de WAV met een korte stilte en zijn de tonen langer, en wordt het
+ * geluid al geladen zodra de Kassa opent. Elke piep speelt een kopie af, zodat hij bij elke poging klinkt.
  */
-let beepUrl = ''
+const BEEP = { rate: 22050, lead: 0.35, tone: 0.25, gap: 0.08, hz: 330 }
 function beepWav(): string {
-  const rate = 22050, tone = 0.18, gap = 0.06, n = Math.round(rate * (tone * 2 + gap))
+  const { rate, lead, tone, gap, hz } = BEEP, n = Math.round(rate * (lead + tone * 2 + gap))
   const data = new DataView(new ArrayBuffer(44 + n * 2))
   const str = (o: number, v: string) => { for (let i = 0; i < v.length; i++) data.setUint8(o + i, v.charCodeAt(i)) }
   str(0, 'RIFF'); data.setUint32(4, 36 + n * 2, true); str(8, 'WAVE'); str(12, 'fmt ')
@@ -43,10 +44,13 @@ function beepWav(): string {
   data.setUint32(24, rate, true); data.setUint32(28, rate * 2, true); data.setUint16(32, 2, true); data.setUint16(34, 16, true)
   str(36, 'data'); data.setUint32(40, n * 2, true)
   for (let i = 0; i < n; i++) {
-    const t = i / rate, inSecond = t >= tone + gap, local = inSecond ? t - tone - gap : t
-    const on = local < tone && (inSecond || t < tone)
-    const fade = Math.min(1, local / 0.01, (tone - local) / 0.02)
-    const v = on ? (Math.sin(2 * Math.PI * 330 * t) >= 0 ? 1 : -1) * 0.3 * Math.max(0, fade) : 0
+    const t = i / rate - lead
+    const start = t < 0 ? -1 : t < tone ? 0 : t >= tone + gap && t < tone * 2 + gap ? tone + gap : -1
+    let v = 0
+    if (start >= 0) {
+      const local = t - start, fade = Math.max(0, Math.min(1, local / 0.01, (tone - local) / 0.02))
+      v = (Math.sin(2 * Math.PI * hz * t) >= 0 ? 1 : -1) * 0.3 * fade
+    }
     data.setInt16(44 + i * 2, Math.round(v * 32767), true)
   }
   let bin = ''
@@ -54,10 +58,22 @@ function beepWav(): string {
   for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i])
   return `data:audio/wav;base64,${btoa(bin)}`
 }
+let beepEl: HTMLAudioElement | null = null
+/** Geluid alvast maken en laden (bij het openen van de Kassa), zodat de eerste piep niet op laden wacht. */
+function preloadBeep() {
+  try {
+    if (beepEl) return
+    beepEl = new Audio(beepWav())
+    beepEl.preload = 'auto'
+    beepEl.load()
+  } catch { /* geen geluid beschikbaar */ }
+}
 function errorBeep() {
   try {
-    beepUrl ||= beepWav()
-    void new Audio(beepUrl).play().catch(() => { /* geen geluid toegestaan of beschikbaar */ })
+    preloadBeep()
+    if (!beepEl) return
+    const a = beepEl.cloneNode(true) as HTMLAudioElement
+    void a.play().catch(() => { /* geen geluid toegestaan of beschikbaar */ })
   } catch { /* geen geluid beschikbaar */ }
 }
 
@@ -116,6 +132,7 @@ export function Pos() {
   // Welk bedrijf de eenvoudige factuur uitgeeft: Bella (standaard) of HDB (Handmade Bali Treasures SL). Na elke verkoop weer Bella.
   const [hdb, setHdb] = useState(false)
   const scanRef = useRef<HTMLInputElement>(null)
+  useEffect(preloadBeep, [])
 
   const shop = posWarehouse(s.warehouses)
   const bella = issuerInfo(s.settings[0], 'bella'), hdbInfo = issuerInfo(s.settings[0], 'hdb')
