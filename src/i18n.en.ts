@@ -1671,7 +1671,6 @@ export const en: Record<string, string> = {
   "Testversie: niet naar Shopify gestuurd.": "Test version: not sent to Shopify.",
   "Nog niet in Shopify: {0} Opnieuw versturen kan onder Beheer > Kassa.": "Not in Shopify yet: {0} You can resend it under Admin > POS.",
   "wacht op Shopify.": "waiting for Shopify.",
-  "Een creditfactuur van HDB gaat niet automatisch naar Shopify. Verwerk de retour of terugbetaling in Shopify bij de bestelling van {0}.": "An HDB credit note is not sent to Shopify automatically. Process the return or refund in Shopify on the order of {0}.",
   "Shopify van HomeDecoBali": "HomeDecoBali Shopify",
   "Elke kassaverkoop van HDB komt als conceptorder in Shopify, met artikelen, prijzen, korting, klant, verkoper, betaalwijze en factuurnummer. Op Afgehandeld zetten doe je zelf in Shopify, als laatste controle.": "Every HDB POS sale goes to Shopify as a draft order, with items, prices, discount, customer, salesperson, payment method and invoice number. You mark it as Fulfilled yourself in Shopify, as the final check.",
   "Conceptorder meteen omzetten naar een bestelling (betaald), met het ordernummer van Shopify": "Convert the draft order straight away into an order (paid), with the Shopify order number",
@@ -1810,4 +1809,9 @@ export const en: Record<string, string> = {
   "Groter bekijken": "View larger",
   "Let op:": "Note:",
   "Tip:": "Tip:",
+  "Een retour aan de kassa wordt terugbetaald zoals er betaald is: {0}.": "A return at the till is refunded the way it was paid: {0}.",
+  "Terug aan de klant met {0}, zoals er betaald is.": "Refund to the customer by {0}, the way it was paid.",
+  "Gaat ook naar Shopify: terugbetaling op de bestelling van {0}, met de artikelen terug in voorraad.": "Also goes to Shopify: refund on the order of {0}, with the items back in stock.",
+  "Versturen naar Shopify staat uit: deze retour gaat niet naar Shopify.": "Sending to Shopify is off: this return will not go to Shopify.",
+  "Shopify terugbetaald op": "Shopify refunded on",
 }

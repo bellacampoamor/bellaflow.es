@@ -262,6 +262,10 @@ export interface CashClosing {
 export type ShopifyPushStatus = 'wachtrij' | 'bezig' | 'aangemaakt' | 'mislukt' | 'demo'
 export interface HdbShopifyOrder {
   id: string; invoice_id: string; status: ShopifyPushStatus
+  /** verkoop: kassabon van HDB als bestelling. retour: creditfactuur op zo'n kassabon als terugbetaling (refund) in Shopify. Ontbreekt = verkoop. */
+  kind?: 'verkoop' | 'retour'
+  /** Retour: de refund in Shopify. */
+  shopify_refund_id?: string
   /** Meteen omzetten naar een bestelling (als betaald) met een Shopify-ordernummer, of conceptorder laten. */
   complete_order: boolean
   shopify_draft_id: string; shopify_draft_name: string; shopify_order_id: string; shopify_order_name: string

@@ -1671,7 +1671,6 @@ export const es: Record<string, string> = {
   "Testversie: niet naar Shopify gestuurd.": "Versión de prueba: no se ha enviado a Shopify.",
   "Nog niet in Shopify: {0} Opnieuw versturen kan onder Beheer > Kassa.": "Todavía no está en Shopify: {0} Puedes reenviarlo en Gestión > TPV.",
   "wacht op Shopify.": "esperando a Shopify.",
-  "Een creditfactuur van HDB gaat niet automatisch naar Shopify. Verwerk de retour of terugbetaling in Shopify bij de bestelling van {0}.": "Una factura rectificativa de HDB no se envía automáticamente a Shopify. Registra la devolución o el reembolso en Shopify en el pedido de {0}.",
   "Shopify van HomeDecoBali": "Shopify de HomeDecoBali",
   "Elke kassaverkoop van HDB komt als conceptorder in Shopify, met artikelen, prijzen, korting, klant, verkoper, betaalwijze en factuurnummer. Op Afgehandeld zetten doe je zelf in Shopify, als laatste controle.": "Cada venta de TPV de HDB llega a Shopify como pedido borrador, con artículos, precios, descuento, cliente, vendedor, forma de pago y número de factura. Marcarlo como Preparado lo haces tú en Shopify, como control final.",
   "Conceptorder meteen omzetten naar een bestelling (betaald), met het ordernummer van Shopify": "Convertir el pedido borrador enseguida en un pedido (pagado), con el número de pedido de Shopify",
@@ -1810,4 +1809,9 @@ export const es: Record<string, string> = {
   "Groter bekijken": "Ver más grande",
   "Let op:": "Atención:",
   "Tip:": "Consejo:",
+  "Een retour aan de kassa wordt terugbetaald zoals er betaald is: {0}.": "Una devolución en caja se reembolsa igual que se pagó: {0}.",
+  "Terug aan de klant met {0}, zoals er betaald is.": "Se devuelve al cliente con {0}, igual que se pagó.",
+  "Gaat ook naar Shopify: terugbetaling op de bestelling van {0}, met de artikelen terug in voorraad.": "También va a Shopify: reembolso en el pedido de {0}, con los artículos de vuelta en stock.",
+  "Versturen naar Shopify staat uit: deze retour gaat niet naar Shopify.": "El envío a Shopify está desactivado: esta devolución no irá a Shopify.",
+  "Shopify terugbetaald op": "Shopify reembolsado en",
 }

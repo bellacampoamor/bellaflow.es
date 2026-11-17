@@ -1,4 +1,4 @@
-import type { Driver } from './driver'
+import type { BatchStep, Driver } from './driver'
 import { tx } from '../i18n'
 import { ArticleStore } from '../domain/articles'
 import { TABLES, type ArticleQuery, type CatalogArticle, type CatalogListQuery, type CatalogArticleElement, type EmailAttachment, type Snapshot, type TableName } from './types'
@@ -84,6 +84,13 @@ export class LocalDriver implements Driver {
   async insert<T extends TableName>(table: T, rows: Snapshot[T][number][]) {
     this.sync();
     (this.data[table] as unknown[]).push(...structuredClone(rows)); this.save()
+  }
+  async commit(batch: BatchStep[]) {
+    this.sync()
+    // Eerst alles kopiëren, dan in één keer toevoegen en één keer opslaan: alles of niets.
+    const copies = batch.map((b) => [b.table, structuredClone(b.rows)] as const)
+    for (const [t, rows] of copies) (this.data[t] as unknown[]).push(...rows)
+    this.save()
   }
   async upsert<T extends TableName>(table: T, rows: Snapshot[T][number][]) {
     this.sync()

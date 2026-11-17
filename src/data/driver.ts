@@ -2,6 +2,9 @@ import { OPTIONAL_TABLES, TABLES, type ArticleHit, type ArticleQuery, type Catal
 
 // De enige plek waar de app met opslag praat. Schermen en bedrijfslogica kennen alleen dit contract,
 // dus overstappen van browseropslag naar Supabase raakt geen enkel scherm.
+/** Rijen voor één tabel binnen een batch (zie Driver.commit). */
+export type BatchStep = { [T in TableName]: { table: T; rows: Snapshot[T][number][] } }[TableName]
+
 export interface Driver {
   list<T extends TableName>(table: T): Promise<Snapshot[T]>
   insert<T extends TableName>(table: T, rows: Snapshot[T][number][]): Promise<void>
@@ -9,6 +12,11 @@ export interface Driver {
   upsert<T extends TableName>(table: T, rows: Snapshot[T][number][]): Promise<void>
   update<T extends TableName>(table: T, id: string, patch: Partial<Snapshot[T][number]>): Promise<void>
   remove(table: TableName, id: string): Promise<void>
+  /**
+   * Schrijft de rijen van één handeling in één keer: alles of niets (opdracht Rick 17 november 2026, creditfactuur en retour).
+   * Supabase: databasefunctie commit_batch, één transactie. Browser: één keer opslaan.
+   */
+  commit(batch: BatchStep[]): Promise<void>
   /** Geeft bijvoorbeeld 'F-2026-0007'. */
   nextNumber(series: string, year: number): Promise<string>
   /** Verstuurt een mail uit de wachtrij. 'demo' betekent dat deze opslag niet kan mailen. */

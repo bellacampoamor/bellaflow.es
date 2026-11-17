@@ -6,12 +6,19 @@
 //   SHOPIFY_HDB_SHOP           het myshopify-domein, bijv. homedecobali.myshopify.com
 //   en ofwel SHOPIFY_HDB_TOKEN  (Admin API-token van een bestaande custom app, shpat_...)
 //   ofwel SHOPIFY_HDB_CLIENT_ID + SHOPIFY_HDB_CLIENT_SECRET (app uit het Dev Dashboard, client credentials grant)
-// Rechten van de app: write_draft_orders, read_products.
+// Rechten van de app: write_draft_orders, read_products, en voor retouren (sinds 17 november 2026) write_orders en read_locations.
+//
+// Retour: een creditfactuur op een kassabon van HDB (rij met kind 'retour') wordt een refund op de bestelling van die
+// kassabon: artikelen terug in voorraad als ze in Bella Flow retour kwamen, geld terug via de betaling van de bestelling.
 import { createClient, type SupabaseClient } from 'npm:@supabase/supabase-js@2'
 import {
   DRAFT_ORDER_BY_TAG, DRAFT_ORDER_COMPLETE, DRAFT_ORDER_CREATE, SHOPIFY_API_VERSION, draftOrderInput, invoiceTag, userErrorText,
   type ShopifySale, type ShopifySaleLine,
 } from '../_shared/shopifyDraft.ts'
+import {
+  ORDER_FOR_REFUND, REFUND_CREATE, alreadyRefunded, refundInput, refundNote,
+  type CreditLineForShopify, type ShopifyOrderLine, type ShopifyTransaction,
+} from '../_shared/shopifyRefund.ts'
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -90,6 +97,66 @@ async function loadSale(db: SupabaseClient, invoiceId: string): Promise<ShopifyS
   }
 }
 
+type Refund = { id: string; note: string | null }
+
+/** Creditfactuur op een kassabon van HDB als refund in Shopify. Geeft de velden om de rij bij te werken. */
+async function pushRefund(db: SupabaseClient, row: Record<string, string>, call: ReturnType<typeof graphql>) {
+  const { data: credit, error } = await db.from('invoices').select('*').eq('id', row.invoice_id).single()
+  if (error || !credit) throw new Error('Creditfactuur niet gevonden.')
+  if (!credit.credit_of) throw new Error('Dit is geen creditfactuur.')
+  const [{ data: original }, { data: sale }] = await Promise.all([
+    db.from('invoices').select('id, number').eq('id', credit.credit_of).single(),
+    db.from('hdb_shopify_orders').select('*').eq('invoice_id', credit.credit_of).maybeSingle(),
+  ])
+  if (!original) throw new Error('De kassabon van deze creditfactuur is niet gevonden.')
+  if (!sale?.shopify_order_id) {
+    throw new ShopifyError(`De kassabon ${original.number} staat nog niet als bestelling in Shopify${sale?.shopify_draft_name ? ` (alleen conceptorder ${sale.shopify_draft_name})` : ''}. Verstuur die eerst, daarna deze retour opnieuw.`)
+  }
+
+  // Regels: creditregel -> regel van de kassabon -> eigen artikelnummer -> variant in Shopify. Retour in voorraad volgt de
+  // voorraadmutatie Retour met het nummer van de creditfactuur.
+  const [{ data: lines }, { data: moves }] = await Promise.all([
+    db.from('invoice_lines').select('*').eq('invoice_id', credit.id),
+    db.from('stock_movements').select('product_id, qty').eq('ref_id', credit.number).eq('kind', 'retour'),
+  ])
+  const pids = [...new Set((moves ?? []).map((m) => m.product_id as string))]
+  const { data: prods } = pids.length ? await db.from('products').select('id, sku').in('id', pids) : { data: [] }
+  const returned = new Map<string, number>()
+  for (const m of moves ?? []) {
+    const sku = (prods ?? []).find((p) => p.id === m.product_id)?.sku
+    if (sku) returned.set(sku, (returned.get(sku) ?? 0) + Number(m.qty))
+  }
+  const numbers = [...new Set((lines ?? []).map((l) => l.article_number).filter(Boolean))]
+  const { data: arts } = numbers.length ? await db.from('catalog_articles').select('article_number, supplier_sku').in('article_number', numbers) : { data: [] }
+  const skuOf = new Map((arts ?? []).map((a) => [a.article_number as string, a.supplier_sku as string]))
+  const skus = [...new Set([...skuOf.values()].filter(Boolean))]
+  const { data: items } = skus.length ? await db.from('supplier_hdb_items').select('supplier_sku, variant_id, active').in('supplier_sku', skus) : { data: [] }
+  const variantOf = new Map<string, string>()
+  for (const it of (items ?? []).sort((a, b) => Number(b.active) - Number(a.active))) if (it.variant_id && !variantOf.has(it.supplier_sku)) variantOf.set(it.supplier_sku, String(it.variant_id))
+  const creditLines: CreditLineForShopify[] = (lines ?? []).filter((l) => l.credits_line_id).map((l) => {
+    const qty = Math.abs(Number(l.qty))
+    const back = returned.get(l.article_number) ?? 0
+    if (back > 0) returned.set(l.article_number, back - Math.min(back, qty))
+    const sku = skuOf.get(l.article_number) ?? ''
+    return { article_number: l.article_number, variant_id: sku ? variantOf.get(sku) ?? null : null, qty, restock: back > 0 }
+  })
+
+  const o = await call<{ order: { id: string; name: string; lineItems: { nodes: ShopifyOrderLine[] }; transactions: ShopifyTransaction[]; refunds: Refund[] } | null; locations: { nodes: { id: string }[] } }>(ORDER_FOR_REFUND, { id: sale.shopify_order_id })
+  if (!o.order) throw new ShopifyError(`Bestelling ${sale.shopify_order_name} niet gevonden in Shopify.`)
+  const base = { shopify_order_id: o.order.id, shopify_order_name: o.order.name }
+  const done = alreadyRefunded(o.order.refunds, credit.number)
+  if (done) return { ...base, shopify_refund_id: done.id, error: '' }
+
+  const plan = refundInput({
+    orderId: o.order.id, locationId: o.locations.nodes[0]?.id ?? null, note: refundNote(credit.number, original.number, credit.credit_reason ?? ''),
+    amount: Math.abs(Number(credit.total)), lines: creditLines, orderLines: o.order.lineItems.nodes, transactions: o.order.transactions,
+  })
+  const r = await call<{ refundCreate: { refund: { id: string } | null; userErrors: { field: string[]; message: string }[] } }>(REFUND_CREATE, { input: plan.input })
+  if (!r.refundCreate.refund) throw new ShopifyError(`Terugbetaling niet aangemaakt in Shopify: ${userErrorText(r.refundCreate.userErrors)}`)
+  const notes = plan.unmatched.length ? `Niet gekoppeld aan een artikel van de bestelling (alleen bedrag terug, voorraad in Shopify niet bijgewerkt): ${plan.unmatched.join(', ')}` : ''
+  return { ...base, shopify_refund_id: r.refundCreate.refund.id, error: notes }
+}
+
 type Draft = { id: string; name: string; status?: string; order: { id: string; name: string } | null }
 
 async function push(db: SupabaseClient, rowId: string, call: ReturnType<typeof graphql>) {
@@ -102,6 +169,19 @@ async function push(db: SupabaseClient, rowId: string, call: ReturnType<typeof g
     .update({ status: 'bezig', claimed_at: new Date().toISOString(), attempts: (row.attempts ?? 0) + 1, error: '' })
     .eq('id', rowId).eq('status', row.status).select('*').maybeSingle()
   if (!claimed) return row
+
+  if (row.kind === 'retour') {
+    try {
+      const r = await pushRefund(db, row, call)
+      const done = { status: 'aangemaakt', sent_at: new Date().toISOString(), ...r }
+      await db.from('hdb_shopify_orders').update(done).eq('id', rowId)
+      return { ...row, ...done }
+    } catch (e) {
+      const error = e instanceof Error ? e.message : String(e)
+      await db.from('hdb_shopify_orders').update({ status: 'mislukt', error }).eq('id', rowId)
+      return { ...row, status: 'mislukt', error }
+    }
+  }
 
   const notes: string[] = []
   try {

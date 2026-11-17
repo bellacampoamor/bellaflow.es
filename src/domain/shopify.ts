@@ -5,9 +5,16 @@
 import type { HdbShopifyOrder, Invoice, Settings, ShopifyPushStatus, Snapshot } from '../data/types'
 import { isCredit } from './credit'
 
-/** Gaat deze factuur naar Shopify? Alleen eenvoudige facturen (kassa) van HDB, geen creditfacturen. */
+/**
+ * Gaat deze factuur naar Shopify? Eenvoudige facturen (kassa) van HDB, en sinds 17 november 2026 (opdracht Rick) ook hun
+ * creditfacturen: een retour of credit wordt in Shopify een terugbetaling (refund) op de bestelling van de kassabon,
+ * met de artikelen terug in voorraad.
+ */
 export const goesToShopify = (inv: Pick<Invoice, 'simplified' | 'issuer' | 'kind' | 'credit_of'>) =>
-  !!inv.simplified && inv.issuer === 'hdb' && !isCredit(inv)
+  !!inv.simplified && inv.issuer === 'hdb'
+
+/** Soort rij in de wachtrij: verkoop (kassabon) of retour (creditfactuur). */
+export const shopifyKindOf = (inv: Pick<Invoice, 'kind' | 'credit_of'>): 'verkoop' | 'retour' => (isCredit(inv) ? 'retour' : 'verkoop')
 
 /** Versturen naar Shopify aan of uit (opdracht Rick 13 november 2026, voor de testperiode). Standaard aan. */
 export const shopifySendingOn = (co: Pick<Settings, 'hdb_shopify_enabled'> | undefined | null) => co?.hdb_shopify_enabled !== false
@@ -22,7 +29,7 @@ export const shopifyOrderOf = (s: Pick<Snapshot, 'hdb_shopify_orders'>, invoiceI
 export const shopifyBacklog = (s: Pick<Snapshot, 'hdb_shopify_orders'>) =>
   (s.hdb_shopify_orders ?? []).filter((r) => r.status === 'wachtrij' || r.status === 'mislukt' || r.status === 'bezig')
 
-/** Het nummer om te tonen: het ordernummer van Shopify, anders de conceptorder. */
+/** Het nummer om te tonen: het ordernummer van Shopify, anders de conceptorder. Bij een retour: de bestelling waarop terugbetaald is. */
 export const shopifyNumber = (r: Pick<HdbShopifyOrder, 'shopify_order_name' | 'shopify_draft_name'>) => r.shopify_order_name || r.shopify_draft_name
 
 /** Schermtekst (Nederlandse sleutel voor tx) en toon per status. */

@@ -3,7 +3,7 @@ import { tx } from '../i18n'
 // zodat een geweigerde actie niets half achterlaat.
 import { loadSnapshot, newId, type Driver } from '../data/driver'
 import type {
-  EmailStatus, Language,
+  EmailStatus, Language, HdbShopifyOrder, Invoice,
   Delivery, Fulfilment, InboundShipment, InvoiceLine, OrderType, Payment, Product, PurchaseLabel, SalesOrder, Settings,
   SalesOrderLine, Salesperson, Snapshot, StockMovement, CatalogArticle, CatalogListQuery, Supplier, ArticleQuery, SupplierShowroomDetail, SupplierShowroomItem, TableName, YearClosing,
 } from '../data/types'
@@ -14,8 +14,8 @@ import { mailsAutomatically } from './mailSettings'
 import { isStaffRole } from './staff'
 import { ISSUER_SERIES, issuerOf, tradeName, type Issuer } from './issuers'
 import { activeClosings, closeBlocker, lastNumbers, numberYear, openYear, rollbackBlocker } from './yearClosing'
-import { goesToShopify, shopifyBacklog, shopifyCompletes, shopifyOrderOf, shopifySendingOn } from './shopify'
-import { creditableAmount, creditableLines, creditSeries, creditSettlement, isCredit } from './credit'
+import { goesToShopify, shopifyBacklog, shopifyCompletes, shopifyKindOf, shopifyOrderOf, shopifySendingOn } from './shopify'
+import { creditableAmount, creditableLines, creditSeries, creditSettlement, isCredit, refundMethodFixed } from './credit'
 import { cashCount, closingOn, closingsOf, countedTotal, DENOMINATIONS, denomKey, kassaDay, openingFloat, type CashCounts } from './cashClosing'
 import { DUMMY_SKU, missingCustomerData, POS_CUSTOMER_NOTE, posShortfalls, posTotals, posWarehouse, SIMPLIFIED_LIMIT, takeNowShortfalls, wrongCompanyLine, type PosLine } from './pos'
 import { isSendable, PURCHASE_MAIL, purchaseJsonFileName, purchaseOrdersJson, toBase64 } from './purchaseExport'
@@ -637,6 +637,14 @@ export async function posCheckout(db: Driver, input: PosInput) {
 // Opdracht Rick 11 november 2026: kassaverkopen van HDB komen als conceptorder in Shopify, met het ordernummer van
 // Shopify en de gegevens die tot nu toe met de hand werden ingevoerd. Op Afgehandeld zetten doet HDB zelf.
 
+/** Nieuwe rij in de wachtrij voor Shopify: verkoop (kassabon) of retour (creditfactuur op een kassabon van HDB). */
+function shopifyQueueRow(inv: Invoice, co: Settings | undefined): HdbShopifyOrder {
+  return {
+    id: newId(), invoice_id: inv.id, kind: shopifyKindOf(inv), status: 'wachtrij', complete_order: shopifyCompletes(co), shopify_draft_id: '', shopify_draft_name: '',
+    shopify_order_id: '', shopify_order_name: '', shopify_refund_id: '', error: '', attempts: 0, claimed_at: null, created_at: new Date().toISOString(), sent_at: null,
+  }
+}
+
 /** Zet een eenvoudige factuur van HDB in de wachtrij (één keer) en verstuurt hem meteen. Ook om één factuur opnieuw te versturen. */
 export async function sendSaleToShopify(db: Driver, invoiceId: string) {
   const s = await loadSnapshot(db)
@@ -645,10 +653,7 @@ export async function sendSaleToShopify(db: Driver, invoiceId: string) {
   if (!shopifySendingOn(s.settings[0])) fail(tx("Versturen naar Shopify staat uit (Instellingen > Bedrijf en factuur > Kassa: HDB)."))
   let row = shopifyOrderOf(s, invoiceId)
   if (!row) {
-    row = {
-      id: newId(), invoice_id: invoiceId, status: 'wachtrij', complete_order: shopifyCompletes(s.settings[0]), shopify_draft_id: '', shopify_draft_name: '',
-      shopify_order_id: '', shopify_order_name: '', error: '', attempts: 0, claimed_at: null, created_at: new Date().toISOString(), sent_at: null,
-    }
+    row = shopifyQueueRow(inv, s.settings[0])
     await db.insert('hdb_shopify_orders', [row])
   }
   if (row.status === 'aangemaakt') return row.status
@@ -1230,6 +1235,9 @@ export async function createCreditInvoice(db: Driver, input: CreditInput) {
     if (![0, 4, 10, 21].includes(extra.vat_rate)) fail(tx("Kies een IVA-tarief."))
   }
   if (!chosen.length && !extra) fail(tx("Kies minimaal één regel of vul een bedrag in om te crediteren."))
+  // Kassa: het geld gaat terug zoals er betaald is, pin of contant (besluit Rick 17 november 2026). Niet later, niet anders.
+  const paidWith = refundMethodFixed(s, original)
+  if (paidWith && input.refund.method !== paidWith) fail(tx("Een retour aan de kassa wordt terugbetaald zoals er betaald is: {0}.", tx(paidWith === 'pin' ? 'Pin' : 'Contant')))
 
   const id = newId()
   const lines: InvoiceLine[] = chosen.map((l) => {
@@ -1249,12 +1257,11 @@ export async function createCreditInvoice(db: Driver, input: CreditInput) {
   const series = creditSeries(original)
   const number = await nextDocumentNumber(db, series.series, series.field, yearOf(input.date), series.fallback)
   const { settle, refund } = creditSettlement(s, original, amount)
-  await db.insert('invoices', [{
+  const invoice: Invoice = {
     id, number, sales_order_id: original.sales_order_id, customer_id: original.customer_id, kind: 'creditfactuur', invoice_date: input.date, due_date: input.date,
     base_amount: b.base, vat_amount: b.vat, total: b.total, deposit_settled: 0, language: original.language,
     ...(original.simplified ? { simplified: true, issuer: issuerOf(original) } : {}), credit_of: original.id, credit_reason: reason,
-  }])
-  await db.insert('invoice_lines', lines)
+  }
 
   // Verrekenen: wat nog openstond op de factuur gaat af, op beide facturen als verrekening.
   const pays: Payment[] = []
@@ -1264,16 +1271,30 @@ export async function createCreditInvoice(db: Driver, input: CreditInput) {
     pays.push({ id: newId(), ...base, invoice_id: id, method: 'verrekening', amount: -settle, reference: original.number })
   }
   if (refund > 0 && input.refund.method !== 'later') pays.push({ id: newId(), ...base, invoice_id: id, method: input.refund.method, amount: -refund, reference: input.refund.reference.trim() })
-  if (pays.length) await db.insert('payments', pays)
 
   // Retour: het artikel komt terug in de gekozen locatie.
   const moves: StockMovement[] = chosen.filter((l) => l.return_warehouse_id).map((l) => ({
     id: newId(), product_id: avail.get(l.invoice_line_id)!.product_id!, warehouse_id: l.return_warehouse_id!, qty: l.qty, kind: 'retour',
     ref_id: number, note: `Retour ${number} (${original.number})`, moved_at: input.date,
   }))
-  if (moves.length) await db.insert('stock_movements', moves)
   const back = moves.length ? `, ${moves.reduce((n, m) => n + m.qty, 0)} st. retour in voorraad` : ''
-  await db.insert('order_events', [event(original.sales_order_id, 'factuur', `Creditfactuur ${number} gemaakt op factuur ${original.number}${back}. Reden: ${reason}`)])
+
+  // HDB: de creditfactuur gaat als terugbetaling (refund) naar de bestelling in Shopify, met de artikelen terug in voorraad.
+  const toShopify = goesToShopify(invoice) && shopifySendingOn(s.settings[0])
+  const queue = toShopify ? [shopifyQueueRow(invoice, s.settings[0])] : []
+
+  // Alles of niets (opdracht Rick 17 november 2026): creditfactuur, regels, terugbetaling, voorraad Retour en de wachtrij
+  // voor Shopify in één transactie. Nooit meer voorraad terug zonder creditfactuur.
+  await db.commit([
+    { table: 'invoices', rows: [invoice] },
+    { table: 'invoice_lines', rows: lines },
+    { table: 'payments', rows: pays },
+    { table: 'stock_movements', rows: moves },
+    { table: 'order_events', rows: original.sales_order_id ? [event(original.sales_order_id, 'factuur', `Creditfactuur ${number} gemaakt op factuur ${original.number}${back}. Reden: ${reason}`)] : [] },
+    { table: 'hdb_shopify_orders', rows: queue },
+  ])
+  // Shopify na het vastleggen: lukt dat niet, dan blijft de retour in Bella Flow staan en staat hij klaar om opnieuw te versturen.
+  if (queue.length) await pushToShopify(db, [queue[0].id]).catch(() => 'mislukt' as const)
   return id
 }
 

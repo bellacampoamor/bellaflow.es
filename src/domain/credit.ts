@@ -75,3 +75,13 @@ export function originalMethod(s: Snapshot, invoiceId: string) {
   const p = s.payments.filter((x) => x.invoice_id === invoiceId && x.amount > 0 && x.method !== 'verrekening')
   return p.length ? p[p.length - 1].method : null
 }
+
+/**
+ * Kassa: het geld gaat terug zoals er betaald is, pin of contant (besluit Rick 17 november 2026). Geeft die betaalwijze
+ * voor een eenvoudige factuur; null als de terugbetaling vrij te kiezen is (gewone factuur, of geen betaling gevonden).
+ */
+export function refundMethodFixed(s: Snapshot, original: Invoice): 'pin' | 'contant' | null {
+  if (!original.simplified) return null
+  const m = originalMethod(s, original.id)
+  return m === 'pin' || m === 'contant' ? m : null
+}

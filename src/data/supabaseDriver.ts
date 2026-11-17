@@ -1,6 +1,6 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import { tx } from '../i18n'
-import type { Driver } from './driver'
+import type { BatchStep, Driver } from './driver'
 import type { ArticleHit, ArticleQuery, CatalogArticle, CatalogListItem, CatalogListQuery, CatalogArticleElement, EmailAttachment, Snapshot, TableName } from './types'
 
 const PAGE = 1000
@@ -37,6 +37,12 @@ export class SupabaseDriver implements Driver {
   }
   async update<T extends TableName>(table: T, id: string, patch: Partial<Snapshot[T][number]>) {
     const { error } = await this.sb.from(table).update(patch as never).eq('id', id)
+    if (error) throw new Error(error.message)
+  }
+  async commit(batch: BatchStep[]) {
+    const steps = batch.filter((b) => b.rows.length)
+    if (!steps.length) return
+    const { error } = await this.sb.rpc('commit_batch', { p_batch: steps })
     if (error) throw new Error(error.message)
   }
   async remove(table: TableName, id: string) {

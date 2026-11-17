@@ -1,9 +1,10 @@
 import { useMemo, useState } from 'react'
 import type { Payment } from '../data/types'
 import { inboundWarehouse, round2, todayISO, vatBreakdown, lineTotal } from '../domain/calc'
-import { canCredit, creditableAmount, creditableLines, creditSettlement, isCredit, originalMethod } from '../domain/credit'
+import { canCredit, creditableAmount, creditableLines, creditSettlement, isCredit, originalMethod, refundMethodFixed } from '../domain/credit'
 import { posWarehouse } from '../domain/pos'
 import { createCreditInvoice } from '../domain/services'
+import { goesToShopify, shopifySendingOn } from '../domain/shopify'
 import { go, useApp } from '../ui/app-context'
 import { Empty, eur, fmtDate, Head, NumInput, Pill, pickRow, PickMark, SelectField, TextField, Sku } from '../ui/kit'
 import { tx } from '../i18n'
@@ -33,6 +34,7 @@ export function CreditForm({ invoiceId }: { invoiceId: string }) {
   const [reason, setReason] = useState('')
   const [extraOn, setExtraOn] = useState(false)
   const [extra, setExtra] = useState({ description: '', amount: 0, vat_rate: 21 })
+  const fixed = inv ? refundMethodFixed(s, inv) : null
   const [method, setMethod] = useState<RefundMethod>(() => {
     const m = inv ? originalMethod(s, inv.id) : null
     return m && m !== 'verrekening' ? m : inv?.simplified ? 'contant' : 'overboeking'
@@ -72,7 +74,7 @@ export function CreditForm({ invoiceId }: { invoiceId: string }) {
         invoice_id: inv.id, date, reason,
         lines: chosen.map((l) => ({ invoice_line_id: l.line.id, qty: rows[l.line.id].qty, return_warehouse_id: rows[l.line.id].warehouse || null })),
         extra: extraOn ? extra : null,
-        refund: { method, reference },
+        refund: { method: fixed ?? method, reference },
       })
     }, tx("Creditfactuur gemaakt"))
     if (ok) go(`facturatie-${id}`)
@@ -139,13 +141,15 @@ export function CreditForm({ invoiceId }: { invoiceId: string }) {
             <div className="grand"><span>{tx("Terug aan de klant")}</span><span>{eur(refund)}</span></div>
           </div>
           {amount > room + 0.005 && <div className="note bad">{tx("Er kan van deze factuur nog maar {0} gecrediteerd worden.", eur(room))}</div>}
-          {refund > 0 && <div className="form-grid" style={{ marginTop: 12 }}>
+          {refund > 0 && fixed && <div className="note" style={{ marginTop: 12 }}>{tx("Terug aan de klant met {0}, zoals er betaald is.", tx(fixed === 'pin' ? 'Pin' : 'Contant'))}</div>}
+          {refund > 0 && !fixed && <div className="form-grid" style={{ marginTop: 12 }}>
             <SelectField label={tx("Terugbetalen met")} value={method} onChange={setMethod} options={[
               { value: 'contant', label: tx("Contant") }, { value: 'pin', label: tx("Pin") }, { value: 'overboeking', label: tx("Overboeking") }, { value: 'online', label: tx("Online") },
               { value: 'later', label: tx("Later, blijft open als terug te betalen") },
             ]} />
             {method !== 'later' && <TextField label={tx("Referentie")} value={reference} onChange={setReference} />}
           </div>}
+          {goesToShopify(inv) && <p className="small muted">{shopifySendingOn(s.settings[0]) ? tx("Gaat ook naar Shopify: terugbetaling op de bestelling van {0}, met de artikelen terug in voorraad.", inv.number) : tx("Versturen naar Shopify staat uit: deze retour gaat niet naar Shopify.")}</p>}
           <p className="small muted">{returned > 0 ? tx("{0} stuks komen terug in voorraad (mutatie Retour).", returned) : tx("Er komt niets terug in voorraad.")} {tx("Na het maken staat de creditfactuur vast, net als een factuur.")}</p>
           <div className="btn-row"><button className="btn primary" disabled={amount <= 0 || !reason.trim()} onClick={submit}>{tx("Creditfactuur maken")}</button></div>
         </section>

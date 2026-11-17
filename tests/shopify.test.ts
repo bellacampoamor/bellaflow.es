@@ -5,9 +5,10 @@ import { LocalDriver } from '../src/data/localDriver'
 import type { CatalogArticle } from '../src/data/types'
 import { seedDemo } from '../src/domain/demo'
 import type { PosLine } from '../src/domain/pos'
-import { importShowroom, posCheckout, pushToShopify, saveSettings, sendSaleToShopify, syncCatalogArticles } from '../src/domain/services'
+import { createCreditInvoice, importShowroom, posCheckout, pushToShopify, saveSettings, sendSaleToShopify, syncCatalogArticles } from '../src/domain/services'
 import { goesToShopify, shopifyAdminUrl, shopifyBacklog, shopifyCompletes, shopifyOrderOf, shopifySendingOn } from '../src/domain/shopify'
 import { countryCode, draftOrderInput, invoiceTag, splitName, type ShopifySale } from '../supabase/functions/_shared/shopifyDraft'
+import { alreadyRefunded, refundInput, refundNote } from '../supabase/functions/_shared/shopifyRefund'
 
 const TODAY = '2026-11-11'
 const LOL = 'Life Outdoor Living International B.V.'
@@ -153,9 +154,65 @@ describe('Shopify: kassa en wachtrij', () => {
     expect(pushed).toBe(1)
   })
 
-  it('creditfacturen gaan niet naar Shopify', () => {
+  it('creditfacturen van HDB gaan als retour naar Shopify (opdracht Rick 17 november 2026)', () => {
     expect(goesToShopify({ simplified: true, issuer: 'hdb', kind: 'volledig', credit_of: null })).toBe(true)
-    expect(goesToShopify({ simplified: true, issuer: 'hdb', kind: 'creditfactuur', credit_of: 'x' })).toBe(false)
+    expect(goesToShopify({ simplified: true, issuer: 'hdb', kind: 'creditfactuur', credit_of: 'x' })).toBe(true)
+    expect(goesToShopify({ simplified: true, issuer: 'bella', kind: 'creditfactuur', credit_of: 'x' })).toBe(false)
     expect(goesToShopify({ simplified: false, issuer: 'bella', kind: 'volledig', credit_of: null })).toBe(false)
+  })
+
+  it('retour van een kassabon van HDB: creditfactuur, voorraad terug en in de wachtrij als retour voor Shopify', async () => {
+    let pushed: string[][] = []
+    db.pushShopifyOrders = async (ids) => { pushed.push(ids); return 'sent' }
+    const r = await checkout('hdb')
+    const sale = db.data.invoices.find((i) => i.id === r.invoiceId)!
+    const line = db.data.invoice_lines.find((l) => l.invoice_id === sale.id)!
+    const shop = db.data.warehouses.find((w) => w.kind === 'winkel')!
+    pushed = []
+    const id = await createCreditInvoice(db, { invoice_id: sale.id, date: TODAY, reason: 'Retour', lines: [{ invoice_line_id: line.id, qty: 1, return_warehouse_id: shop.id }], refund: { method: 'pin', reference: '' } })
+    const row = shopifyOrderOf(db.data, id)!
+    expect(row.kind).toBe('retour')
+    expect(pushed).toEqual([[row.id]])
+    expect(db.data.stock_movements.some((m) => m.kind === 'retour' && m.ref_id === db.data.invoices.find((i) => i.id === id)!.number)).toBe(true)
+  })
+})
+
+describe('Shopify: retour als terugbetaling (refund)', () => {
+  const orderLines = [
+    { id: 'L1', variant: { id: 'gid://shopify/ProductVariant/111' }, quantity: 2, refundableQuantity: 2, unfulfilledQuantity: 2 },
+    { id: 'L2', variant: { id: 'gid://shopify/ProductVariant/222' }, quantity: 1, refundableQuantity: 1, unfulfilledQuantity: 0 },
+  ]
+  const transactions = [{ id: 'T1', kind: 'SALE', status: 'SUCCESS', gateway: 'manual', amountSet: { presentmentMoney: { amount: '300.00', currencyCode: 'EUR' } } }]
+  const base = { orderId: 'gid://shopify/Order/9', locationId: 'gid://shopify/Location/1', note: refundNote('CRE-FS-HDB-2026-0001', 'FS-HDB-2026-0003', 'Retour'), transactions, orderLines }
+
+  it('artikel terug in voorraad: nog niet afgehandeld = CANCEL, afgehandeld = RETURN, geld terug via de betaling', () => {
+    const { input, unmatched } = refundInput({ ...base, amount: 250, lines: [
+      { article_number: 'HDB-ACC-1', variant_id: '111', qty: 1, restock: true },
+      { article_number: 'HDB-ACC-2', variant_id: '222', qty: 1, restock: true },
+    ] })
+    expect(unmatched).toEqual([])
+    expect(input.refundLineItems).toEqual([
+      { lineItemId: 'L1', quantity: 1, restockType: 'CANCEL', locationId: 'gid://shopify/Location/1' },
+      { lineItemId: 'L2', quantity: 1, restockType: 'RETURN', locationId: 'gid://shopify/Location/1' },
+    ])
+    expect(input.transactions).toEqual([{ orderId: 'gid://shopify/Order/9', parentId: 'T1', gateway: 'manual', kind: 'REFUND', amount: '250.00' }])
+    expect(input.notify).toBe(false)
+  })
+
+  it('geen retour in voorraad: NO_RESTOCK; los artikel alleen bedrag; nooit meer terug dan betaald', () => {
+    const { input, unmatched } = refundInput({ ...base, amount: 999, lines: [
+      { article_number: 'HDB-ACC-1', variant_id: '111', qty: 2, restock: false },
+      { article_number: 'HDB-ACC-9', variant_id: null, qty: 1, restock: false },
+      { article_number: 'DIVERSEN', variant_id: null, qty: 1, restock: false },
+    ] })
+    expect(input.refundLineItems).toEqual([{ lineItemId: 'L1', quantity: 2, restockType: 'NO_RESTOCK' }])
+    expect(unmatched).toEqual(['HDB-ACC-9'])
+    expect((input.transactions as { amount: string }[])[0].amount).toBe('300.00')
+  })
+
+  it('herkent een refund die al in Shopify staat aan het nummer van de creditfactuur', () => {
+    const refunds = [{ id: 'R1', note: refundNote('CRE-FS-HDB-2026-0001', 'FS-HDB-2026-0003', '') }]
+    expect(alreadyRefunded(refunds, 'CRE-FS-HDB-2026-0001')?.id).toBe('R1')
+    expect(alreadyRefunded(refunds, 'CRE-FS-HDB-2026-0002')).toBeNull()
   })
 })
