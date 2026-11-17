@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { BookOpen, Calculator, ChevronDown, FileBarChart, Headset, Moon, Store, Sun, Boxes, ClipboardList, FileText, LayoutDashboard, PackageCheck, Settings2, ShoppingCart, Truck, Warehouse as WarehouseIcon } from 'lucide-react'
+import { BookOpen, Calculator, ChevronDown, FileBarChart, Headset, LogOut, Moon, Store, Sun, Boxes, ClipboardList, FileText, LayoutDashboard, PackageCheck, Settings2, ShoppingCart, Truck, Warehouse as WarehouseIcon } from 'lucide-react'
 import { parseOrdersParam } from './domain/orderFlow'
 import { parsePurchasesParam } from './domain/purchaseFlow'
 import { useApp, useHash } from './ui/app-context'
@@ -129,7 +129,7 @@ export function App({ onResetDemo, onSignOut }: { onResetDemo?: () => Promise<vo
             <HelpButton hash={hash} />
             <button className="btn-toggle" aria-label={tx("Contact en support")} title={tx("Contact en support")} onClick={() => setSupport(true)}><Headset size={18} /></button>
             <AdminMenu screen={screen} />
-            {onSignOut && <a href="#overzicht" onClick={onSignOut}>{tx("Uitloggen")}</a>}
+            {onSignOut && <a href="#overzicht" className="btn-toggle" onClick={onSignOut} aria-label={tx("Uitloggen")} title={tx("Uitloggen")}><LogOut size={18} /></a>}
           </nav>
         </div>
       </header>
