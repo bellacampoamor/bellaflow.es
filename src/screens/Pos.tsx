@@ -158,8 +158,8 @@ export function Pos() {
   const [newCust, setNewCust] = useState<(Omit<Customer, 'id'> & { id?: string }) | null>(null)
   const [done, setDone] = useState<{ issuer: string; orderNumber: string; invoiceId: string; invoiceNumber: string; change: number; note: string; shop: string; shopBad: boolean; corrected: number } | null>(null)
   const [focusKey, setFocusKey] = useState<string | null>(null)
-  // Welk bedrijf de eenvoudige factuur uitgeeft: Bella (standaard) of HDB (Handmade Bali Treasures SL). Na elke verkoop weer Bella.
-  const [hdb, setHdb] = useState(false)
+  // Welk bedrijf de eenvoudige factuur uitgeeft: HDB (Handmade Bali Treasures SL, standaard) of Bella. Na elke verkoop weer HDB.
+  const [hdb, setHdb] = useState(true)
   const scanRef = useRef<HTMLInputElement>(null)
   useEffect(preloadBeep, [])
   useKeepAudioAwake()
@@ -307,7 +307,7 @@ export function Pos() {
     if (!ok || !result) return
     const r = result as Awaited<ReturnType<typeof posCheckout>>
     setDone({ issuer: issuer.name, orderNumber: r.orderNumber, invoiceId: r.invoiceId, invoiceNumber: r.invoiceNumber, change, note, shop, shopBad, corrected: r.corrections.filter((x) => !x.dummy).length })
-    setLines([]); setCustomerId(''); setReference(''); setReceived(0); setMail(null); setMethod('pin'); setMessage(''); setHdb(false)
+    setLines([]); setCustomerId(''); setReference(''); setReceived(0); setMail(null); setMethod('pin'); setMessage(''); setHdb(true)
   }
 
   const saveCustomer = async () => {
