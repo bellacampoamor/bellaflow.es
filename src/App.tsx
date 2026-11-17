@@ -14,6 +14,7 @@ import { Deliveries } from './screens/Deliveries'
 import { DeliveryNote } from './screens/DeliveryNote'
 import { CreditForm } from './screens/CreditForm'
 import { GlobalSearch } from './ui/GlobalSearch'
+import { HelpButton } from './ui/HelpPanel'
 import { InvoiceDetail, Invoices } from './screens/Invoices'
 import { Stock } from './screens/Stock'
 import { Admin } from './screens/Admin'
@@ -125,6 +126,7 @@ export function App({ onResetDemo, onSignOut }: { onResetDemo?: () => Promise<vo
             <GlobalSearch />
             <LangFlags value={language} onChange={switchLanguage} label={tx("Taal")} />
             <button className="btn-toggle" onClick={toggleTheme}>{theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}{theme === 'dark' ? tx("Dagstand") : tx("Nachtstand")}</button>
+            <HelpButton hash={hash} />
             <button className="btn-toggle" aria-label={tx("Contact en support")} title={tx("Contact en support")} onClick={() => setSupport(true)}><Headset size={18} /></button>
             <AdminMenu screen={screen} />
             {onSignOut && <a href="#overzicht" onClick={onSignOut}>{tx("Uitloggen")}</a>}

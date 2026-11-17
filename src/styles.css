@@ -976,3 +976,58 @@ tr.close-hist.on td { background: var(--selected); color: var(--on-selected); }
 /* Jaarafsluiting (Instellingen > Bedrijf en factuur, 13 november 2026). */
 .year-open { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; margin: 8px 0 4px; }
 .year-open .note { flex: 1 1 280px; }
+
+/* Hulp per scherm (opdracht Rick 17 november 2026): F1 of de knop Hulp opent rechts een vast venster.
+   Het werkvlak krijgt 80% van de breedte, de hulp 20% (minimaal 300 px). Op een smal scherm schuift de hulp
+   als venster over het werkvlak, want 20% zou daar onleesbaar smal zijn. */
+:root { --help-w: max(20vw, 300px); }
+html.help-open body { padding-right: var(--help-w); }
+.help-panel { position: fixed; top: 0; right: 0; bottom: 0; width: var(--help-w); z-index: 60; display: flex; flex-direction: column;
+  background: var(--surface); color: var(--fg); border-left: 3px solid var(--brand-line); box-shadow: -8px 0 28px rgb(64 68 78 / .16);
+  animation: help-in .18s ease-out; }
+@keyframes help-in { from { transform: translateX(24px); opacity: 0; } to { transform: none; opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .help-panel { animation: none; } }
+.help-head { display: flex; align-items: center; justify-content: space-between; padding: 12px 14px 6px; }
+.help-kicker { display: inline-flex; align-items: center; gap: 6px; font: 600 .78rem var(--body); letter-spacing: .04em; text-transform: uppercase; color: var(--brand-strong); }
+.help-close { background: none; border: 0; color: var(--muted); padding: 6px; border-radius: 8px; cursor: pointer; display: inline-flex; }
+.help-close:hover { background: var(--surface-2); color: var(--fg); }
+.help-topic { padding: 0 14px 10px; border-bottom: 1px solid var(--line); }
+.help-topic select { width: 100%; }
+.help-body { flex: 1; overflow-y: auto; padding: 14px 16px 20px; font-size: .9rem; line-height: 1.5; }
+.help-body h2 { font: 700 1.25rem var(--display); color: var(--heading); margin: 0 0 8px; }
+.help-body h3 { font: 700 1rem var(--display); color: var(--heading); margin: 18px 0 6px; padding-bottom: 4px; border-bottom: 1px solid var(--brand-line); }
+.help-body p { margin: 0 0 10px; }
+.help-why { border-left: 3px solid var(--brand-line); background: var(--surface-2); padding: 8px 10px; border-radius: 0 8px 8px 0; }
+.help-lang { color: var(--warn); background: var(--warn-bg); padding: 6px 8px; border-radius: 6px; }
+.help-shot { margin: 8px 0 12px; }
+.help-shot.narrow img { max-width: 92%; display: block; margin: 0 auto; }
+.help-shot img { width: 100%; height: auto; border-radius: 6px; border: 1px solid var(--line-strong); background: var(--photo-bg); cursor: zoom-in; }
+.help-shot figcaption { font-size: .78rem; font-style: italic; color: var(--muted); text-align: center; margin-top: 4px; }
+.help-steps { list-style: none; padding: 0; margin: 0 0 12px; display: grid; gap: 7px; }
+.help-steps > li { display: grid; grid-template-columns: 24px 1fr; gap: 8px; align-items: start; }
+.help-steps strong { color: var(--heading); }
+.help-steps ul { margin: 4px 0 0; padding-left: 16px; }
+.help-num { width: 22px; height: 22px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center;
+  font: 700 .72rem var(--body); background: var(--sell); color: var(--sell-fg); margin-top: 1px; }
+.help-num.mark { background: var(--primary); color: var(--on-primary); box-shadow: 0 0 0 2px var(--surface), 0 1px 4px rgb(0 0 0 / .25); }
+.help-box { padding: 9px 11px; border-radius: 8px; margin: 0 0 12px; border-left: 3px solid var(--brand-line); background: var(--sell); color: var(--sell-fg); }
+.help-box.tip { background: var(--info-bg); color: var(--info); border-left-color: var(--info); }
+.help-box p, .help-box ul { margin: 4px 0 0; }
+.help-box ul { padding-left: 16px; }
+.help-see { margin: 4px 0 8px; }
+.help-see .linklike { color: var(--link); }
+.help-foot { display: flex; gap: 6px; justify-content: space-between; padding: 10px 14px; border-top: 1px solid var(--line); }
+.help-foot .btn { min-height: 34px; padding: 6px 10px; font-size: .82rem; }
+.help-copy { font-size: .72rem; color: var(--muted); text-align: center; padding: 0 0 8px; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.util .btn-toggle.on { background: var(--surface-2); color: var(--heading); }
+/* Vensters en de knop naar boven blijven in het werkvlak, links van de hulp. */
+html.help-open .overlay { right: var(--help-w); }
+html.help-open .back-to-top { right: calc(var(--help-w) + 18px); }
+@media (max-width: 1099px) {
+  :root { --help-w: min(420px, 100vw); }
+  html.help-open body { padding-right: 0; }
+  html.help-open .overlay { right: 0; }
+  html.help-open .back-to-top { right: max(18px, env(safe-area-inset-right, 0px)); }
+}
+@media print { .help-panel { display: none !important; } html.help-open body { padding-right: 0; } }

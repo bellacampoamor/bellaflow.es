@@ -122,12 +122,15 @@ export function replaceHash(href: string) {
   last = navState()
 }
 
+export const NAV_UI_EVENT = 'bella-flow-nav-ui'
 /** Bewaart een keuze van het scherm in de huidige stap, zodat Terug hem herstelt. */
 export function rememberUi(key: string, value: unknown) {
   const st = navState()
   const next: NavState = { ...st, ui: { ...(st.ui ?? {}), [key]: value } }
   history.replaceState(next, '')
   last = next
+  // Een tabblad wisselen verandert de hash niet; de hulp per scherm (F1) luistert hierop.
+  try { window.dispatchEvent(new CustomEvent(NAV_UI_EVENT, { detail: { key, value } })) } catch { /* zonder browser (tests) */ }
 }
 export function recallUi<T>(key: string, fallback: T): T {
   const v = navState().ui?.[key]
