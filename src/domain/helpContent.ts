@@ -29,7 +29,18 @@ export const HELP_NL: Record<HelpTopic, HelpPage> = {
     chapter: '1–2', title: 'Zo werkt Bella Flow',
     blocks: [
       { t: 'p', text: 'Bella Flow is het systeem van Bella Outdoor & Furnishing van inkoop tot factuur. Het hoofdmenu loopt van links naar rechts. Deze hulp laat bij elk scherm zien wat je waar invult. Druk overal op F1 om de hulp bij het scherm te openen of te sluiten.' },
-      { t: 'img', src: shot('01-menu', [220, 0, 1090, 80]), cap: 'Het hoofdmenu, van links naar rechts.' },
+      { t: 'h', text: 'Inloggen' },
+      { t: 'img', src: 'help/inloggen.jpg', cap: 'Het inlogscherm van bellaflow.es. Het e-mailadres is onleesbaar gemaakt.', narrow: true },
+      { t: 'steps', items: [
+        mk(1, 'E-mailadres:', 'het adres waarmee je als medewerker bent vastgelegd onder Instellingen > Medewerkers.'),
+        mk(2, 'Wachtwoord:', 'je eigen wachtwoord.'),
+        mk(3, 'Oogje:', 'laat zien wat je hebt getypt, om tikfouten te zien.'),
+        mk(4, 'Inloggen.', ''),
+        mk(5, 'Wachtwoord vergeten?', 'Je krijgt een mail met een link om een nieuw wachtwoord in te stellen.'),
+      ] },
+      { t: 'note', items: ['Zie je "nog geen medewerker met toegang", dan ben je nog niet als actieve medewerker vastgelegd. Vraag de beheerder.'] },
+      { t: 'h', text: 'Het hoofdmenu' },
+      { t: 'img', src: shot('01-menu', [220, 0, 1090, 80]), cap: 'Het hoofdmenu, van links naar rechts. Rechts staan ook Hulp (F1) en Uitloggen.' },
       { t: 'steps', items: [
         mk(1, 'Overzicht:', 'je startpagina met wat er vandaag te doen is.'),
         mk(2, 'Kassa:', 'snel verkopen in de winkel.'),
@@ -93,7 +104,7 @@ export const HELP_NL: Record<HelpTopic, HelpPage> = {
     blocks: [
       { t: 'why', text: 'Een verkoop in de winkel afrekenen: de klant neemt alles direct mee en betaalt meteen. Je maakt een kassabon (eenvoudige factuur), geen verkooporder.' },
       { t: 'p', text: 'De eerste keer vraagt de kassa: "Wie staat er achter de kassa?" Klik op je naam. De browser onthoudt dat.' },
-      { t: 'img', src: shot('04-kassa', [268, 64, 980, 666]), cap: 'De kassa met één artikel op de bon. Op deze afdruk staat de kassa nog op Bella en heet de knop nog CREDIT.' },
+      { t: 'img', src: shot('04-kassa-v2', [268, 64, 980, 666]), cap: 'De kassa met één artikel op de bon. Voor dit artikel van Bella is Bon voor op Bella gezet.' },
       { t: 'steps', items: [
         mk(1, 'Medewerker:', 'staat hier je eigen naam? Zo niet, kies jezelf.'),
         mk(2, 'Bon voor:', 'staat standaard op HomeDecoBali, ook na elke verkoop. Verkoop je een artikel van Bella, klik dan eerst op Bella Outdoor & Furniture.'),
@@ -110,7 +121,7 @@ export const HELP_NL: Record<HelpTopic, HelpPage> = {
         'Een gele melding "0 vrij in de winkel" is geen probleem: het verschil wordt bij afrekenen bijgeboekt.',
       ] },
       { t: 'h', text: 'Retour of correctie' },
-      { t: 'img', src: shot('04-kassa-retour', [530, 20, 462, 480]), cap: 'Venster Retour of correctie.', narrow: true },
+      { t: 'img', src: shot('04-kassa-retour-v2', [530, 20, 462, 480]), cap: 'Venster Retour of correctie, na een klik op RETOUR.', narrow: true },
       { t: 'steps', items: [
         { t: 'Klik rechtsboven op de rode knop RETOUR.' },
         mk(1, 'Factuurnummer:', 'scan of typ het nummer van de kassabon en klik op Zoeken.'),

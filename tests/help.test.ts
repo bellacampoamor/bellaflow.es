@@ -33,9 +33,14 @@ describe('Hulp per scherm (F1)', () => {
       expect(page.blocks.length).toBeGreaterThan(0)
       for (const b of page.blocks) {
         if (b.t === 'see') expect(HELP_ORDER).toContain(b.topic)
-        if (b.t === 'img') expect(b.src).toMatch(/^https:\/\/res\.cloudinary\.com\/uhdvgzei\/image\/upload\/.+\/bellaflow-handleiding\/[\w-]+\.jpg$/)
+        if (b.t === 'img') expect(b.src).toMatch(/^(https:\/\/res\.cloudinary\.com\/uhdvgzei\/image\/upload\/.+\/bellaflow-handleiding\/[\w-]+|help\/[\w-]+)\.jpg$/)
       }
     }
+  })
+  it('noemt de retourknop van de kassa RETOUR, niet CREDIT', () => {
+    const text = JSON.stringify(HELP_NL.kassa)
+    expect(text.includes('RETOUR')).toBe(true)
+    expect(/\bCREDIT\b/.test(text)).toBe(false)
   })
   it('bladert in de volgorde van het hoofdmenu', () => {
     expect(helpNeighbours('start')).toEqual({ prev: null, next: 'overzicht' })
