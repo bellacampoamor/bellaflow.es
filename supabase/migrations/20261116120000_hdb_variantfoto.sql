@@ -140,8 +140,13 @@ begin
     'removed', v_removed, 'deactivated', v_off, 'catalog', v_cat);
 end $function$;
 
-revoke all on function public.apply_supplier_hdb_sync(text, jsonb) from public, anon, authenticated;
-grant execute on function public.apply_supplier_hdb_sync(text, jsonb) to service_role;
+do $$
+begin
+  execute 'revoke all on function public.apply_supplier_hdb_sync(text, jsonb) from public';
+  if exists (select 1 from pg_roles where rolname = 'anon') then execute 'revoke all on function public.apply_supplier_hdb_sync(text, jsonb) from anon'; end if;
+  if exists (select 1 from pg_roles where rolname = 'authenticated') then execute 'revoke all on function public.apply_supplier_hdb_sync(text, jsonb) from authenticated'; end if;
+  if exists (select 1 from pg_roles where rolname = 'service_role') then execute 'grant execute on function public.apply_supplier_hdb_sync(text, jsonb) to service_role'; end if;
+end $$;
 
 -- 2. Variantfoto's uit Shopify vastzetten: [{ "variant_id": "559...", "url": "https://cdn.shopify.com/..." }, ...].
 --    Een lege url betekent: deze variant heeft in Shopify geen eigen foto, dan geldt de eerste productfoto.
@@ -174,5 +179,10 @@ begin
   return jsonb_build_object('received', jsonb_array_length(coalesce(p_images, '[]'::jsonb)), 'changed', v_changed, 'catalog', v_cat);
 end $function$;
 
-revoke all on function public.apply_hdb_variant_images(jsonb) from public, anon, authenticated;
-grant execute on function public.apply_hdb_variant_images(jsonb) to service_role;
+do $$
+begin
+  execute 'revoke all on function public.apply_hdb_variant_images(jsonb) from public';
+  if exists (select 1 from pg_roles where rolname = 'anon') then execute 'revoke all on function public.apply_hdb_variant_images(jsonb) from anon'; end if;
+  if exists (select 1 from pg_roles where rolname = 'authenticated') then execute 'revoke all on function public.apply_hdb_variant_images(jsonb) from authenticated'; end if;
+  if exists (select 1 from pg_roles where rolname = 'service_role') then execute 'grant execute on function public.apply_hdb_variant_images(jsonb) to service_role'; end if;
+end $$;
