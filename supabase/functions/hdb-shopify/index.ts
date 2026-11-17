@@ -6,7 +6,7 @@
 //   SHOPIFY_HDB_SHOP           het myshopify-domein, bijv. homedecobali.myshopify.com
 //   en ofwel SHOPIFY_HDB_TOKEN  (Admin API-token van een bestaande custom app, shpat_...)
 //   ofwel SHOPIFY_HDB_CLIENT_ID + SHOPIFY_HDB_CLIENT_SECRET (app uit het Dev Dashboard, client credentials grant)
-// Rechten van de app: write_draft_orders, read_products, en voor retouren (sinds 17 november 2026) write_orders en read_locations.
+// Rechten van de app: write_draft_orders, read_products, en voor retouren write_orders en read_locations (gecontroleerd 17 november 2026: aanwezig).
 //
 // Retour: een creditfactuur op een kassabon van HDB (rij met kind 'retour') wordt een refund op de bestelling van die
 // kassabon: artikelen terug in voorraad als ze in Bella Flow retour kwamen, geld terug via de betaling van de bestelling.
@@ -16,7 +16,7 @@ import {
   type ShopifySale, type ShopifySaleLine,
 } from '../_shared/shopifyDraft.ts'
 import {
-  ORDER_FOR_REFUND, REFUND_CREATE, alreadyRefunded, refundInput, refundNote,
+  ORDER_FOR_REFUND, REFUND_CREATE, alreadyRefunded, refundInput, refundNote, returnLocation,
   type CreditLineForShopify, type ShopifyOrderLine, type ShopifyTransaction,
 } from '../_shared/shopifyRefund.ts'
 
@@ -141,14 +141,14 @@ async function pushRefund(db: SupabaseClient, row: Record<string, string>, call:
     return { article_number: l.article_number, variant_id: sku ? variantOf.get(sku) ?? null : null, qty, restock: back > 0 }
   })
 
-  const o = await call<{ order: { id: string; name: string; lineItems: { nodes: ShopifyOrderLine[] }; transactions: ShopifyTransaction[]; refunds: Refund[] } | null; locations: { nodes: { id: string }[] } }>(ORDER_FOR_REFUND, { id: sale.shopify_order_id })
+  const o = await call<{ order: { id: string; name: string; lineItems: { nodes: ShopifyOrderLine[] }; transactions: ShopifyTransaction[]; refunds: Refund[] } | null; locations: { nodes: { id: string; name: string; isActive: boolean }[] } }>(ORDER_FOR_REFUND, { id: sale.shopify_order_id })
   if (!o.order) throw new ShopifyError(`Bestelling ${sale.shopify_order_name} niet gevonden in Shopify.`)
   const base = { shopify_order_id: o.order.id, shopify_order_name: o.order.name }
   const done = alreadyRefunded(o.order.refunds, credit.number)
   if (done) return { ...base, shopify_refund_id: done.id, error: '' }
 
   const plan = refundInput({
-    orderId: o.order.id, locationId: o.locations.nodes[0]?.id ?? null, note: refundNote(credit.number, original.number, credit.credit_reason ?? ''),
+    orderId: o.order.id, locationId: returnLocation(o.locations.nodes), note: refundNote(credit.number, original.number, credit.credit_reason ?? ''),
     amount: Math.abs(Number(credit.total)), lines: creditLines, orderLines: o.order.lineItems.nodes, transactions: o.order.transactions,
   })
   const r = await call<{ refundCreate: { refund: { id: string } | null; userErrors: { field: string[]; message: string }[] } }>(REFUND_CREATE, { input: plan.input })

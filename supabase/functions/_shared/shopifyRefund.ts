@@ -98,8 +98,14 @@ export const ORDER_FOR_REFUND = `query orderForRefund($id: ID!) {
     transactions(first: 20) { id kind status gateway amountSet { presentmentMoney { amount currencyCode } } }
     refunds(first: 50) { id note }
   }
-  locations(first: 1) { nodes { id } }
+  locations(first: 10) { nodes { id name isActive } }
 }`
+
+/** Locatie voor de retour in Shopify: de winkel in Campoamor (daar verkoopt en neemt de kassa terug), anders de eerste actieve. */
+export function returnLocation(nodes: { id: string; name: string; isActive?: boolean }[]) {
+  const active = nodes.filter((l) => l.isActive !== false)
+  return (active.find((l) => /campoamor/i.test(l.name)) ?? active[0])?.id ?? null
+}
 
 export const REFUND_CREATE = `mutation refundCreate($input: RefundInput!) {
   refundCreate(input: $input) { refund { id } userErrors { field message } }

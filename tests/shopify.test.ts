@@ -8,7 +8,7 @@ import type { PosLine } from '../src/domain/pos'
 import { createCreditInvoice, importShowroom, posCheckout, pushToShopify, saveSettings, sendSaleToShopify, syncCatalogArticles } from '../src/domain/services'
 import { goesToShopify, shopifyAdminUrl, shopifyBacklog, shopifyCompletes, shopifyOrderOf, shopifySendingOn } from '../src/domain/shopify'
 import { countryCode, draftOrderInput, invoiceTag, splitName, type ShopifySale } from '../supabase/functions/_shared/shopifyDraft'
-import { alreadyRefunded, refundInput, refundNote } from '../supabase/functions/_shared/shopifyRefund'
+import { alreadyRefunded, refundInput, refundNote, returnLocation } from '../supabase/functions/_shared/shopifyRefund'
 
 const TODAY = '2026-11-11'
 const LOL = 'Life Outdoor Living International B.V.'
@@ -208,6 +208,12 @@ describe('Shopify: retour als terugbetaling (refund)', () => {
     expect(input.refundLineItems).toEqual([{ lineItemId: 'L1', quantity: 2, restockType: 'NO_RESTOCK' }])
     expect(unmatched).toEqual(['HDB-ACC-9'])
     expect((input.transactions as { amount: string }[])[0].amount).toBe('300.00')
+  })
+
+  it('retour naar de locatie in Campoamor', () => {
+    expect(returnLocation([{ id: 'A', name: 'Centraal magazijn', isActive: true }, { id: 'B', name: 'Bella Outdoor & Furniture - Campoamor', isActive: true }])).toBe('B')
+    expect(returnLocation([{ id: 'A', name: 'Centraal magazijn', isActive: true }])).toBe('A')
+    expect(returnLocation([])).toBeNull()
   })
 
   it('herkent een refund die al in Shopify staat aan het nummer van de creditfactuur', () => {
