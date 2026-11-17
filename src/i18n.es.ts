@@ -1541,7 +1541,7 @@ export const es: Record<string, string> = {
   "{0} t/m {1}": "{0} a {1}",
   "Creditfactuur": "Factura rectificativa",
   "Terug te betalen": "Pendiente de devolver",
-  "CREDIT": "ABONO",
+  "RETOUR": "ABONO",
   "Retour": "Devolución",
   "Fout in de factuur": "Error en la factura",
   "Korting achteraf": "Descuento posterior",

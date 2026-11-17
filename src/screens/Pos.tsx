@@ -343,7 +343,7 @@ export function Pos() {
             {people.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
         </label>
-        <button className="btn danger-solid pos-credit" onClick={() => setReturning(true)} title={tx("Retour of correctie op een eerdere kassabon: maakt een creditfactuur")}>{tx("CREDIT")}</button>
+        <button className="btn danger-solid pos-credit" onClick={() => setReturning(true)} title={tx("Retour of correctie op een eerdere kassabon: maakt een creditfactuur")}>{tx("RETOUR")}</button>
       </Head>
       {returning && <ReturnPicker onClose={() => setReturning(false)} />}
       <div className="pos">
