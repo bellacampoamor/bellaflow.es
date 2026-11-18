@@ -912,6 +912,10 @@ tr.close-hist.on td { background: var(--selected); color: var(--on-selected); }
 .gs-row.on { background: var(--surface-2); box-shadow: inset 3px 0 0 var(--brand-line); }
 .gs-title { font-weight: 600; color: var(--heading); }
 .gs-sub { font-size: .84rem; color: var(--muted); }
+.gs-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.gs-row.gs-art { display: grid; grid-template-columns: 48px minmax(0, 1fr) auto; gap: 10px; align-items: center; }
+.gs-row.gs-art .cat-photo.thumb { width: 48px; height: 48px; }
+.gs-stock { white-space: nowrap; }
 
 /* Kassabon 80 mm (thermische bonprinter, 9 november 2026). Bedrukbare breedte 72 mm, puur zwart op wit,
    geen kleurvlakken: een thermische printer kent alleen zwart. Op het scherm een strookje van 80 mm breed. */

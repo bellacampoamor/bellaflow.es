@@ -60,14 +60,21 @@ export function SearchSourceChips({ value, onChange }: { value: SearchSources; o
 }
 
 /** Voorraad van HomeDecoBali (ligt in het magazijn van Bella): de beschikbare voorraad aan de kassa (besluit Rick 18 november 2026). */
-function StockPill({ n }: { n: number }) {
+export function StockPill({ n }: { n: number }) {
   return n > 0 ? <Pill tone="good">{tx("{0} op voorraad", n)}</Pill> : <Pill tone="warn">{tx("Niet op voorraad")}</Pill>
+}
+
+/** Beschikbare voorraad bij een catalogusartikel: HomeDecoBali uit de voorraad van de leverancier, anders de vrije voorraad van het product. */
+export function ArticleStock({ a, product, free }: { a: ArticleHit; product?: Product; free: (pid: string) => number }) {
+  const { s } = useApp()
+  if (isHdbArticle(a, s.suppliers) && a.supplier_stock !== null && a.supplier_stock !== undefined) return <StockPill n={a.supplier_stock} />
+  return product ? <small>{tx("{0} vrij", free(product.id))}</small> : null
 }
 
 const money = (n: number | null, currency: string) => (n === null ? '–' : currency === 'EUR' ? eur(n) : `${n.toFixed(2)} ${currency}`)
 
 /** Vrije voorraad van een product over alle locaties. */
-function useFree() {
+export function useFree() {
   const { s } = useApp()
   return useMemo(() => {
     const hand = onHandMap(s), res = reservedMap(s)
@@ -170,9 +177,7 @@ export function ArticleSearch({ id, label, sources, onPick }: { id?: string; lab
                   </span>
                   <span className="article-side">
                     <span className="strong">{p ? eur(p.sale_price) : money(priceWithSurcharge(a?.price ?? null, s.suppliers.find((x) => x.id === a?.supplier_id)), a?.currency ?? 'EUR')}</span>
-                    {a && isHdbArticle(a, s.suppliers) && a.supplier_stock !== null && a.supplier_stock !== undefined
-                      ? <StockPill n={a.supplier_stock} />
-                      : p ? <small>{tx("{0} vrij", free(p.id))}</small> : null}
+                    {a ? <ArticleStock a={a} product={p} free={free} /> : p ? <small>{tx("{0} vrij", free(p.id))}</small> : null}
                     {a && a.element_count > 0 && <small>{tx("+{0} elementen", a.element_count)}</small>}
                     {a && (a.variant_count ?? 0) > 0 && <Pill tone="info">{tx("{0} varianten", a.variant_count)}</Pill>}
                     {p && a && <Pill tone="info">{tx("In assortiment")}</Pill>}

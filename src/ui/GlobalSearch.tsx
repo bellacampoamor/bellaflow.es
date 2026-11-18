@@ -4,7 +4,8 @@ import type { ArticleHit } from '../data/types'
 import { globalSearch, groupHits, type HitKind, type SearchHit } from '../domain/search'
 import { searchCatalogArticles } from '../domain/services'
 import { go, useApp } from './app-context'
-import { Modal, Sku } from './kit'
+import { CatalogPhoto, Modal, Sku } from './kit'
+import { ArticleStock, useFree } from './ArticleSearch'
 import { setCatalogQuery } from './nav'
 import { tx } from '../i18n'
 
@@ -42,7 +43,7 @@ export function GlobalSearch() {
   )
 }
 
-interface Row { key: string; kind: HitKind; title: string; sub: string; open: () => void; code?: string }
+interface Row { key: string; kind: HitKind; title: string; sub: string; open: () => void; code?: string; article?: ArticleHit }
 
 function SearchDialog({ onClose }: { onClose: () => void }) {
   const { s, db } = useApp()
@@ -51,6 +52,8 @@ function SearchDialog({ onClose }: { onClose: () => void }) {
   const [active, setActive] = useState(0)
   const list = useRef<HTMLDivElement>(null)
   const hits = useMemo(() => globalSearch(s, q), [s, q])
+  const free = useFree()
+  const byNumber = useMemo(() => new Map(s.products.filter((p) => p.catalog_article_number).map((p) => [p.catalog_article_number!, p])), [s.products])
 
   // Artikelen zoekt de opslag zelf (tienduizenden per catalogus), even wachten tot er niet meer getypt wordt.
   useEffect(() => {
@@ -65,7 +68,7 @@ function SearchDialog({ onClose }: { onClose: () => void }) {
   const groups = useMemo(() => {
     const g: { kind: HitKind; rows: Row[] }[] = groupHits(hits).map((x) => ({ kind: x.kind, rows: x.hits.map((h: SearchHit) => ({ key: `${h.kind}-${h.id}`, kind: h.kind, title: h.title, sub: h.sub, open: () => go(h.href) })) }))
     if (articles.length) g.push({ kind: 'artikel', rows: articles.map((a) => ({
-      key: `artikel-${a.id}`, kind: 'artikel', title: a.name, code: a.article_number, sub: [supplierName(a.supplier_id), a.supplier_sku].filter(Boolean).join(' · '),
+      key: `artikel-${a.id}`, kind: 'artikel', article: a, title: a.name, code: a.article_number, sub: [supplierName(a.supplier_id), a.supplier_sku].filter(Boolean).join(' · '),
       open: () => { setCatalogQuery(a.supplier_id, a.supplier_sku); go(`catalogi-${a.supplier_id}`) },
     })) })
     return g
@@ -100,9 +103,13 @@ function SearchDialog({ onClose }: { onClose: () => void }) {
                 n++
                 const idx = n
                 return (
-                  <button key={r.key} type="button" role="option" aria-selected={idx === active} className={`gs-row${idx === active ? ' on' : ''}`} onMouseMove={() => setActive(idx)} onClick={() => choose(r)}>
-                    <span className="gs-title">{r.title}{r.code && <Sku code={r.code} />}</span>
-                    {r.sub && <span className="gs-sub">{r.sub}</span>}
+                  <button key={r.key} type="button" role="option" aria-selected={idx === active} className={`gs-row${r.article ? ' gs-art' : ''}${idx === active ? ' on' : ''}`} onMouseMove={() => setActive(idx)} onClick={() => choose(r)}>
+                    {r.article && <CatalogPhoto url={r.article.image_url} alt={r.title} className="thumb" />}
+                    <span className="gs-main">
+                      <span className="gs-title">{r.title}{r.code && <Sku code={r.code} />}</span>
+                      {r.sub && <span className="gs-sub">{r.sub}</span>}
+                    </span>
+                    {r.article && <span className="gs-stock"><ArticleStock a={r.article} product={byNumber.get(r.article.article_number)} free={free} /></span>}
                   </button>
                 )
               })}
