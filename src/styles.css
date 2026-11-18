@@ -796,6 +796,7 @@ tr.focus-flash td { animation: focus-flash-cell 2.6s ease-out; }
 .pos-pay .btn { justify-content: center; padding: 14px 10px; font-size: 1.05rem; }
 .pos-pay .btn.on { background: var(--selected); color: var(--on-selected); border-color: var(--selected); }
 .pos-change { font: 700 1.2rem var(--display); color: var(--heading); }
+.pos-test { align-self: flex-start; margin-top: 6px; }
 .pos-go { width: 100%; justify-content: center; padding: 18px; font-size: 1.25rem; }
 .pos-done { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; border-left: 4px solid var(--good); }
 .pos-done-icon { width: 48px; height: 48px; border-radius: 50%; display: grid; place-items: center; background: var(--good-bg); color: var(--good); flex: 0 0 auto; }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { receiptLegalLine, receiptLines, receiptPayments, simplifiedPrint } from '../src/domain/receipt'
+import { receiptLegalLine, receiptLines, receiptPayments, simplifiedPrint, testReceipt } from '../src/domain/receipt'
 import { spanishDescription } from '../src/domain/spanish'
 import { settingsUpgrade } from '../src/domain/issuers'
 
@@ -44,5 +44,15 @@ describe('Kassabon 80 mm', () => {
   it('betalingen per betaalwijze, zonder verrekening', () => {
     expect(receiptPayments([{ method: 'contant', amount: 20 }, { method: 'pin', amount: 30.1 }, { method: 'contant', amount: 5.2 }, { method: 'verrekening', amount: 10 }]))
       .toEqual([{ method: 'contant', amount: 25.2 }, { method: 'pin', amount: 30.1 }])
+  })
+  it('testbon: geen nummer uit een reeks, bedragen 0, duidelijk geen factuur', () => {
+    const t = testReceipt('hdb', '2026-11-18')
+    expect(t.inv.number).toBe('TICKET DE PRUEBA')
+    expect(t.inv.number).not.toMatch(/FS-|VO-|\d{4}-\d{4}/)
+    expect(t.inv.issuer).toBe('hdb')
+    expect(t.inv.total).toBe(0)
+    expect(t.lines.every((l) => l.line_total === 0)).toBe(true)
+    expect(t.note).toMatch(/No es una factura/)
+    expect(testReceipt('bella', '2026-11-18', 'nl').title).toBe('Testbon')
   })
 })

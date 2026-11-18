@@ -15,7 +15,9 @@ import { shopifyOrderOf } from '../domain/shopify'
 import { CustomerFields } from './OrderForm'
 import { tx } from '../i18n'
 import { mailsAutomatically } from '../domain/mailSettings'
-import { simplifiedPrint } from '../domain/receipt'
+import { simplifiedPrint, testReceipt } from '../domain/receipt'
+import { INVOICE_TEXT } from '../domain/noteText'
+import { ReceiptPaper } from './Receipt'
 
 const USER_KEY = 'bella-flow-pos-user'
 const CART_KEY = 'bella-flow-pos-cart'
@@ -131,6 +133,25 @@ function useScannerKeys(onScan: (code: string) => void) {
 }
 
 /**
+ * Testbon van 80 mm voor de bonprinter: dezelfde opmaak als een echte kassabon, met de kop van het gekozen bedrijf,
+ * maar zonder nummer, factuur of betaling. Alleen zichtbaar bij afdrukken.
+ */
+function TestReceipt({ hdb, seller }: { hdb: boolean; seller: string }) {
+  const { s } = useApp()
+  const co = s.settings[0]
+  const setting = co?.language_invoice_simplified
+  const language = !setting || setting === 'klant' ? 'es' : setting
+  const test = testReceipt(hdb ? 'hdb' : 'bella', todayISO(), language)
+  return (
+    <div className="print-only">
+      <ReceiptPaper language={language} t={INVOICE_TEXT[language]} title={test.title} notice={test.note} inv={test.inv} issuer={issuerInfo(co, hdb ? 'hdb' : 'bella')}
+        base={import.meta.env.BASE_URL} lines={test.lines} articleOf={() => ''} productOf={() => undefined} rates={[{ rate: 21, vat: 0 }]}
+        customer={null} seller={seller} original={null} pays={[]} balance={0} credit={false} />
+    </div>
+  )
+}
+
+/**
  * Kassa (POS): een zeer eenvoudig scherm voor een verkoop in de winkel. Scannen met de handscanner, eventueel een
  * artikel met eigen omschrijving (DIVERSEN), afrekenen met pin of contant. Er ontstaat meteen een verkooporder,
  * afgeleverd, gefactureerd en betaald. Staat een artikel niet vrij op voorraad, dan wordt het verschil bijgeboekt.
@@ -161,6 +182,20 @@ export function Pos() {
   // Welk bedrijf de eenvoudige factuur uitgeeft: HDB (Handmade Bali Treasures SL, standaard) of Bella. Na elke verkoop weer HDB.
   const [hdb, setHdb] = useState(true)
   const scanRef = useRef<HTMLInputElement>(null)
+  // Testbon: alleen afdrukken, er wordt niets opgeslagen (besluit Rick 18 november 2026).
+  const [testing, setTesting] = useState(false)
+  useEffect(() => {
+    if (!testing) return
+    const done = () => { setTesting(false); refocus() }
+    window.addEventListener('afterprint', done)
+    let cancelled = false
+    const timer = window.setTimeout(async () => {
+      // Het logo moet geladen zijn, anders ontbreekt het op papier.
+      await Promise.all([...document.images].map((img) => img.decode().catch(() => undefined)))
+      if (!cancelled) window.print()
+    }, 150)
+    return () => { cancelled = true; window.clearTimeout(timer); window.removeEventListener('afterprint', done) }
+  }, [testing])
   useEffect(preloadBeep, [])
   useKeepAudioAwake()
 
@@ -346,7 +381,8 @@ export function Pos() {
         <button className="btn danger-solid pos-credit" onClick={() => setReturning(true)} title={tx("Retour of correctie op een eerdere kassabon: maakt een creditfactuur")}>{tx("RETOUR")}</button>
       </Head>
       {returning && <ReturnPicker onClose={() => setReturning(false)} />}
-      <div className="pos">
+      {testing && <TestReceipt hdb={hdb} seller={me.name} />}
+      <div className={testing ? 'pos no-print' : 'pos'}>
         <div className="stack">
           <section className="panel pos-scan">
             <form onSubmit={submitCode} className="pos-scan-row">
@@ -462,6 +498,7 @@ export function Pos() {
           <button className="btn primary pos-go" disabled={!lines.length} onClick={checkout}>{tx("Afrekenen {0}", eur(totals.total))}</button>
           <p className="small muted" style={{ margin: 0 }}>{tx("Maakt de verkooporder, de factura simplificada van vandaag en de betaling, in één keer.")}</p>
           <button className="linklike small" style={{ alignSelf: 'flex-start' }} onClick={() => go('orders-nieuw')}>{tx("Bezorgen of bestellen? Maak een gewone verkooporder.")}</button>
+          <button className="btn sm pos-test" type="button" disabled={testing} onClick={() => setTesting(true)} title={tx("Drukt een voorbeeldbon af om de bonprinter te controleren. Er wordt geen factuur gemaakt en geen nummer gebruikt.")}><Printer size={14} />{tx("Testbon printen")}</button>
         </div>
       </div>
 

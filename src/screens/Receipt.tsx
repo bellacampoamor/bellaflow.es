@@ -15,6 +15,8 @@ export function ReceiptPaper(p: {
   language: Language; t: Record<string, string>; title: string; inv: Invoice; issuer: IssuerInfo; base: string
   lines: InvoiceLine[]; articleOf: (l: InvoiceLine) => string; productOf: (articleNumber: string) => Product | undefined; rates: { rate: number; vat: number }[]
   customer: Customer | null; seller: string; original: Invoice | null; pays: Payment[]; balance: number; credit: boolean
+  /** Testbon: vetgedrukte melding onder de titel, bijv. "No es una factura". */
+  notice?: string
 }) {
   const r = RECEIPT_TEXT[p.language]
   const { t, inv, issuer } = p
@@ -35,6 +37,7 @@ export function ReceiptPaper(p: {
       </div>
       <div className="receipt-rule" />
       <div className="receipt-title">{p.title}</div>
+      {p.notice && <div className="receipt-center strong">{p.notice}</div>}
       <div className="receipt-kv"><span>{inv.number}</span><span>{fmtDate(inv.invoice_date)}</span></div>
       {p.seller && <div className="receipt-kv"><span>{r.seller}</span><span>{p.seller}</span></div>}
       {p.original && <div className="receipt-note">{t.corrects} {p.original.number} {t.of_date} {fmtDate(p.original.invoice_date)}. {t.reason}: {inv.credit_reason}</div>}

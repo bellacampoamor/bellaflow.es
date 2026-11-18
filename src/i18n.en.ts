@@ -1436,6 +1436,8 @@ export const en: Record<string, string> = {
   "Afrekenen {0}": "Pay {0}",
   "Maakt de verkooporder, de factuur van vandaag en de betaling, in één keer.": "Creates the sales order, today's invoice and the payment in one go.",
   "Bezorgen of bestellen? Maak een gewone verkooporder.": "Delivery or order? Create a regular sales order.",
+  "Testbon printen": "Print test receipt",
+  "Drukt een voorbeeldbon af om de bonprinter te controleren. Er wordt geen factuur gemaakt en geen nummer gebruikt.": "Prints a sample receipt to check the receipt printer. No invoice is created and no number is used.",
   "Klant opslaan": "Save customer",
   "Scan of voeg minimaal één artikel toe.": "Scan or add at least one item.",
   "Vul bij {0} een aantal in.": "Enter a quantity for {0}.",
