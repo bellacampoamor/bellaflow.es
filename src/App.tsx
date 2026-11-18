@@ -134,7 +134,7 @@ export function App({ onResetDemo, onSignOut }: { onResetDemo?: () => Promise<vo
           </nav>
         </div>
       </header>
-      <main className="wrap">
+      <main className="wrap" data-screen={screen}>
         <div className="inner">
           <Route screen={screen} param={param} settings={canOpenSettings(login)} />
         </div>

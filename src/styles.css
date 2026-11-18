@@ -40,6 +40,12 @@
   --logo-pad: 0;
   --top-glow: transparent;
   --photo-bg: #FFFFFF; --photo-fg: #6D5D5F;
+  /* Diepte en sfeer (besluit Rick 18 november 2026): warme schaduw uit Smoky Taupe, licht verloop op de achtergrond. */
+  --surface-3: #FAF8F5;
+  --shadow-sm: 0 1px 2px rgb(90 74 76 / .06), 0 6px 18px -8px rgb(90 74 76 / .18);
+  --shadow-lift: 0 2px 4px rgb(90 74 76 / .08), 0 14px 28px -10px rgb(90 74 76 / .3);
+  --edge: transparent;
+  --bg-glow: rgb(250 248 245 / .95); --bg-glow-2: rgb(206 141 97 / .08);
   --display: 'Outfit', 'Avenir Next', 'Segoe UI', sans-serif;
   --body: 'Figtree', 'Segoe UI', system-ui, sans-serif;
 }
@@ -51,6 +57,7 @@
   --acc-klant: #9FC3DC; --acc-producten: #E0AC87; --acc-levering: #D2B3AE; --acc-notitie: #C3C9D4;
   --good: #AFD6B3; --good-bg: #2F463A; --warn: #E9C786; --warn-bg: #4D3D22; --bad: #F4B0A8; --bad-bg: #57302D; --info: #BAD2E1; --info-bg: #2B4354;
   --neutral-bg: #4A4E59; --overlay: rgb(11 24 42 / .62); --shadow: 0 12px 40px rgb(11 24 42 / .5); --logo-plate: #F2E8DF; --logo-pad: 5px 10px; --top-glow: #E0E3E8; --photo-bg: #FFFFFF; --photo-fg: #6D5D5F; color-scheme: dark;
+  --surface-3: #383C47; --shadow-sm: 0 1px 2px rgb(11 24 42 / .35), 0 8px 22px -10px rgb(11 24 42 / .6); --shadow-lift: 0 2px 6px rgb(11 24 42 / .4), 0 16px 32px -10px rgb(11 24 42 / .72); --edge: rgb(242 232 223 / .06); --bg-glow: rgb(206 141 97 / .08); --bg-glow-2: rgb(64 68 78 / .55);
 } }
 :root[data-theme="dark"] {
   --heading: #F2E8DF; --link: #E0AC87; --brand-line: #CE8D61; --brand-strong: #CE8D61;
@@ -60,6 +67,7 @@
   --acc-klant: #9FC3DC; --acc-producten: #E0AC87; --acc-levering: #D2B3AE; --acc-notitie: #C3C9D4;
   --good: #AFD6B3; --good-bg: #2F463A; --warn: #E9C786; --warn-bg: #4D3D22; --bad: #F4B0A8; --bad-bg: #57302D; --info: #BAD2E1; --info-bg: #2B4354;
   --neutral-bg: #4A4E59; --overlay: rgb(11 24 42 / .62); --shadow: 0 12px 40px rgb(11 24 42 / .5); --logo-plate: #F2E8DF; --logo-pad: 5px 10px; --top-glow: #E0E3E8; --photo-bg: #FFFFFF; --photo-fg: #6D5D5F; color-scheme: dark;
+  --surface-3: #383C47; --shadow-sm: 0 1px 2px rgb(11 24 42 / .35), 0 8px 22px -10px rgb(11 24 42 / .6); --shadow-lift: 0 2px 6px rgb(11 24 42 / .4), 0 16px 32px -10px rgb(11 24 42 / .72); --edge: rgb(242 232 223 / .06); --bg-glow: rgb(206 141 97 / .08); --bg-glow-2: rgb(64 68 78 / .55);
 }
 
 * { box-sizing: border-box; }
@@ -1044,3 +1052,41 @@ html.help-open .back-to-top { right: calc(var(--help-w) + 18px); }
   html.help-open .back-to-top { right: max(18px, env(safe-area-inset-right, 0px)); }
 }
 @media print { .help-panel { display: none !important; } html.help-open body { padding-right: 0; } }
+
+/* Afwerking (besluit Rick 18 november 2026): meer diepte en sfeer in dag- en nachtstand, binnen het palet.
+   Geen nieuwe kleuren voor de flow; de stapkleuren blijven zoals ze zijn en dienen hier alleen als accent. */
+body { min-height: 100vh; background:
+  radial-gradient(900px 520px at 100% 0, var(--bg-glow), transparent 70%),
+  radial-gradient(800px 600px at 0 100%, var(--bg-glow-2), transparent 70%),
+  var(--bg); background-attachment: fixed; }
+.top { box-shadow: 0 6px 18px -14px rgb(11 24 42 / .45); }
+h1 { letter-spacing: -.01em; }
+/* Paginakop: korte lijn in de kleur van de stap waar je bent; elders Terracotta (nacht Warm Copper). */
+.head h1::after { content: ''; display: block; width: 40px; height: 3px; border-radius: 3px; margin-top: 8px; background: var(--head-accent, var(--brand-line)); }
+main[data-screen="inkoop"], main[data-screen="inkomend"], main[data-screen="ontvangst"] { --head-accent: var(--buy-fg); }
+main[data-screen="orders"] { --head-accent: var(--sell-fg); }
+main[data-screen="levering"] { --head-accent: var(--ship-fg); }
+main[data-screen="facturatie"] { --head-accent: var(--bill-fg); }
+/* Vlakken met diepte: overdag een warme schaduw, 's nachts een smalle lichte bovenrand. */
+.panel, .figures, .cat-supplier, .drv-stop, .queue-bar.panel-bar { box-shadow: var(--shadow-sm), inset 0 1px 0 var(--edge); }
+.panel { border-radius: 12px; }
+.modal, .combo-list { background: var(--surface-3); }
+.modal { box-shadow: var(--shadow-lift), inset 0 1px 0 var(--edge); }
+/* Hoofdknop: zacht verloop binnen Terracotta (nacht Warm Copper), geen nieuwe kleur. */
+.btn.primary { background-image: linear-gradient(180deg, var(--primary), color-mix(in oklab, var(--primary) 82%, var(--primary-hover))); box-shadow: 0 1px 2px rgb(11 24 42 / .18); }
+.btn.primary:hover { background-image: none; }
+input:focus, select:focus, textarea:focus { box-shadow: 0 0 0 3px color-mix(in oklab, var(--brand-line) 22%, transparent); }
+td { font-variant-numeric: tabular-nums; }
+th { letter-spacing: .02em; }
+.cat-supplier:hover { border-color: var(--line-strong); }
+@media (prefers-reduced-motion: no-preference) {
+  .btn { transition: background-color .15s, border-color .15s, box-shadow .15s, transform .15s; }
+  .btn:not(:disabled):not(.icon):hover { transform: translateY(-1px); }
+  .btn:not(:disabled):active { transform: none; }
+  .ov-action, .cat-supplier, .drv-stop { transition: transform .15s, box-shadow .15s, border-color .15s; }
+  .ov-action:hover, .cat-supplier:hover { transform: translateY(-2px); box-shadow: var(--shadow-lift); }
+  tr.click td { transition: background-color .12s; }
+  /* Dag/nacht wisselen loopt vloeiend over. */
+  body, .top, .panel, .modal, .figures > div, input, select, textarea { transition: background-color .25s ease, color .25s ease, border-color .25s ease; }
+}
+@media print { .panel, .top { box-shadow: none; } .head h1::after { display: none; } }
