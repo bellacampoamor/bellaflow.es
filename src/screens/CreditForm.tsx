@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { Loader } from 'lucide-react'
 import type { Payment } from '../data/types'
 import { inboundWarehouse, round2, todayISO, vatBreakdown, lineTotal } from '../domain/calc'
 import { canCredit, creditableAmount, creditableLines, creditSettlement, isCredit, originalMethod, refundMethodFixed } from '../domain/credit'
@@ -43,6 +44,8 @@ export function CreditForm({ invoiceId }: { invoiceId: string }) {
     return m && m !== 'verrekening' ? m : inv?.simplified ? 'contant' : 'overboeking'
   })
   const [reference, setReference] = useState('')
+  // Bezig met crediteren: knop geblokkeerd, zodat er nooit twee creditfacturen ontstaan.
+  const [saving, setSaving] = useState(false)
 
   if (!inv) return <div className="panel">{tx("Factuur niet gevonden.")} <a href="#facturatie">{tx("Terug naar facturatie")}</a>.</div>
   const c = s.customers.find((x) => x.id === inv.customer_id)
@@ -71,7 +74,9 @@ export function CreditForm({ invoiceId }: { invoiceId: string }) {
   const returned = chosen.filter((l) => rows[l.line.id].warehouse).reduce((n, l) => n + rows[l.line.id].qty, 0)
 
   const submit = async () => {
+    if (saving) return
     let id = ''
+    setSaving(true)
     const ok = await run(async (db) => {
       id = await createCreditInvoice(db, {
         invoice_id: inv.id, date, reason,
@@ -79,7 +84,7 @@ export function CreditForm({ invoiceId }: { invoiceId: string }) {
         extra: extraOn ? extra : null,
         refund: { method: fixed ?? method, reference },
       })
-    }, tx("Creditfactuur gemaakt"))
+    }, tx("Creditfactuur gemaakt")).finally(() => setSaving(false))
     if (ok) go(`facturatie-${id}`)
   }
 
@@ -157,7 +162,10 @@ export function CreditForm({ invoiceId }: { invoiceId: string }) {
               ? tx("Contant betaald: in Shopify gaan alleen de artikelen die retour in voorraad komen terug in de voorraad (Centraal magazijn). Geen bestelling en geen terugbetaling in Shopify.")
               : tx("Gaat ook naar Shopify: terugbetaling op de bestelling van {0}, met de artikelen terug in voorraad.", inv.number)}</p>}
           <p className="small muted">{returned > 0 ? tx("{0} stuks komen terug in voorraad (mutatie Retour).", returned) : tx("Er komt niets terug in voorraad.")} {tx("Na het maken staat de creditfactuur vast, net als een factuur.")}</p>
-          <div className="btn-row"><button className="btn primary" disabled={amount <= 0 || !reason.trim()} onClick={submit}>{tx("Creditfactuur maken")}</button></div>
+          <div className="btn-row"><button className="btn primary" disabled={amount <= 0 || !reason.trim() || saving} aria-busy={saving} onClick={submit}>
+            {saving ? <><Loader size={18} className="spin" aria-hidden />{tx("Bezig met crediteren…")}</> : tx("Creditfactuur maken")}
+          </button></div>
+          {saving && <p className="note pos-paying" role="status" aria-live="polite">{tx("Creditfactuur, terugbetaling en voorraad worden vastgelegd. Niet opnieuw klikken.")}</p>}
         </section>
       </div>
     </>

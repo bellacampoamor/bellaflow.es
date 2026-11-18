@@ -1438,6 +1438,8 @@ export const en: Record<string, string> = {
   "Bezorgen of bestellen? Maak een gewone verkooporder.": "Delivery or order? Create a regular sales order.",
   "Laatste bonnen": "Latest receipts",
   "Nog geen kassabonnen.": "No receipts yet.",
+  "Bezig met crediteren…": "Creating credit note…",
+  "Creditfactuur, terugbetaling en voorraad worden vastgelegd. Niet opnieuw klikken.": "Credit note, refund and stock are being recorded. Do not click again.",
   "Testbon printen": "Print test receipt",
   "Drukt een voorbeeldbon af om de bonprinter te controleren. Er wordt geen factuur gemaakt en geen nummer gebruikt.": "Prints a sample receipt to check the receipt printer. No invoice is created and no number is used.",
   "Klant opslaan": "Save customer",

@@ -1438,6 +1438,8 @@ export const es: Record<string, string> = {
   "Bezorgen of bestellen? Maak een gewone verkooporder.": "¿Entrega o pedido? Cree un pedido de venta normal.",
   "Laatste bonnen": "Últimos tickets",
   "Nog geen kassabonnen.": "Todavía no hay tickets.",
+  "Bezig met crediteren…": "Creando factura rectificativa…",
+  "Creditfactuur, terugbetaling en voorraad worden vastgelegd. Niet opnieuw klikken.": "Se están registrando la factura rectificativa, el reembolso y el stock. No vuelva a pulsar.",
   "Testbon printen": "Imprimir ticket de prueba",
   "Drukt een voorbeeldbon af om de bonprinter te controleren. Er wordt geen factuur gemaakt en geen nummer gebruikt.": "Imprime un ticket de ejemplo para comprobar la impresora de tickets. No se crea ninguna factura ni se usa ningún número.",
   "Klant opslaan": "Guardar cliente",
