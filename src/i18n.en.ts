@@ -1674,7 +1674,6 @@ export const en: Record<string, string> = {
   "Nog niet in Shopify: {0} Opnieuw versturen kan onder Beheer > Kassa.": "Not in Shopify yet: {0} You can resend it under Admin > POS.",
   "wacht op Shopify.": "waiting for Shopify.",
   "Shopify van HomeDecoBali": "HomeDecoBali Shopify",
-  "Elke kassaverkoop van HDB komt als conceptorder in Shopify, met artikelen, prijzen, korting, klant, verkoper, betaalwijze en factuurnummer. Op Afgehandeld zetten doe je zelf in Shopify, als laatste controle.": "Every HDB POS sale goes to Shopify as a draft order, with items, prices, discount, customer, salesperson, payment method and invoice number. You mark it as Fulfilled yourself in Shopify, as the final check.",
   "Conceptorder meteen omzetten naar een bestelling (betaald), met het ordernummer van Shopify": "Convert the draft order straight away into an order (paid), with the Shopify order number",
   "Naam van de winkel in Shopify": "Store name in Shopify",
   "Voor de links naar de bestelling: admin.shopify.com/store/{0}": "For the links to the order: admin.shopify.com/store/{0}",
@@ -1816,4 +1815,9 @@ export const en: Record<string, string> = {
   "Gaat ook naar Shopify: terugbetaling op de bestelling van {0}, met de artikelen terug in voorraad.": "Also goes to Shopify: refund on the order of {0}, with the items back in stock.",
   "Versturen naar Shopify staat uit: deze retour gaat niet naar Shopify.": "Sending to Shopify is off: this return will not go to Shopify.",
   "Shopify terugbetaald op": "Shopify refunded on",
+  "Elke kassaverkoop van HDB met pin komt als conceptorder in Shopify, met artikelen, prijzen, korting, klant, verkoper, betaalwijze en factuurnummer. Op Afgehandeld zetten doe je zelf in Shopify, als laatste controle.": "Every HDB POS sale paid by card goes to Shopify as a draft order, with items, prices, discount, customer, salesperson, payment method and invoice number. You mark it as Fulfilled yourself in Shopify, as the final check.",
+  "Contant afgerekend: geen bestelling en geen betaling in Shopify, alleen de voorraad wordt afgeboekt (bij een retour weer bijgeboekt).": "Paid in cash: no order and no payment in Shopify, only the stock is deducted (added back on a return).",
+  "Contant: in Shopify alleen de voorraad afgeboekt, geen bestelling.": "Cash: only the stock was deducted in Shopify, no order.",
+  "Shopify: alleen voorraad afgeboekt (contant)": "Shopify: stock deducted only (cash)",
+  "Shopify: voorraad teruggeboekt (contant)": "Shopify: stock added back (cash)",
 }

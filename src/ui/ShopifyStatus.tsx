@@ -2,7 +2,7 @@
 import type { MouseEvent } from 'react'
 import { RefreshCw } from 'lucide-react'
 import { pushToShopify, sendSaleToShopify } from '../domain/services'
-import { SHOPIFY_STATE, shopifyAdminUrl, shopifyBacklog, shopifyNumber, shopifyOrderOf, shopifySendingOn } from '../domain/shopify'
+import { SHOPIFY_STATE, shopifyAdminUrl, shopifyBacklog, shopifyNumber, shopifyOrderOf, shopifySendingOn, shopifyStockOnly } from '../domain/shopify'
 import { tx } from '../i18n'
 import { useApp } from './app-context'
 import { Pill } from './kit'
@@ -27,7 +27,9 @@ export function ShopifyStatus({ invoiceId, compact = false }: { invoiceId: strin
   const url = shopifyAdminUrl(row, store)
   return (
     <span className="shopify-status">
-      {row.status === 'aangemaakt' && num
+      {row.status === 'aangemaakt' && shopifyStockOnly(row)
+        ? <Pill tone={row.error ? 'warn' : 'good'}>{row.kind === 'voorraad' ? tx("Shopify: alleen voorraad afgeboekt (contant)") : tx("Shopify: voorraad teruggeboekt (contant)")}</Pill>
+        : row.status === 'aangemaakt' && num
         ? <Pill tone={row.error ? 'warn' : 'good'}>{row.kind === 'retour' ? tx("Shopify terugbetaald op") : 'Shopify'} {url ? <a href={url} target="_blank" rel="noreferrer">{num}</a> : num}{row.kind !== 'retour' && !row.shopify_order_name && ` (${tx("conceptorder")})`}</Pill>
         : <Pill tone={tone}>{tx(label)}</Pill>}
       {on && (row.status === 'mislukt' || row.status === 'wachtrij' || row.status === 'demo') && <> <button className="linklike small" onClick={send}><RefreshCw size={13} /> {tx("Opnieuw versturen")}</button></>}

@@ -6,9 +6,10 @@ import type { CatalogArticle } from '../src/data/types'
 import { seedDemo } from '../src/domain/demo'
 import type { PosLine } from '../src/domain/pos'
 import { createCreditInvoice, importShowroom, posCheckout, pushToShopify, saveSettings, sendSaleToShopify, syncCatalogArticles } from '../src/domain/services'
-import { goesToShopify, shopifyAdminUrl, shopifyBacklog, shopifyCompletes, shopifyOrderOf, shopifySendingOn } from '../src/domain/shopify'
+import { goesToShopify, paidCashOnly, shopifyAdminUrl, shopifyBacklog, shopifyCompletes, shopifyOrderOf, shopifySendingOn, shopifyStockOnly } from '../src/domain/shopify'
 import { countryCode, draftOrderInput, invoiceTag, splitName, type ShopifySale } from '../supabase/functions/_shared/shopifyDraft'
 import { alreadyRefunded, refundInput, refundNote, returnLocation } from '../supabase/functions/_shared/shopifyRefund'
+import { adjustInput, stockPlan, stockReference } from '../supabase/functions/_shared/shopifyStock'
 
 const TODAY = '2026-11-11'
 const LOL = 'Life Outdoor Living International B.V.'
@@ -94,7 +95,29 @@ describe('Shopify: kassa en wachtrij', () => {
     const a: CatalogArticle = issuer === 'hdb' ? { ...table, source: 'hdb' } : table
     return { key: newId(), code: a.article_number, article: a, description: a.name, qty: 1, unit_price: 187.4, discount_pct: 0, vat_rate: 21 }
   }
-  const checkout = (issuer: 'bella' | 'hdb') => posCheckout(db, { salesperson_id: seller, customer_id: null, date: TODAY, lines: [line(issuer)], payment: { method: 'pin', reference: '' }, issuer })
+  const checkout = (issuer: 'bella' | 'hdb', method: 'pin' | 'contant' = 'pin') => posCheckout(db, { salesperson_id: seller, customer_id: null, date: TODAY, lines: [line(issuer)], payment: { method, reference: '' }, issuer })
+
+  // Besluit Rick 18 november 2026: contant aan de kassa geen bestelling en geen betaling in Shopify, alleen voorraad afboeken.
+  it('contant afgerekend: in de wachtrij als voorraad (geen bestelling); pin blijft een bestelling', async () => {
+    const cash = await checkout('hdb', 'contant')
+    const row = shopifyOrderOf(db.data, cash.invoiceId)!
+    expect(row.kind).toBe('voorraad')
+    expect(shopifyStockOnly(row)).toBe(true)
+    const card = await checkout('hdb', 'pin')
+    expect(shopifyOrderOf(db.data, card.invoiceId)!.kind).toBe('verkoop')
+    expect(paidCashOnly([{ invoice_id: 'a', method: 'contant' }, { invoice_id: 'a', method: 'pin' }], 'a')).toBe(false)
+    expect(paidCashOnly([{ invoice_id: 'a', method: 'contant' }, { invoice_id: 'a', method: 'verrekening' }], 'a')).toBe(true)
+    expect(paidCashOnly([], 'a')).toBe(false)
+  })
+
+  it('retour op een contante kassabon: voorraad_retour (voorraad terug), geen refund', async () => {
+    const r = await checkout('hdb', 'contant')
+    const sale = db.data.invoices.find((i) => i.id === r.invoiceId)!
+    const line = db.data.invoice_lines.find((l) => l.invoice_id === sale.id)!
+    const shop = db.data.warehouses.find((w) => w.kind === 'winkel')!
+    const id = await createCreditInvoice(db, { invoice_id: sale.id, date: TODAY, reason: 'Retour', lines: [{ invoice_line_id: line.id, qty: 1, return_warehouse_id: shop.id }], refund: { method: 'contant', reference: '' } })
+    expect(shopifyOrderOf(db.data, id)!.kind).toBe('voorraad_retour')
+  })
 
   it('een kassaverkoop van HDB komt één keer in de wachtrij; in de browserversie als testversie', async () => {
     const r = await checkout('hdb')
@@ -220,5 +243,27 @@ describe('Shopify: retour als terugbetaling (refund)', () => {
     const refunds = [{ id: 'R1', note: refundNote('CRE-FS-HDB-2026-0001', 'FS-HDB-2026-0003', '') }]
     expect(alreadyRefunded(refunds, 'CRE-FS-HDB-2026-0001')?.id).toBe('R1')
     expect(alreadyRefunded(refunds, 'CRE-FS-HDB-2026-0002')).toBeNull()
+  })
+})
+
+describe('Shopify: contant alleen voorraad', () => {
+  it('telt per variant op, boekt af bij verkoop en bij bij retour; DIVERSEN en losse artikelen niet', () => {
+    const lines = [
+      { article_number: 'HDB-ACC-1', variant_id: '111', qty: 2 },
+      { article_number: 'HDB-ACC-1', variant_id: 'gid://shopify/ProductVariant/111', qty: 1 },
+      { article_number: 'HDB-ACC-9', variant_id: null, qty: 1 },
+      { article_number: 'DIVERSEN', variant_id: null, qty: 1 },
+    ]
+    expect(stockPlan(lines, -1)).toEqual({ deltas: [{ variantId: 'gid://shopify/ProductVariant/111', delta: -3 }], unlinked: ['HDB-ACC-9'] })
+    expect(stockPlan(lines, 1).deltas).toEqual([{ variantId: 'gid://shopify/ProductVariant/111', delta: 3 }])
+  })
+
+  it('past de beschikbare voorraad van de locatie aan, zonder vergelijking met de stand in Shopify', () => {
+    const input = adjustInput({ deltas: [{ inventoryItemId: 'gid://shopify/InventoryItem/5', delta: -2 }], locationId: 'gid://shopify/Location/1', sign: -1, reference: stockReference('FS-HDB-2026-0007') })
+    expect(input).toEqual({
+      name: 'available', reason: 'correction', referenceDocumentUri: 'bellaflow://factuur/FS-HDB-2026-0007',
+      changes: [{ inventoryItemId: 'gid://shopify/InventoryItem/5', locationId: 'gid://shopify/Location/1', delta: -2, changeFromQuantity: null }],
+    })
+    expect(adjustInput({ deltas: [], locationId: 'L', sign: 1, reference: 'x' }).reason).toBe('restock')
   })
 })

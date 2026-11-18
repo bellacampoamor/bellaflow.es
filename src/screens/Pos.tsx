@@ -334,7 +334,8 @@ export function Pos() {
       const sh = shopifyOrderOf(snap, result!.invoiceId)
       if (result!.shopify === 'uit') shop = tx("Niet naar Shopify: versturen staat uit.")
       else if (sh) shop = sh.status === 'aangemaakt'
-        ? (sh.shopify_order_name ? tx("In Shopify als bestelling {0}, nog niet afgehandeld.", sh.shopify_order_name) : tx("In Shopify als conceptorder {0}.", sh.shopify_draft_name))
+        ? (sh.kind === 'voorraad' ? tx("Contant: in Shopify alleen de voorraad afgeboekt, geen bestelling.") + (sh.error ? ` ${sh.error}` : '')
+          : sh.shopify_order_name ? tx("In Shopify als bestelling {0}, nog niet afgehandeld.", sh.shopify_order_name) : tx("In Shopify als conceptorder {0}.", sh.shopify_draft_name))
         : sh.status === 'demo' ? tx("Testversie: niet naar Shopify gestuurd.")
         : tx("Nog niet in Shopify: {0} Opnieuw versturen kan onder Beheer > Kassa.", sh.error || tx("wacht op Shopify."))
       shopBad = !!sh && sh.status !== 'aangemaakt' && sh.status !== 'demo'

@@ -1674,7 +1674,6 @@ export const es: Record<string, string> = {
   "Nog niet in Shopify: {0} Opnieuw versturen kan onder Beheer > Kassa.": "Todavía no está en Shopify: {0} Puedes reenviarlo en Gestión > TPV.",
   "wacht op Shopify.": "esperando a Shopify.",
   "Shopify van HomeDecoBali": "Shopify de HomeDecoBali",
-  "Elke kassaverkoop van HDB komt als conceptorder in Shopify, met artikelen, prijzen, korting, klant, verkoper, betaalwijze en factuurnummer. Op Afgehandeld zetten doe je zelf in Shopify, als laatste controle.": "Cada venta de TPV de HDB llega a Shopify como pedido borrador, con artículos, precios, descuento, cliente, vendedor, forma de pago y número de factura. Marcarlo como Preparado lo haces tú en Shopify, como control final.",
   "Conceptorder meteen omzetten naar een bestelling (betaald), met het ordernummer van Shopify": "Convertir el pedido borrador enseguida en un pedido (pagado), con el número de pedido de Shopify",
   "Naam van de winkel in Shopify": "Nombre de la tienda en Shopify",
   "Voor de links naar de bestelling: admin.shopify.com/store/{0}": "Para los enlaces al pedido: admin.shopify.com/store/{0}",
@@ -1816,4 +1815,9 @@ export const es: Record<string, string> = {
   "Gaat ook naar Shopify: terugbetaling op de bestelling van {0}, met de artikelen terug in voorraad.": "También va a Shopify: reembolso en el pedido de {0}, con los artículos de vuelta en stock.",
   "Versturen naar Shopify staat uit: deze retour gaat niet naar Shopify.": "El envío a Shopify está desactivado: esta devolución no irá a Shopify.",
   "Shopify terugbetaald op": "Shopify reembolsado en",
+  "Elke kassaverkoop van HDB met pin komt als conceptorder in Shopify, met artikelen, prijzen, korting, klant, verkoper, betaalwijze en factuurnummer. Op Afgehandeld zetten doe je zelf in Shopify, als laatste controle.": "Cada venta de TPV de HDB pagada con tarjeta llega a Shopify como pedido borrador, con artículos, precios, descuento, cliente, vendedor, forma de pago y número de factura. Marcarlo como Preparado lo haces tú en Shopify, como control final.",
+  "Contant afgerekend: geen bestelling en geen betaling in Shopify, alleen de voorraad wordt afgeboekt (bij een retour weer bijgeboekt).": "Pagado en efectivo: sin pedido ni pago en Shopify, solo se descuenta el stock (en una devolución se vuelve a sumar).",
+  "Contant: in Shopify alleen de voorraad afgeboekt, geen bestelling.": "Efectivo: en Shopify solo se ha descontado el stock, sin pedido.",
+  "Shopify: alleen voorraad afgeboekt (contant)": "Shopify: solo stock descontado (efectivo)",
+  "Shopify: voorraad teruggeboekt (contant)": "Shopify: stock devuelto (efectivo)",
 }

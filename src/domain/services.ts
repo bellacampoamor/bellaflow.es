@@ -638,9 +638,9 @@ export async function posCheckout(db: Driver, input: PosInput) {
 // Shopify en de gegevens die tot nu toe met de hand werden ingevoerd. Op Afgehandeld zetten doet HDB zelf.
 
 /** Nieuwe rij in de wachtrij voor Shopify: verkoop (kassabon) of retour (creditfactuur op een kassabon van HDB). */
-function shopifyQueueRow(inv: Invoice, co: Settings | undefined): HdbShopifyOrder {
+function shopifyQueueRow(s: Pick<Snapshot, 'payments' | 'hdb_shopify_orders'>, inv: Invoice, co: Settings | undefined): HdbShopifyOrder {
   return {
-    id: newId(), invoice_id: inv.id, kind: shopifyKindOf(inv), status: 'wachtrij', complete_order: shopifyCompletes(co), shopify_draft_id: '', shopify_draft_name: '',
+    id: newId(), invoice_id: inv.id, kind: shopifyKindOf(s, inv), status: 'wachtrij', complete_order: shopifyCompletes(co), shopify_draft_id: '', shopify_draft_name: '',
     shopify_order_id: '', shopify_order_name: '', shopify_refund_id: '', error: '', attempts: 0, claimed_at: null, created_at: new Date().toISOString(), sent_at: null,
   }
 }
@@ -653,7 +653,7 @@ export async function sendSaleToShopify(db: Driver, invoiceId: string) {
   if (!shopifySendingOn(s.settings[0])) fail(tx("Versturen naar Shopify staat uit (Instellingen > Bedrijf en factuur > Kassa: HDB)."))
   let row = shopifyOrderOf(s, invoiceId)
   if (!row) {
-    row = shopifyQueueRow(inv, s.settings[0])
+    row = shopifyQueueRow(s, inv, s.settings[0])
     await db.insert('hdb_shopify_orders', [row])
   }
   if (row.status === 'aangemaakt') return row.status
@@ -1281,7 +1281,7 @@ export async function createCreditInvoice(db: Driver, input: CreditInput) {
 
   // HDB: de creditfactuur gaat als terugbetaling (refund) naar de bestelling in Shopify, met de artikelen terug in voorraad.
   const toShopify = goesToShopify(invoice) && shopifySendingOn(s.settings[0])
-  const queue = toShopify ? [shopifyQueueRow(invoice, s.settings[0])] : []
+  const queue = toShopify ? [shopifyQueueRow(s, invoice, s.settings[0])] : []
 
   // Alles of niets (opdracht Rick 17 november 2026): creditfactuur, regels, terugbetaling, voorraad Retour en de wachtrij
   // voor Shopify in één transactie. Nooit meer voorraad terug zonder creditfactuur.

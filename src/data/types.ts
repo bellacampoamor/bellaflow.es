@@ -260,12 +260,17 @@ export interface CashClosing {
  * één rij per eenvoudige factuur van HDB. De edge function hdb-shopify vult de Shopify-velden.
  */
 export type ShopifyPushStatus = 'wachtrij' | 'bezig' | 'aangemaakt' | 'mislukt' | 'demo'
+/** verkoop/retour: bestelling en refund in Shopify; voorraad/voorraad_retour: contant aan de kassa, alleen de voorraad in Shopify. */
+export type ShopifyKind = 'verkoop' | 'retour' | 'voorraad' | 'voorraad_retour'
+
 export interface HdbShopifyOrder {
   id: string; invoice_id: string; status: ShopifyPushStatus
-  /** verkoop: kassabon van HDB als bestelling. retour: creditfactuur op zo'n kassabon als terugbetaling (refund) in Shopify. Ontbreekt = verkoop. */
-  kind?: 'verkoop' | 'retour'
+  /** Zie shopifyKindOf in src/domain/shopify.ts. Ontbreekt = verkoop. */
+  kind?: ShopifyKind
   /** Retour: de refund in Shopify. */
   shopify_refund_id?: string
+  /** Voorraad (contant): de voorraadaanpassing (inventory adjustment group) in Shopify. */
+  shopify_adjustment_id?: string
   /** Meteen omzetten naar een bestelling (als betaald) met een Shopify-ordernummer, of conceptorder laten. */
   complete_order: boolean
   shopify_draft_id: string; shopify_draft_name: string; shopify_order_id: string; shopify_order_name: string

@@ -166,7 +166,7 @@ export function Admin({ param = '' }: { param?: string }) {
         </div>
         {/* Kassaverkopen van HDB als conceptorder in Shopify (opdracht Rick 11 november 2026). De sleutels staan alleen in Supabase. */}
         <h3 style={{ marginTop: 18 }}>{tx("Shopify van HomeDecoBali")}</h3>
-        <p className="small muted">{tx("Elke kassaverkoop van HDB komt als conceptorder in Shopify, met artikelen, prijzen, korting, klant, verkoper, betaalwijze en factuurnummer. Op Afgehandeld zetten doe je zelf in Shopify, als laatste controle.")}</p>
+        <p className="small muted">{tx("Elke kassaverkoop van HDB met pin komt als conceptorder in Shopify, met artikelen, prijzen, korting, klant, verkoper, betaalwijze en factuurnummer. Op Afgehandeld zetten doe je zelf in Shopify, als laatste controle.")} {tx("Contant afgerekend: geen bestelling en geen betaling in Shopify, alleen de voorraad wordt afgeboekt (bij een retour weer bijgeboekt).")}</p>
         <div className="form-grid">
           <Check label={tx("Kassaverkopen van HDB naar Shopify sturen")} checked={co.hdb_shopify_enabled !== false} onChange={(v) => setCo({ ...co, hdb_shopify_enabled: v })} />
           <Check label={tx("Conceptorder meteen omzetten naar een bestelling (betaald), met het ordernummer van Shopify")} checked={co.hdb_shopify_complete !== false} onChange={(v) => setCo({ ...co, hdb_shopify_complete: v })} />

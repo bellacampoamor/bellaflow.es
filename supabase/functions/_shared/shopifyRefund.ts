@@ -107,6 +107,7 @@ export function returnLocation(nodes: { id: string; name: string; isActive?: boo
   return (active.find((l) => /campoamor/i.test(l.name)) ?? active[0])?.id ?? null
 }
 
-export const REFUND_CREATE = `mutation refundCreate($input: RefundInput!) {
-  refundCreate(input: $input) { refund { id } userErrors { field message } }
+/** Sinds API 2026-04 verplicht met een idempotency key (het nummer van de creditfactuur): nooit dubbel terugbetalen. */
+export const REFUND_CREATE = `mutation refundCreate($input: RefundInput!, $key: String!) {
+  refundCreate(input: $input) @idempotent(key: $key) { refund { id } userErrors { field message } }
 }`

@@ -7,6 +7,11 @@
 //   en ofwel SHOPIFY_HDB_TOKEN  (Admin API-token van een bestaande custom app, shpat_...)
 //   ofwel SHOPIFY_HDB_CLIENT_ID + SHOPIFY_HDB_CLIENT_SECRET (app uit het Dev Dashboard, client credentials grant)
 // Rechten van de app: write_draft_orders, read_products, en voor retouren write_orders en read_locations (gecontroleerd 17 november 2026: aanwezig).
+// Voor contante kassaverkopen ook read_inventory en write_inventory.
+//
+// Contant (besluit Rick 18 november 2026): een kassabon die volledig contant is betaald (rij met kind 'voorraad') wordt geen
+// bestelling en geeft geen betaling door; alleen de voorraad op de locatie Campoamor gaat omlaag. Een retour daarop (kind
+// 'voorraad_retour') boekt de artikelen die in Bella Flow retour in voorraad kwamen weer bij.
 //
 // Retour: een creditfactuur op een kassabon van HDB (rij met kind 'retour') wordt een refund op de bestelling van die
 // kassabon: artikelen terug in voorraad als ze in Bella Flow retour kwamen, geld terug via de betaling van de bestelling.
@@ -15,6 +20,7 @@ import {
   DRAFT_ORDER_BY_TAG, DRAFT_ORDER_COMPLETE, DRAFT_ORDER_CREATE, SHOPIFY_API_VERSION, draftOrderInput, invoiceTag, userErrorText,
   type ShopifySale, type ShopifySaleLine,
 } from '../_shared/shopifyDraft.ts'
+import { INVENTORY_ADJUST, VARIANT_INVENTORY, adjustInput, stockPlan, stockReference, type StockLine } from '../_shared/shopifyStock.ts'
 import {
   ORDER_FOR_REFUND, REFUND_CREATE, alreadyRefunded, refundInput, refundNote, returnLocation,
   type CreditLineForShopify, type ShopifyOrderLine, type ShopifyTransaction,
@@ -99,6 +105,80 @@ async function loadSale(db: SupabaseClient, invoiceId: string): Promise<ShopifyS
 
 type Refund = { id: string; note: string | null }
 
+/** Eigen artikelnummer -> variant in Shopify (via het artikelnummer van HDB uit de catalogus-sync). */
+async function variantsFor(db: SupabaseClient, articleNumbers: string[]) {
+  const numbers = [...new Set(articleNumbers.filter(Boolean))]
+  const { data: arts } = numbers.length ? await db.from('catalog_articles').select('article_number, supplier_sku').in('article_number', numbers) : { data: [] }
+  const skuOf = new Map((arts ?? []).map((a) => [a.article_number as string, a.supplier_sku as string]))
+  const skus = [...new Set([...skuOf.values()].filter(Boolean))]
+  const { data: items } = skus.length ? await db.from('supplier_hdb_items').select('supplier_sku, variant_id, active').in('supplier_sku', skus) : { data: [] }
+  const bySku = new Map<string, string>()
+  for (const it of (items ?? []).sort((a, b) => Number(b.active) - Number(a.active))) if (it.variant_id && !bySku.has(it.supplier_sku)) bySku.set(it.supplier_sku, String(it.variant_id))
+  return (article: string) => { const sku = skuOf.get(article) ?? ''; return sku ? bySku.get(sku) ?? null : null }
+}
+
+/** Regels van een creditfactuur met variant en of het artikel in Bella Flow retour in voorraad kwam (mutatie Retour). */
+async function creditLinesOf(db: SupabaseClient, credit: { id: string; number: string }): Promise<CreditLineForShopify[]> {
+  const [{ data: lines }, { data: moves }] = await Promise.all([
+    db.from('invoice_lines').select('*').eq('invoice_id', credit.id),
+    db.from('stock_movements').select('product_id, qty').eq('ref_id', credit.number).eq('kind', 'retour'),
+  ])
+  const pids = [...new Set((moves ?? []).map((m) => m.product_id as string))]
+  const { data: prods } = pids.length ? await db.from('products').select('id, sku').in('id', pids) : { data: [] }
+  const returned = new Map<string, number>()
+  for (const m of moves ?? []) {
+    const sku = (prods ?? []).find((p) => p.id === m.product_id)?.sku
+    if (sku) returned.set(sku, (returned.get(sku) ?? 0) + Number(m.qty))
+  }
+  const variantOf = await variantsFor(db, (lines ?? []).map((l) => l.article_number))
+  return (lines ?? []).filter((l) => l.credits_line_id).map((l) => {
+    const qty = Math.abs(Number(l.qty))
+    const back = returned.get(l.article_number) ?? 0
+    if (back > 0) returned.set(l.article_number, back - Math.min(back, qty))
+    return { article_number: l.article_number, variant_id: variantOf(l.article_number), qty, restock: back > 0 }
+  })
+}
+
+/**
+ * Contant aan de kassa: alleen de voorraad in Shopify. Verkoop (kind 'voorraad') boekt af, retour (kind 'voorraad_retour')
+ * boekt bij wat in Bella Flow retour in voorraad kwam. Geen bestelling, geen betaling. Geeft de velden om de rij bij te werken.
+ */
+async function pushStock(db: SupabaseClient, row: Record<string, string>, call: ReturnType<typeof graphql>) {
+  if (row.shopify_adjustment_id) return { shopify_adjustment_id: row.shopify_adjustment_id, error: '' }
+  const { data: inv, error } = await db.from('invoices').select('id, number, issuer, simplified').eq('id', row.invoice_id).single()
+  if (error || !inv) throw new Error('Factuur niet gevonden.')
+  if (inv.issuer !== 'hdb' || !inv.simplified) throw new Error('Alleen eenvoudige facturen van HDB gaan naar Shopify.')
+  const sign: 1 | -1 = row.kind === 'voorraad_retour' ? 1 : -1
+  let lines: StockLine[]
+  if (sign < 0) {
+    const { data } = await db.from('invoice_lines').select('article_number, qty').eq('invoice_id', inv.id)
+    const variantOf = await variantsFor(db, (data ?? []).map((l) => l.article_number))
+    lines = (data ?? []).map((l) => ({ article_number: l.article_number, variant_id: variantOf(l.article_number), qty: Number(l.qty) }))
+  } else {
+    // Alleen wat retour in voorraad kwam; een artikel dat niet terug in voorraad ging, blijft in Shopify ook weg.
+    lines = (await creditLinesOf(db, inv)).filter((l) => l.restock)
+  }
+  const plan = stockPlan(lines, sign)
+  const notes = plan.unlinked.length ? `Zonder koppeling aan een Shopify-artikel (voorraad in Shopify niet bijgewerkt): ${plan.unlinked.join(', ')}` : ''
+  if (!plan.deltas.length) return { shopify_adjustment_id: '', error: notes }
+
+  const q = await call<{ nodes: ({ id: string; inventoryItem: { id: string; tracked: boolean } | null } | null)[]; locations: { nodes: { id: string; name: string; isActive: boolean }[] } }>(VARIANT_INVENTORY, { ids: plan.deltas.map((d) => d.variantId) })
+  const location = returnLocation(q.locations.nodes)
+  if (!location) throw new ShopifyError('Geen actieve locatie in Shopify gevonden.')
+  const itemOf = new Map(q.nodes.filter((n) => n?.inventoryItem).map((n) => [n!.id, n!.inventoryItem!.id]))
+  const missing = plan.deltas.filter((d) => !itemOf.has(d.variantId)).map((d) => d.variantId.split('/').pop())
+  const deltas = plan.deltas.filter((d) => itemOf.has(d.variantId)).map((d) => ({ inventoryItemId: itemOf.get(d.variantId)!, delta: d.delta }))
+  const extra = missing.length ? `Variant niet gevonden in Shopify: ${missing.join(', ')}` : ''
+  if (!deltas.length) return { shopify_adjustment_id: '', error: [notes, extra].filter(Boolean).join(' ') }
+
+  const r = await call<{ inventoryAdjustQuantities: { inventoryAdjustmentGroup: { id: string } | null; userErrors: { field: string[]; message: string }[] } }>(
+    INVENTORY_ADJUST, { input: adjustInput({ deltas, locationId: location, sign, reference: stockReference(inv.number) }), key: `bellaflow-voorraad-${row.id}` },
+  )
+  const group = r.inventoryAdjustQuantities.inventoryAdjustmentGroup
+  if (!group) throw new ShopifyError(`Voorraad niet aangepast in Shopify: ${userErrorText(r.inventoryAdjustQuantities.userErrors)}`)
+  return { shopify_adjustment_id: group.id, error: [notes, extra].filter(Boolean).join(' ') }
+}
+
 /** Creditfactuur op een kassabon van HDB als refund in Shopify. Geeft de velden om de rij bij te werken. */
 async function pushRefund(db: SupabaseClient, row: Record<string, string>, call: ReturnType<typeof graphql>) {
   const { data: credit, error } = await db.from('invoices').select('*').eq('id', row.invoice_id).single()
@@ -115,31 +195,7 @@ async function pushRefund(db: SupabaseClient, row: Record<string, string>, call:
 
   // Regels: creditregel -> regel van de kassabon -> eigen artikelnummer -> variant in Shopify. Retour in voorraad volgt de
   // voorraadmutatie Retour met het nummer van de creditfactuur.
-  const [{ data: lines }, { data: moves }] = await Promise.all([
-    db.from('invoice_lines').select('*').eq('invoice_id', credit.id),
-    db.from('stock_movements').select('product_id, qty').eq('ref_id', credit.number).eq('kind', 'retour'),
-  ])
-  const pids = [...new Set((moves ?? []).map((m) => m.product_id as string))]
-  const { data: prods } = pids.length ? await db.from('products').select('id, sku').in('id', pids) : { data: [] }
-  const returned = new Map<string, number>()
-  for (const m of moves ?? []) {
-    const sku = (prods ?? []).find((p) => p.id === m.product_id)?.sku
-    if (sku) returned.set(sku, (returned.get(sku) ?? 0) + Number(m.qty))
-  }
-  const numbers = [...new Set((lines ?? []).map((l) => l.article_number).filter(Boolean))]
-  const { data: arts } = numbers.length ? await db.from('catalog_articles').select('article_number, supplier_sku').in('article_number', numbers) : { data: [] }
-  const skuOf = new Map((arts ?? []).map((a) => [a.article_number as string, a.supplier_sku as string]))
-  const skus = [...new Set([...skuOf.values()].filter(Boolean))]
-  const { data: items } = skus.length ? await db.from('supplier_hdb_items').select('supplier_sku, variant_id, active').in('supplier_sku', skus) : { data: [] }
-  const variantOf = new Map<string, string>()
-  for (const it of (items ?? []).sort((a, b) => Number(b.active) - Number(a.active))) if (it.variant_id && !variantOf.has(it.supplier_sku)) variantOf.set(it.supplier_sku, String(it.variant_id))
-  const creditLines: CreditLineForShopify[] = (lines ?? []).filter((l) => l.credits_line_id).map((l) => {
-    const qty = Math.abs(Number(l.qty))
-    const back = returned.get(l.article_number) ?? 0
-    if (back > 0) returned.set(l.article_number, back - Math.min(back, qty))
-    const sku = skuOf.get(l.article_number) ?? ''
-    return { article_number: l.article_number, variant_id: sku ? variantOf.get(sku) ?? null : null, qty, restock: back > 0 }
-  })
+  const creditLines = await creditLinesOf(db, credit)
 
   const o = await call<{ order: { id: string; name: string; lineItems: { nodes: ShopifyOrderLine[] }; transactions: ShopifyTransaction[]; refunds: Refund[] } | null; locations: { nodes: { id: string; name: string; isActive: boolean }[] } }>(ORDER_FOR_REFUND, { id: sale.shopify_order_id })
   if (!o.order) throw new ShopifyError(`Bestelling ${sale.shopify_order_name} niet gevonden in Shopify.`)
@@ -151,7 +207,7 @@ async function pushRefund(db: SupabaseClient, row: Record<string, string>, call:
     orderId: o.order.id, locationId: returnLocation(o.locations.nodes), note: refundNote(credit.number, original.number, credit.credit_reason ?? ''),
     amount: Math.abs(Number(credit.total)), lines: creditLines, orderLines: o.order.lineItems.nodes, transactions: o.order.transactions,
   })
-  const r = await call<{ refundCreate: { refund: { id: string } | null; userErrors: { field: string[]; message: string }[] } }>(REFUND_CREATE, { input: plan.input })
+  const r = await call<{ refundCreate: { refund: { id: string } | null; userErrors: { field: string[]; message: string }[] } }>(REFUND_CREATE, { input: plan.input, key: `bellaflow-refund-${credit.number}` })
   if (!r.refundCreate.refund) throw new ShopifyError(`Terugbetaling niet aangemaakt in Shopify: ${userErrorText(r.refundCreate.userErrors)}`)
   const notes = plan.unmatched.length ? `Niet gekoppeld aan een artikel van de bestelling (alleen bedrag terug, voorraad in Shopify niet bijgewerkt): ${plan.unmatched.join(', ')}` : ''
   return { ...base, shopify_refund_id: r.refundCreate.refund.id, error: notes }
@@ -170,9 +226,9 @@ async function push(db: SupabaseClient, rowId: string, call: ReturnType<typeof g
     .eq('id', rowId).eq('status', row.status).select('*').maybeSingle()
   if (!claimed) return row
 
-  if (row.kind === 'retour') {
+  if (row.kind === 'retour' || row.kind === 'voorraad' || row.kind === 'voorraad_retour') {
     try {
-      const r = await pushRefund(db, row, call)
+      const r = row.kind === 'retour' ? await pushRefund(db, row, call) : await pushStock(db, row, call)
       const done = { status: 'aangemaakt', sent_at: new Date().toISOString(), ...r }
       await db.from('hdb_shopify_orders').update(done).eq('id', rowId)
       return { ...row, ...done }
