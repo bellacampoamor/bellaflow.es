@@ -167,7 +167,8 @@ export function Pos() {
   const [lines, setLines] = useState<PosLine[]>(() => read(CART_KEY, []))
   useEffect(() => write(CART_KEY, lines), [lines])
   const [customerId, setCustomerId] = useState('')
-  const [method, setMethod] = useState<Payment['method']>('pin')
+  // Betaalwijze staat standaard op Contant, ook na elke verkoop (besluit Rick 18 november 2026).
+  const [method, setMethod] = useState<Payment['method']>('contant')
   const [reference, setReference] = useState('')
   const [received, setReceived] = useState(0)
   const [mail, setMail] = useState<string | null>(null)
@@ -343,7 +344,7 @@ export function Pos() {
     if (!ok || !result) return
     const r = result as Awaited<ReturnType<typeof posCheckout>>
     setDone({ issuer: issuer.name, orderNumber: r.orderNumber, invoiceId: r.invoiceId, invoiceNumber: r.invoiceNumber, change, note, shop, shopBad, corrected: r.corrections.filter((x) => !x.dummy).length })
-    setLines([]); setCustomerId(''); setReference(''); setReceived(0); setMail(null); setMethod('pin'); setMessage(''); setHdb(true)
+    setLines([]); setCustomerId(''); setReference(''); setReceived(0); setMail(null); setMethod('contant'); setMessage(''); setHdb(true)
   }
 
   const saveCustomer = async () => {
