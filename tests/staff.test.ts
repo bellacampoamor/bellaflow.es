@@ -78,3 +78,13 @@ describe('Medewerker kiezen op Kassa, Scan-app en Etiketten (besluit Rick 18 nov
     expect(staffChoice(people, { userId: 'u-x', email: 'onbekend@voorbeeld.test', role: 'verkoper' })).toMatchObject({ locked: true, people: [], self: undefined })
   })
 })
+
+describe('Instellingen alleen voor een beheerder (besluit Rick 18 november 2026)', () => {
+  it('beheerder en demo zonder login wel, verkoper en administratie niet', async () => {
+    const { canOpenSettings } = await import('../src/domain/staff')
+    expect(canOpenSettings(null)).toBe(true)
+    expect(canOpenSettings({ userId: 'u', email: '', role: 'beheerder' })).toBe(true)
+    expect(canOpenSettings({ userId: 'u', email: '', role: 'verkoper' })).toBe(false)
+    expect(canOpenSettings({ userId: 'u', email: '', role: 'administratie' })).toBe(false)
+  })
+})

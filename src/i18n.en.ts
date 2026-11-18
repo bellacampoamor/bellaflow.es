@@ -1829,4 +1829,5 @@ export const en: Record<string, string> = {
   "Shopify: voorraad teruggeboekt (contant)": "Shopify: stock added back (cash)",
   "Je inlogaccount is niet gekoppeld aan een actieve medewerker. Vraag een beheerder om dit te regelen onder Beheer > Instellingen > Medewerkers.": "Your login is not linked to an active staff member. Ask an administrator to set this up under Admin > Settings > Staff.",
   "Alleen een beheerder kan een andere medewerker kiezen.": "Only an administrator can choose another staff member.",
+  "Instellingen zijn alleen voor een beheerder.": "Settings are for administrators only.",
 }

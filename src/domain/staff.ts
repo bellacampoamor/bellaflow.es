@@ -29,3 +29,11 @@ export function staffChoice(people: Salesperson[], login: Login | null | undefin
   if (login.role === 'beheerder') return { people, locked: false, self }
   return { people: self ? [self] : [], locked: true, self }
 }
+
+/**
+ * Mag de ingelogde medewerker Instellingen openen? Alleen een beheerder (besluit Rick 18 november 2026).
+ * Zonder login (demo in de browser) wel.
+ */
+export function canOpenSettings(login: Login | null | undefined): boolean {
+  return !login || login.role === 'beheerder'
+}

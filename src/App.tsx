@@ -3,6 +3,7 @@ import { BookOpen, Calculator, ChevronDown, FileBarChart, Headset, LogOut, Moon,
 import { parseOrdersParam } from './domain/orderFlow'
 import { parsePurchasesParam } from './domain/purchaseFlow'
 import { useApp, useHash } from './ui/app-context'
+import { canOpenSettings } from './domain/staff'
 import { Logo, Modal } from './ui/kit'
 import { Overview } from './screens/Overview'
 import { PurchaseDetail, PurchaseForm, Purchases } from './screens/Purchases'
@@ -58,7 +59,7 @@ function useTheme() {
 }
 
 export function App({ onResetDemo, onSignOut }: { onResetDemo?: () => Promise<void>; onSignOut?: () => void }) {
-  const { s } = useApp()
+  const { s, login } = useApp()
   const [theme, toggleTheme] = useTheme()
   // Vaste fasekoppen plakken direct onder het hoofdmenu, dat op smalle schermen hoger is.
   const headerRef = useRef<HTMLElement>(null)
@@ -128,14 +129,14 @@ export function App({ onResetDemo, onSignOut }: { onResetDemo?: () => Promise<vo
             <button className="btn-toggle" onClick={toggleTheme}>{theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}{theme === 'dark' ? tx("Dagstand") : tx("Nachtstand")}</button>
             <HelpButton hash={hash} />
             <button className="btn-toggle" aria-label={tx("Contact en support")} title={tx("Contact en support")} onClick={() => setSupport(true)}><Headset size={18} /></button>
-            <AdminMenu screen={screen} />
+            <AdminMenu screen={screen} settings={canOpenSettings(login)} />
             {onSignOut && <a href="#overzicht" className="btn-toggle" onClick={onSignOut} aria-label={tx("Uitloggen")} title={tx("Uitloggen")}><LogOut size={18} /></a>}
           </nav>
         </div>
       </header>
       <main className="wrap">
         <div className="inner">
-          <Route screen={screen} param={param} />
+          <Route screen={screen} param={param} settings={canOpenSettings(login)} />
         </div>
       </main>
       {support && (
@@ -160,7 +161,7 @@ export function App({ onResetDemo, onSignOut }: { onResetDemo?: () => Promise<vo
 // (het vroegere Beheer). Het uitklapvlak staat vast in beeld, zodat het op een telefoon niet wordt afgesneden
 // door het zijwaarts scrollende menu.
 const ADMIN_SCREENS = ['rapportage', 'archief', 'kassabeheer', 'catalogi', 'instellingen', 'beheer']
-function AdminMenu({ screen }: { screen: string }) {
+function AdminMenu({ screen, settings }: { screen: string; settings: boolean }) {
   const [open, setOpen] = useState(false)
   const [pos, setPos] = useState({ top: 0, right: 0 })
   const btn = useRef<HTMLButtonElement>(null)
@@ -204,14 +205,14 @@ function AdminMenu({ screen }: { screen: string }) {
           {item('#rapportage', screen === 'rapportage' || screen === 'archief', <FileBarChart size={16} />, tx("Rapportage"))}
           {item('#kassabeheer', screen === 'kassabeheer', <Calculator size={16} />, tx("Kassa"))}
           {item('#catalogi', screen === 'catalogi', <BookOpen size={16} />, tx("Catalogi"))}
-          {item('#instellingen', screen === 'instellingen' || screen === 'beheer', <Settings2 size={16} />, tx("Instellingen"))}
+          {settings && item('#instellingen', screen === 'instellingen' || screen === 'beheer', <Settings2 size={16} />, tx("Instellingen"))}
         </div>
       )}
     </>
   )
 }
 
-function Route({ screen, param }: { screen: string; param: string }) {
+function Route({ screen, param, settings }: { screen: string; param: string; settings: boolean }) {
   switch (screen) {
     case 'overzicht': return <Overview />
     case 'kassa': return <Pos />
@@ -233,7 +234,11 @@ function Route({ screen, param }: { screen: string; param: string }) {
     case 'catalogi': return <Catalogs supplierId={param} />
     case 'voorraad': return <Stock />
     case 'instellingen':
-    case 'beheer': return <Admin key={param} param={param} />
+    case 'beheer': return settings ? <Admin key={param} param={param} /> : (
+      <div className="panel">
+        <p>{tx("Instellingen zijn alleen voor een beheerder.")} <a href="#overzicht">{tx("Ga naar het overzicht")}</a>.</p>
+      </div>
+    )
     default: return (
       <div className="panel">
         <WarehouseIcon size={20} />

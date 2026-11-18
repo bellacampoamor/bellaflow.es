@@ -4,6 +4,7 @@ import type { ArticleHit } from '../data/types'
 import { globalSearch, groupHits, type HitKind, type SearchHit } from '../domain/search'
 import { searchCatalogArticles } from '../domain/services'
 import { go, useApp } from './app-context'
+import { canOpenSettings } from '../domain/staff'
 import { CatalogPhoto, Modal, Sku } from './kit'
 import { ArticleStock, useFree } from './ArticleSearch'
 import { setCatalogQuery } from './nav'
@@ -46,12 +47,14 @@ export function GlobalSearch() {
 interface Row { key: string; kind: HitKind; title: string; sub: string; open: () => void; code?: string; article?: ArticleHit }
 
 function SearchDialog({ onClose }: { onClose: () => void }) {
-  const { s, db } = useApp()
+  const { s, db, login } = useApp()
+  // Een klant opent onder Instellingen; die zijn alleen voor een beheerder.
+  const settings = canOpenSettings(login)
   const [q, setQ] = useState('')
   const [articles, setArticles] = useState<ArticleHit[]>([])
   const [active, setActive] = useState(0)
   const list = useRef<HTMLDivElement>(null)
-  const hits = useMemo(() => globalSearch(s, q), [s, q])
+  const hits = useMemo(() => globalSearch(s, q).filter((h) => settings || h.kind !== 'klant'), [s, q, settings])
   const free = useFree()
   const byNumber = useMemo(() => new Map(s.products.filter((p) => p.catalog_article_number).map((p) => [p.catalog_article_number!, p])), [s.products])
 
