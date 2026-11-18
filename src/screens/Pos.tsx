@@ -469,7 +469,7 @@ export function Pos() {
         <div className="stack pos-side">
           <section className={`panel pos-issuer${hdb ? ' hdb' : ''}`}>
             {/* Klein logo van het uitgevende bedrijf rechtsboven, wisselt mee met de schakelaar (besluit Rick 18 november 2026). */}
-            {issuer.logo && <img className="pos-issuer-logo" src={imageSrc(issuer.logo, import.meta.env.BASE_URL)} alt={issuer.name} />}
+            {issuer.logo && <span className="pos-issuer-plate"><img className="pos-issuer-logo" src={imageSrc(issuer.logo, import.meta.env.BASE_URL)} alt={issuer.name} /></span>}
             <div className="small muted">{tx("Factuur van")}</div>
             <div className="strong">{hdb ? hdbLabel : bellaLabel}</div>
             <div className="small muted">{issuer.name}{issuer.tax_id ? ` · CIF ${issuer.tax_id}` : ''}</div>

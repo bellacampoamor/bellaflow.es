@@ -42,32 +42,33 @@
   --photo-bg: #FFFFFF; --photo-fg: #6D5D5F;
   /* Diepte en sfeer (besluit Rick 18 november 2026): warme schaduw uit Smoky Taupe, licht verloop op de achtergrond. */
   --surface-3: #FAF8F5;
-  --shadow-sm: 0 1px 2px rgb(90 74 76 / .06), 0 6px 18px -8px rgb(90 74 76 / .18);
-  --shadow-lift: 0 2px 4px rgb(90 74 76 / .08), 0 14px 28px -10px rgb(90 74 76 / .3);
+  --shadow-sm: 0 1px 3px rgb(90 74 76 / .10), 0 10px 26px -10px rgb(90 74 76 / .32);
+  --shadow-lift: 0 3px 6px rgb(90 74 76 / .12), 0 18px 34px -12px rgb(90 74 76 / .42);
+  --shadow-top: 0 4px 16px -6px rgb(90 74 76 / .28);
   --edge: transparent;
-  --bg-glow: rgb(250 248 245 / .95); --bg-glow-2: rgb(206 141 97 / .08);
+  --bg-glow: rgb(250 248 245 / .95); --bg-glow-2: rgb(206 141 97 / .14);
   --display: 'Outfit', 'Avenir Next', 'Segoe UI', sans-serif;
   --body: 'Figtree', 'Segoe UI', system-ui, sans-serif;
 }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
   --heading: #F2E8DF; --link: #E0AC87; --brand-line: #CE8D61; --brand-strong: #CE8D61;
-  --bg: #252A33; --surface: #30343E; --surface-2: #40444E; --fg: #F2E8DF; --muted: #CDBFB4;
+  --bg: #1E222A; --surface: #30343E; --surface-2: #40444E; --fg: #F2E8DF; --muted: #CDBFB4;
   --line: #4D4C53; --line-strong: #6E6264; --on-primary: #0B182A; --primary: #CE8D61; --primary-hover: #BD7A52; --selected: #CE8D61; --on-selected: #0B182A; --danger: #B83A32; --danger-hover: #9E2B2B; --on-danger: #FFFFFF;
   --buy: #4A505C; --buy-fg: #E0E3E8; --sell: #5F4235; --sell-fg: #F2D6C2; --ship: #54484A; --ship-fg: #EADCD8; --bill: #1F3D54; --bill-fg: #C9DBE7;
   --acc-klant: #9FC3DC; --acc-producten: #E0AC87; --acc-levering: #D2B3AE; --acc-notitie: #C3C9D4;
   --good: #AFD6B3; --good-bg: #2F463A; --warn: #E9C786; --warn-bg: #4D3D22; --bad: #F4B0A8; --bad-bg: #57302D; --info: #BAD2E1; --info-bg: #2B4354;
   --neutral-bg: #4A4E59; --overlay: rgb(11 24 42 / .62); --shadow: 0 12px 40px rgb(11 24 42 / .5); --logo-plate: #F2E8DF; --logo-pad: 5px 10px; --top-glow: #E0E3E8; --photo-bg: #FFFFFF; --photo-fg: #6D5D5F; color-scheme: dark;
-  --surface-3: #383C47; --shadow-sm: 0 1px 2px rgb(11 24 42 / .35), 0 8px 22px -10px rgb(11 24 42 / .6); --shadow-lift: 0 2px 6px rgb(11 24 42 / .4), 0 16px 32px -10px rgb(11 24 42 / .72); --edge: rgb(242 232 223 / .06); --bg-glow: rgb(206 141 97 / .08); --bg-glow-2: rgb(64 68 78 / .55);
+  --surface-3: #383C47; --shadow-sm: 0 1px 3px rgb(11 24 42 / .55), 0 12px 28px -10px rgb(11 24 42 / .85); --shadow-lift: 0 3px 8px rgb(11 24 42 / .6), 0 20px 38px -10px rgb(11 24 42 / .9); --shadow-top: 0 6px 20px -6px rgb(11 24 42 / .8); --edge: rgb(242 232 223 / .09); --bg-glow: rgb(206 141 97 / .13); --bg-glow-2: rgb(64 68 78 / .6);
 } }
 :root[data-theme="dark"] {
   --heading: #F2E8DF; --link: #E0AC87; --brand-line: #CE8D61; --brand-strong: #CE8D61;
-  --bg: #252A33; --surface: #30343E; --surface-2: #40444E; --fg: #F2E8DF; --muted: #CDBFB4;
+  --bg: #1E222A; --surface: #30343E; --surface-2: #40444E; --fg: #F2E8DF; --muted: #CDBFB4;
   --line: #4D4C53; --line-strong: #6E6264; --on-primary: #0B182A; --primary: #CE8D61; --primary-hover: #BD7A52; --selected: #CE8D61; --on-selected: #0B182A; --danger: #B83A32; --danger-hover: #9E2B2B; --on-danger: #FFFFFF;
   --buy: #4A505C; --buy-fg: #E0E3E8; --sell: #5F4235; --sell-fg: #F2D6C2; --ship: #54484A; --ship-fg: #EADCD8; --bill: #1F3D54; --bill-fg: #C9DBE7;
   --acc-klant: #9FC3DC; --acc-producten: #E0AC87; --acc-levering: #D2B3AE; --acc-notitie: #C3C9D4;
   --good: #AFD6B3; --good-bg: #2F463A; --warn: #E9C786; --warn-bg: #4D3D22; --bad: #F4B0A8; --bad-bg: #57302D; --info: #BAD2E1; --info-bg: #2B4354;
   --neutral-bg: #4A4E59; --overlay: rgb(11 24 42 / .62); --shadow: 0 12px 40px rgb(11 24 42 / .5); --logo-plate: #F2E8DF; --logo-pad: 5px 10px; --top-glow: #E0E3E8; --photo-bg: #FFFFFF; --photo-fg: #6D5D5F; color-scheme: dark;
-  --surface-3: #383C47; --shadow-sm: 0 1px 2px rgb(11 24 42 / .35), 0 8px 22px -10px rgb(11 24 42 / .6); --shadow-lift: 0 2px 6px rgb(11 24 42 / .4), 0 16px 32px -10px rgb(11 24 42 / .72); --edge: rgb(242 232 223 / .06); --bg-glow: rgb(206 141 97 / .08); --bg-glow-2: rgb(64 68 78 / .55);
+  --surface-3: #383C47; --shadow-sm: 0 1px 3px rgb(11 24 42 / .55), 0 12px 28px -10px rgb(11 24 42 / .85); --shadow-lift: 0 3px 8px rgb(11 24 42 / .6), 0 20px 38px -10px rgb(11 24 42 / .9); --shadow-top: 0 6px 20px -6px rgb(11 24 42 / .8); --edge: rgb(242 232 223 / .09); --bg-glow: rgb(206 141 97 / .13); --bg-glow-2: rgb(64 68 78 / .6);
 }
 
 * { box-sizing: border-box; }
@@ -844,8 +845,10 @@ tr.focus-flash td { animation: focus-flash-cell 2.6s ease-out; }
 .logo-upload .logo-preview { display: flex; align-items: center; justify-content: center; min-height: 84px; padding: 10px; background: #fff; border: 1px dashed var(--line-strong); border-radius: 8px; }
 .logo-upload .logo-preview img { max-width: 100%; max-height: 72px; object-fit: contain; }
 .logo-upload .actions { gap: 6px; }
-.pos-issuer { position: relative; display: flex; flex-direction: column; gap: 4px; border-left: 4px solid var(--primary); padding-right: 112px; }
-.pos-issuer-logo { position: absolute; top: 10px; right: 12px; max-width: 90px; max-height: 32px; object-fit: contain; }
+.pos-issuer { position: relative; display: flex; flex-direction: column; gap: 4px; border-left: 4px solid var(--primary); padding-right: 148px; }
+/* Logo rechtsboven op een eigen wit plaatje met een dunne rand, in dag- en nachtstand (besluit Rick 18 november 2026). */
+.pos-issuer-plate { position: absolute; top: 12px; right: 12px; display: grid; place-items: center; width: 124px; height: 56px; padding: 6px 10px; background: var(--photo-bg); border: 1px solid var(--line-strong); border-radius: 8px; }
+.pos-issuer-logo { display: block; max-width: 100%; max-height: 100%; object-fit: contain; }
 .pos-issuer.hdb { border-left-color: var(--info); background: var(--info-bg); }
 
 /* Menu Beheer: klein en bescheiden, uitklapvlak met Rapportage, Catalogi en Instellingen */
@@ -1059,10 +1062,10 @@ body { min-height: 100vh; background:
   radial-gradient(900px 520px at 100% 0, var(--bg-glow), transparent 70%),
   radial-gradient(800px 600px at 0 100%, var(--bg-glow-2), transparent 70%),
   var(--bg); background-attachment: fixed; }
-.top { box-shadow: 0 6px 18px -14px rgb(11 24 42 / .45); }
+.top { box-shadow: var(--shadow-top); }
 h1 { letter-spacing: -.01em; }
 /* Paginakop: korte lijn in de kleur van de stap waar je bent; elders Terracotta (nacht Warm Copper). */
-.head h1::after { content: ''; display: block; width: 40px; height: 3px; border-radius: 3px; margin-top: 8px; background: var(--head-accent, var(--brand-line)); }
+.head h1::after { content: ''; display: block; width: 56px; height: 4px; border-radius: 4px; margin-top: 10px; background: var(--head-accent, var(--brand-line)); }
 main[data-screen="inkoop"], main[data-screen="inkomend"], main[data-screen="ontvangst"] { --head-accent: var(--buy-fg); }
 main[data-screen="orders"] { --head-accent: var(--sell-fg); }
 main[data-screen="levering"] { --head-accent: var(--ship-fg); }
