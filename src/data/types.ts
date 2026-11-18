@@ -62,7 +62,7 @@ export interface Customer {
 }
 // Medewerker (tabel salespeople). Rol: verkoper, administratie of beheerder. Database-toegang volgt later.
 export type StaffRole = 'verkoper' | 'administratie' | 'beheerder'
-export interface Salesperson { id: string; name: string; email: string; phone: string; is_active: boolean; role?: StaffRole }
+export interface Salesperson { id: string; name: string; email: string; phone: string; is_active: boolean; role?: StaffRole; /** Inlogaccount (auth.users), gezet door de database. */ user_id?: string | null }
 export interface Product {
   id: string; sku: string; name: string; collection: string; category: string; material: string
   color: string; dimensions: string; weight_kg: number; colli: number; purchase_price: number

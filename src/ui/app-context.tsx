@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useState, type ReactNode } from 'react'
 import { loadSnapshot, type Driver } from '../data/driver'
 import type { Snapshot } from '../data/types'
+import type { Login } from '../domain/staff'
 import { FlowError } from '../domain/services'
 import { tx } from '../i18n'
 import { goBack, navState, restoreScroll, scrollTarget } from './nav'
@@ -12,13 +13,15 @@ interface Ctx {
   /** Voert een handeling uit, ververst de gegevens en toont het resultaat. Geeft true bij succes. */
   run: (fn: (db: Driver) => Promise<unknown>, success?: string) => Promise<boolean>
   toast: (msg: string, err?: boolean) => void
+  /** Ingelogde medewerker; null in de demo zonder login. */
+  login: Login | null
 }
 const AppCtx = createContext<Ctx | null>(null)
 export const useApp = () => useContext(AppCtx)!
 /** Zoals useApp, maar null buiten de AppProvider (bijv. op het laadscherm). */
 export const useAppOptional = () => useContext(AppCtx)
 
-export function AppProvider({ db, children, fallback }: { db: Driver; children: ReactNode; fallback: ReactNode }) {
+export function AppProvider({ db, children, fallback, login = null }: { db: Driver; children: ReactNode; fallback: ReactNode; login?: Login | null }) {
   const [s, setS] = useState<Snapshot | null>(null)
   const [msg, setMsg] = useState<{ text: string; err: boolean } | null>(null)
   const [loadError, setLoadError] = useState('')
@@ -54,7 +57,7 @@ export function AppProvider({ db, children, fallback }: { db: Driver; children: 
   if (loadError) return <div className="wrap" style={{ paddingBlock: 40 }}><div className="note bad">{tx("De gegevens konden niet worden geladen:")} {loadError}</div></div>
   if (!s) return <>{fallback}</>
   return (
-    <AppCtx.Provider value={{ db, s, refresh, run, toast }}>
+    <AppCtx.Provider value={{ db, s, refresh, run, toast, login }}>
       {children}
       {msg && (
         <div className={`toast ${msg.err ? 'err' : ''}`} role="status">

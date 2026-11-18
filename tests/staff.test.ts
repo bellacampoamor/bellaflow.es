@@ -7,7 +7,7 @@ import { LocalDriver } from '../src/data/localDriver'
 import type { StaffRole } from '../src/data/types'
 import { seedDemo } from '../src/domain/demo'
 import { saveStaff } from '../src/domain/services'
-import { roleOf, STAFF_ROLES } from '../src/domain/staff'
+import { roleOf, STAFF_ROLES, staffChoice } from '../src/domain/staff'
 
 let db: LocalDriver
 beforeEach(async () => { db = new LocalDriver(false); await seedDemo(db, '2026-11-08') })
@@ -54,4 +54,27 @@ describe('Medewerkers met een rol', () => {
     await pg.exec(`insert into salespeople (name, role) values ('Admin', 'beheerder')`)
     await expect(pg.exec(`insert into salespeople (name, role) values ('Fout', 'chef')`)).rejects.toThrow()
   }, 60000)
+})
+
+describe('Medewerker kiezen op Kassa, Scan-app en Etiketten (besluit Rick 18 november 2026)', () => {
+  const people = [
+    { id: 'a', name: 'Beheerder', email: 'baas@voorbeeld.test', phone: '', is_active: true, role: 'beheerder' as StaffRole, user_id: 'u-a' },
+    { id: 'b', name: 'Verkoper', email: 'Verkoop@Voorbeeld.test', phone: '', is_active: true, role: 'verkoper' as StaffRole, user_id: null },
+    { id: 'c', name: 'Collega', email: 'collega@voorbeeld.test', phone: '', is_active: true, role: 'verkoper' as StaffRole, user_id: 'u-c' },
+  ]
+  it('zonder login (demo) mag iedereen kiezen', () => {
+    expect(staffChoice(people, null)).toMatchObject({ locked: false, people })
+  })
+  it('een beheerder kiest vrij uit alle medewerkers', () => {
+    const r = staffChoice(people, { userId: 'u-a', email: 'baas@voorbeeld.test', role: 'beheerder' })
+    expect(r.locked).toBe(false); expect(r.people).toHaveLength(3); expect(r.self?.id).toBe('a')
+  })
+  it('een verkoper ziet alleen zichzelf, gevonden op inlogaccount of e-mailadres', () => {
+    expect(staffChoice(people, { userId: 'u-c', email: 'ander@voorbeeld.test', role: 'verkoper' })).toMatchObject({ locked: true, people: [people[2]] })
+    expect(staffChoice(people, { userId: 'u-x', email: 'verkoop@voorbeeld.test ', role: 'verkoper' })).toMatchObject({ locked: true, people: [people[1]] })
+  })
+  it('administratie staat ook vast op zichzelf; zonder koppeling geen keuze', () => {
+    expect(staffChoice(people, { userId: 'u-c', email: '', role: 'administratie' }).people.map((p) => p.id)).toEqual(['c'])
+    expect(staffChoice(people, { userId: 'u-x', email: 'onbekend@voorbeeld.test', role: 'verkoper' })).toMatchObject({ locked: true, people: [], self: undefined })
+  })
 })

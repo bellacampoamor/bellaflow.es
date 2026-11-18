@@ -9,6 +9,7 @@ import { canCredit, isCredit } from '../domain/credit'
 import { loadSnapshot } from '../data/driver'
 import { ArticleSearch, type ArticlePick } from '../ui/ArticleSearch'
 import { go, useApp } from '../ui/app-context'
+import { useStaffUser } from '../ui/useStaffUser'
 import { Combo, Empty, eur, Field, fmtDate, Head, Modal, NumInput, Pill, TextField } from '../ui/kit'
 import { imageSrc, issuerInfo } from '../domain/issuers'
 import { shopifyOrderOf } from '../domain/shopify'
@@ -158,11 +159,8 @@ function TestReceipt({ hdb, seller }: { hdb: boolean; seller: string }) {
  */
 export function Pos() {
   const { s, db, run, toast } = useApp()
-  const people = s.salespeople.filter((p) => p.is_active)
-  const [user, setUser] = useState<string>(() => read(USER_KEY, ''))
-  const me = people.find((p) => p.id === user)
+  const { people, user, me, pickUser, locked, unlinked } = useStaffUser(USER_KEY)
   const [returning, setReturning] = useState(false)
-  const pickUser = (id: string) => { setUser(id); write(USER_KEY, id) }
 
   const [lines, setLines] = useState<PosLine[]>(() => read(CART_KEY, []))
   useEffect(() => write(CART_KEY, lines), [lines])
@@ -367,7 +365,8 @@ export function Pos() {
       <Head title={tx("Kassa")} sub={tx("Snelle verkoop in de winkel: scannen, afrekenen en meegeven.")} />
       <section className="panel pos-who">
         <h2>{tx("Wie staat er achter de kassa?")}</h2>
-        {people.length === 0 && <div className="note warn">{tx("Er zijn nog geen medewerkers. Voeg ze toe onder Instellingen.")}</div>}
+        {unlinked ? <div className="note warn">{tx("Je inlogaccount is niet gekoppeld aan een actieve medewerker. Vraag een beheerder om dit te regelen onder Beheer > Instellingen > Medewerkers.")}</div>
+          : people.length === 0 && <div className="note warn">{tx("Er zijn nog geen medewerkers. Voeg ze toe onder Instellingen.")}</div>}
         <div className="scan-people">{people.map((p) => <button key={p.id} className="scan-person" onClick={() => pickUser(p.id)}>{p.name}</button>)}</div>
       </section>
     </>
@@ -385,9 +384,11 @@ export function Pos() {
         </div>
         <label className="pos-user">
           <span className="small muted">{tx("Medewerker")}</span>
-          <select value={user} onChange={(e) => pickUser(e.target.value)} aria-label={tx("Medewerker")}>
-            {people.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-          </select>
+          {locked
+            ? <span className="pos-user-fixed" title={tx("Alleen een beheerder kan een andere medewerker kiezen.")}>{me.name}</span>
+            : <select value={user} onChange={(e) => pickUser(e.target.value)} aria-label={tx("Medewerker")}>
+              {people.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+            </select>}
         </label>
         <button className="btn danger-solid pos-credit" onClick={() => setReturning(true)} title={tx("Retour of correctie op een eerdere kassabon: maakt een creditfactuur")}>{tx("RETOUR")}</button>
       </Head>

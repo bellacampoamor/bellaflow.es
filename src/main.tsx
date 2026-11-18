@@ -199,7 +199,7 @@ function SupabaseRoot({ sb }: { sb: SupabaseClient }) {
       <button type="button" className="btn" onClick={() => sb.auth.signOut()}>{tx("Uitloggen")}</button>
     </LoginShell>
   )
-  return <AppProvider db={new SupabaseDriver(sb)} fallback={<Loading />}><App onSignOut={() => sb.auth.signOut()} /></AppProvider>
+  return <AppProvider db={new SupabaseDriver(sb)} fallback={<Loading />} login={{ userId: session.user.id, email: session.user.email ?? '', role }}><App onSignOut={() => sb.auth.signOut()} /></AppProvider>
 }
 
 const useSupabase = import.meta.env.VITE_DATA_SOURCE === 'supabase'

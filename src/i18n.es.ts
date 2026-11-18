@@ -1827,4 +1827,6 @@ export const es: Record<string, string> = {
   "Contant: in Shopify alleen de voorraad afgeboekt, geen bestelling.": "Efectivo: en Shopify solo se ha descontado el stock, sin pedido.",
   "Shopify: alleen voorraad afgeboekt (contant)": "Shopify: solo stock descontado (efectivo)",
   "Shopify: voorraad teruggeboekt (contant)": "Shopify: stock devuelto (efectivo)",
+  "Je inlogaccount is niet gekoppeld aan een actieve medewerker. Vraag een beheerder om dit te regelen onder Beheer > Instellingen > Medewerkers.": "Tu cuenta no está vinculada a un empleado activo. Pide a un administrador que lo configure en Gestión > Ajustes > Empleados.",
+  "Alleen een beheerder kan een andere medewerker kiezen.": "Solo un administrador puede elegir otro empleado.",
 }

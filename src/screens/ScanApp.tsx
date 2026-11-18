@@ -8,6 +8,7 @@ import { createProformaOrder, findArticleByCode } from '../domain/services'
 import { BarcodeScanner } from '../ui/BarcodeScanner'
 import { armBeep, beepError } from '../ui/beep'
 import { useApp } from '../ui/app-context'
+import { useStaffUser } from '../ui/useStaffUser'
 import { eur, Modal, NumInput } from '../ui/kit'
 import { tx } from '../i18n'
 
@@ -25,10 +26,7 @@ interface Found { article: CatalogArticle; price: number | null; free: number; a
  */
 export function ScanApp() {
   const { db, s, run } = useApp()
-  const people = s.salespeople.filter((p) => p.is_active)
-  const [user, setUser] = useState<string>(() => read(USER_KEY, ''))
-  const me = people.find((p) => p.id === user)
-  const pickUser = (id: string) => { setUser(id); write(USER_KEY, id) }
+  const { people, user, me, pickUser, locked, unlinked } = useStaffUser(USER_KEY)
 
   const [rows, setRows] = useState<BasketRow[]>(() => read(BASKET_KEY, []))
   useEffect(() => write(BASKET_KEY, rows), [rows])
@@ -94,8 +92,8 @@ export function ScanApp() {
         <img className="lab-logo" src={`${import.meta.env.BASE_URL}assets/brand/bellaflow-logo-small.png`} alt="Bella Flow" />
         {people.length > 0 && <label className="lab-user">
           <span>{tx("Medewerker")}</span>
-          <select value={user} onChange={(e) => pickUser(e.target.value)} aria-label={tx("Medewerker")}>
-            <option value="">{tx("Kies…")}</option>
+          <select value={user} onChange={(e) => pickUser(e.target.value)} aria-label={tx("Medewerker")} disabled={locked} title={locked ? tx("Alleen een beheerder kan een andere medewerker kiezen.") : undefined}>
+            {!locked && <option value="">{tx("Kies…")}</option>}
             {people.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
         </label>}
@@ -105,7 +103,8 @@ export function ScanApp() {
         <main className="scan-body">
           <h1 className="scan-h">{tx("Wie ben je?")}</h1>
           <p className="muted">{tx("Kies jezelf. De gescande verkooporder komt op jouw naam.")}</p>
-          {people.length === 0 && <div className="note warn">{tx("Er zijn nog geen medewerkers. Voeg ze toe onder Instellingen in Bella Flow.")}</div>}
+          {unlinked ? <div className="note warn">{tx("Je inlogaccount is niet gekoppeld aan een actieve medewerker. Vraag een beheerder om dit te regelen onder Beheer > Instellingen > Medewerkers.")}</div>
+            : people.length === 0 && <div className="note warn">{tx("Er zijn nog geen medewerkers. Voeg ze toe onder Instellingen in Bella Flow.")}</div>}
           <div className="scan-people">
             {people.map((p) => <button key={p.id} className="scan-person" onClick={() => pickUser(p.id)}><UserRound size={22} />{p.name}</button>)}
           </div>

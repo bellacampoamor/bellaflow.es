@@ -6,6 +6,7 @@ import {
   type PriceRule, type PrinterSettings,
 } from '../domain/labels'
 import { useApp } from '../ui/app-context'
+import { useStaffUser } from '../ui/useStaffUser'
 import { Check, Modal, NumberField, NumInput, SelectField } from '../ui/kit'
 import {
   fmtLabelPrice, labelImage, loadPrinterSettings, pairedPrinter, pairPrinter, printDirect, printViaDialog, savePrinterSettings,
@@ -30,10 +31,8 @@ const TEST_ROW = (): Row => ({ key: 'test', articleNumber: 'LOL-TSE-0000000001',
 /** Klantenservice-agent op client.bellaflow.es. Voorlopig alleen prijsetiketten voor de DYMO LabelWriter 450 Turbo. */
 export function LabelAgent() {
   const { db, s } = useApp()
-  const people = s.salespeople.filter((p) => p.is_active)
-  const [user, setUser] = useState(() => { try { return localStorage.getItem(USER_KEY) ?? '' } catch { return '' } })
-  const userName = people.find((p) => p.id === user)?.name ?? ''
-  const pickUser = (id: string) => { setUser(id); try { localStorage.setItem(USER_KEY, id) } catch { /* alleen deze sessie */ } }
+  const { people, user, me, pickUser, locked } = useStaffUser(USER_KEY)
+  const userName = me?.name ?? ''
 
   const [msgs, setMsgs] = useState<Msg[]>([])
   const [lists, setLists] = useState<Record<string, PrintList>>({})
@@ -173,8 +172,8 @@ export function LabelAgent() {
         <img className="lab-logo" src={`${import.meta.env.BASE_URL}assets/brand/bellaflow-logo-small.png`} alt="Bella Flow" />
         <label className="lab-user">
           <span>{tx("Medewerker")}</span>
-          <select value={user} onChange={(e) => pickUser(e.target.value)} aria-label={tx("Medewerker")}>
-            <option value="">{tx("Kies…")}</option>
+          <select value={user} onChange={(e) => pickUser(e.target.value)} aria-label={tx("Medewerker")} disabled={locked} title={locked ? tx("Alleen een beheerder kan een andere medewerker kiezen.") : undefined}>
+            {!locked && <option value="">{tx("Kies…")}</option>}
             {people.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
         </label>

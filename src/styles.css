@@ -762,6 +762,7 @@ tr.focus-flash td { animation: focus-flash-cell 2.6s ease-out; }
 .pos-who { max-width: 520px; }
 .pos-user { display: flex; flex-direction: column; gap: 2px; }
 .pos-user select { min-width: 180px; height: 42px; box-sizing: border-box; }
+.pos-user-fixed { min-width: 180px; height: 42px; box-sizing: border-box; display: flex; align-items: center; padding: 0 12px; border: 1px solid var(--line); border-radius: 8px; font-weight: 600; color: var(--heading); }
 .head .actions:has(.pos-credit) { align-items: flex-end; }
 /* Kassa: toggle rechtsboven voor welk bedrijf de bon maakt (Bella of HomeDecoBali) */
 .pos-company { display: flex; flex-direction: column; gap: 2px; }
