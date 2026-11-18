@@ -835,7 +835,8 @@ tr.focus-flash td { animation: focus-flash-cell 2.6s ease-out; }
 .logo-upload .logo-preview { display: flex; align-items: center; justify-content: center; min-height: 84px; padding: 10px; background: #fff; border: 1px dashed var(--line-strong); border-radius: 8px; }
 .logo-upload .logo-preview img { max-width: 100%; max-height: 72px; object-fit: contain; }
 .logo-upload .actions { gap: 6px; }
-.pos-issuer { display: flex; flex-direction: column; gap: 4px; border-left: 4px solid var(--primary); }
+.pos-issuer { position: relative; display: flex; flex-direction: column; gap: 4px; border-left: 4px solid var(--primary); padding-right: 112px; }
+.pos-issuer-logo { position: absolute; top: 10px; right: 12px; max-width: 90px; max-height: 32px; object-fit: contain; }
 .pos-issuer.hdb { border-left-color: var(--info); background: var(--info-bg); }
 
 /* Menu Beheer: klein en bescheiden, uitklapvlak met Rapportage, Catalogi en Instellingen */

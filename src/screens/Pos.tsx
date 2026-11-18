@@ -10,7 +10,7 @@ import { loadSnapshot } from '../data/driver'
 import { ArticleSearch, type ArticlePick } from '../ui/ArticleSearch'
 import { go, useApp } from '../ui/app-context'
 import { Combo, Empty, eur, Field, fmtDate, Head, Modal, NumInput, Pill, TextField } from '../ui/kit'
-import { issuerInfo } from '../domain/issuers'
+import { imageSrc, issuerInfo } from '../domain/issuers'
 import { shopifyOrderOf } from '../domain/shopify'
 import { CustomerFields } from './OrderForm'
 import { tx } from '../i18n'
@@ -467,6 +467,8 @@ export function Pos() {
 
         <div className="stack pos-side">
           <section className={`panel pos-issuer${hdb ? ' hdb' : ''}`}>
+            {/* Klein logo van het uitgevende bedrijf rechtsboven, wisselt mee met de schakelaar (besluit Rick 18 november 2026). */}
+            {issuer.logo && <img className="pos-issuer-logo" src={imageSrc(issuer.logo, import.meta.env.BASE_URL)} alt={issuer.name} />}
             <div className="small muted">{tx("Factuur van")}</div>
             <div className="strong">{hdb ? hdbLabel : bellaLabel}</div>
             <div className="small muted">{issuer.name}{issuer.tax_id ? ` · CIF ${issuer.tax_id}` : ''}</div>
