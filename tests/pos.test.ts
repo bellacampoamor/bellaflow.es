@@ -4,7 +4,7 @@ import { LocalDriver } from '../src/data/localDriver'
 import type { CatalogArticle } from '../src/data/types'
 import { freeAt, onHandMap, stockKey } from '../src/domain/calc'
 import { seedDemo } from '../src/domain/demo'
-import { addPosLine, DUMMY_SKU, hdbStockAlignment, posLineCompany, wrongCompanyLine, isDummyCode, missingCustomerData, POS_CUSTOMER_NOTE, posTotals, SIMPLIFIED_LIMIT, type PosLine } from '../src/domain/pos'
+import { addPosLine, DUMMY_SKU, hdbStockAlignment, posLineCompany, recentReceipts, wrongCompanyLine, isDummyCode, missingCustomerData, POS_CUSTOMER_NOTE, posTotals, SIMPLIFIED_LIMIT, type PosLine } from '../src/domain/pos'
 import { createCreditInvoice, importShowroom, posCheckout, saveSettings, productForArticle, saveRecord, syncCatalogArticles } from '../src/domain/services'
 import { invoiceReport } from '../src/domain/calc'
 import { HDB_DEFAULTS, issuerInfo, legalLine, settingsUpgrade } from '../src/domain/issuers'
@@ -332,5 +332,21 @@ describe('Kassa: voorraad van HomeDecoBali is de beschikbare voorraad (besluit R
     const pid = newId()
     expect(hdbStockAlignment(db.data, [{ product_id: pid, qty: 1 }], shopId, new Map([[pid, 4]]))).toEqual([{ product_id: pid, qty: 4, free: 0, hdb: 4 }])
     expect(hdbStockAlignment(db.data, [{ product_id: pid, qty: 1 }], shopId, new Map())).toEqual([])
+  })
+})
+
+describe('Kassa: laatste bonnen (opdracht Rick 18 november 2026)', () => {
+  it('de laatste 10 kassabonnen van Bella en HDB, nieuwste eerst, zonder gewone facturen', () => {
+    const inv = (number: string, invoice_date: string, extra: Record<string, unknown> = {}) => ({ number, invoice_date, simplified: true, ...extra })
+    const list = [
+      inv('FS-BELLA-2026-0001', '2026-11-17'), inv('F-2026-0009', '2026-11-18', { simplified: false }),
+      inv('FS-HDB-2026-0001', '2026-11-18', { created_at: '2026-11-18T15:28:45Z' }), inv('FS-BELLA-2026-0002', '2026-11-18', { created_at: '2026-11-18T16:01:00Z' }),
+      inv('FRS-HDB-2026-0001', '2026-11-18', { created_at: '2026-11-18T15:50:00Z' }),
+      ...Array.from({ length: 12 }, (_, n) => inv(`FS-BELLA-2026-1${String(n).padStart(3, '0')}`, '2026-11-01')),
+    ]
+    const r = recentReceipts(list)
+    expect(r).toHaveLength(10)
+    expect(r.slice(0, 4).map((i) => i.number)).toEqual(['FS-BELLA-2026-0002', 'FRS-HDB-2026-0001', 'FS-HDB-2026-0001', 'FS-BELLA-2026-0001'])
+    expect(r.some((i) => i.number.startsWith('F-'))).toBe(false)
   })
 })

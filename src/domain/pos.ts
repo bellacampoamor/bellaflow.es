@@ -149,3 +149,16 @@ export const wrongCompanyLine = <L extends Pick<PosLine, 'dummy' | 'article' | '
   lines.find((l) => { const c = posLineCompany(l, s); return c !== null && c !== issuer })
 
 export { stockKey }
+
+/**
+ * De laatst gemaakte kassabonnen (eenvoudige facturen en hun creditfacturen, van Bella en HDB), nieuwste eerst, voor de
+ * lijst onderaan de Kassa met opnieuw afdrukken (opdracht Rick 18 november 2026). Volgorde: tijdstip van aanmaken als de
+ * database dat kent, anders factuurdatum en nummer.
+ */
+export function recentReceipts<T extends { simplified?: boolean; invoice_date: string; number: string; created_at?: string }>(invoices: T[], n = 10): T[] {
+  const key = (i: T) => `${i.created_at ?? ''}|${i.invoice_date}|${i.number}`
+  return invoices.filter((i) => i.simplified).sort((a, b) => {
+    if (a.created_at && b.created_at && a.created_at !== b.created_at) return b.created_at.localeCompare(a.created_at)
+    return b.invoice_date.localeCompare(a.invoice_date) || key(b).localeCompare(key(a))
+  }).slice(0, n)
+}

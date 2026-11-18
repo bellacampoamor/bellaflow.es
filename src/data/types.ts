@@ -222,6 +222,8 @@ export interface Invoice {
   issuer?: 'bella' | 'hdb'
   /** Creditfactuur (factura rectificativa): de factuur die gecorrigeerd wordt, en de reden. Bedragen zijn negatief. */
   credit_of?: string | null; credit_reason?: string
+  /** Tijdstip van aanmaken, gezet door de database (niet in de browserversie). */
+  created_at?: string
 }
 export interface InvoiceLine {
   id: string; invoice_id: string; delivery_line_id: string | null; article_number: string; description: string; qty: number

@@ -3,13 +3,13 @@ import { AlertTriangle, Banknote, Check as CheckIcon, CreditCard, Loader, Minus,
 import type { Customer, Payment } from '../data/types'
 import { freeAt, lineTotal, todayISO } from '../domain/calc'
 import { labelBasePrice } from '../domain/labels'
-import { addPosLine, DUMMY_SKU, isDummyCode, isHdbArticle, missingCustomerData, POS_CUSTOMER_NOTE, posLineCompany, posTotals, posWarehouse, SIMPLIFIED_LIMIT, wrongCompanyLine, type PosLine } from '../domain/pos'
+import { addPosLine, DUMMY_SKU, isDummyCode, isHdbArticle, recentReceipts, missingCustomerData, POS_CUSTOMER_NOTE, posLineCompany, posTotals, posWarehouse, SIMPLIFIED_LIMIT, wrongCompanyLine, type PosLine } from '../domain/pos'
 import { findArticleByCode, findInvoiceByNumber, posCheckout, saveRecord } from '../domain/services'
 import { canCredit, isCredit } from '../domain/credit'
 import { loadSnapshot } from '../data/driver'
 import { ArticleSearch, type ArticlePick } from '../ui/ArticleSearch'
 import { go, useApp } from '../ui/app-context'
-import { Combo, Empty, eur, Field, Head, Modal, NumInput, TextField } from '../ui/kit'
+import { Combo, Empty, eur, Field, fmtDate, Head, Modal, NumInput, Pill, TextField } from '../ui/kit'
 import { issuerInfo } from '../domain/issuers'
 import { shopifyOrderOf } from '../domain/shopify'
 import { CustomerFields } from './OrderForm'
@@ -462,6 +462,7 @@ export function Pos() {
               </ul>
             )}
           </section>
+          <RecentReceipts />
         </div>
 
         <div className="stack pos-side">
@@ -531,6 +532,37 @@ export function Pos() {
 }
 
 /** Retour aan de kassa: zoek de eenvoudige factuur (scan of typ het nummer, of kies een recente) en maak de creditfactuur. */
+/**
+ * De laatste 10 kassabonnen (Bella en HDB, ook creditbonnen), nieuwste eerst, met opnieuw afdrukken (opdracht Rick
+ * 18 november 2026). Afdrukken maakt geen nieuwe factuur: zelfde nummer, zelfde inhoud.
+ */
+function RecentReceipts() {
+  const { s } = useApp()
+  const list = recentReceipts(s.invoices, 10)
+  const bon = simplifiedPrint(s.settings[0]) === 'bon80'
+  const time = (at?: string) => (at ? new Date(at).toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' }) : '')
+  const method = (id: string) => [...new Set(s.payments.filter((p) => p.invoice_id === id && p.method !== 'verrekening').map((p) => (p.method === 'contant' ? tx("Contant") : p.method === 'pin' ? tx("Pin") : p.method)))].join(', ')
+  return (
+    <section className="panel">
+      <div className="panel-head"><h2>{tx("Laatste bonnen")}</h2></div>
+      {list.length === 0 ? <Empty>{tx("Nog geen kassabonnen.")}</Empty> : (
+        <div className="table-wrap flush"><table>
+          <thead><tr><th>{tx("Bon")}</th><th>{tx("Datum")}</th><th>{tx("Betaalwijze")}</th><th className="num">{tx("Totaal")}</th><th /></tr></thead>
+          <tbody>{list.map((i) => (
+            <tr key={i.id}>
+              <td style={{ whiteSpace: 'nowrap' }}><a className="strong" href={`#facturatie-${i.id}`}>{i.number}</a>{' '}{i.issuer === 'hdb' && <Pill tone="info">HDB</Pill>}{' '}{isCredit(i) && <Pill tone="warn">{tx("Credit")}</Pill>}</td>
+              <td style={{ whiteSpace: 'nowrap' }}>{fmtDate(i.invoice_date)} {time(i.created_at)}</td>
+              <td>{method(i.id)}</td>
+              <td className="num">{eur(i.total)}</td>
+              <td style={{ textAlign: 'right' }}><a className="btn sm" href={`#facturatie-print-${i.id}`}><Printer size={14} />{bon ? tx("Bon afdrukken") : tx("Factuur afdrukken")}</a></td>
+            </tr>
+          ))}</tbody>
+        </table></div>
+      )}
+    </section>
+  )
+}
+
 function ReturnPicker({ onClose }: { onClose: () => void }) {
   const { s } = useApp()
   const [number, setNumber] = useState('')
