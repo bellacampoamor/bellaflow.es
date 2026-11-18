@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
-import { AlertTriangle, Banknote, Check as CheckIcon, CreditCard, Minus, PenLine, Plus, Printer, ScanLine, Trash2, UserPlus } from 'lucide-react'
+import { AlertTriangle, Banknote, Check as CheckIcon, CreditCard, Loader, Minus, PenLine, Plus, Printer, ScanLine, Trash2, UserPlus } from 'lucide-react'
 import type { Customer, Payment } from '../data/types'
 import { freeAt, lineTotal, todayISO } from '../domain/calc'
 import { labelBasePrice } from '../domain/labels'
@@ -174,6 +174,9 @@ export function Pos() {
   const [mail, setMail] = useState<string | null>(null)
   const [code, setCode] = useState('')
   const [busy, setBusy] = useState(false)
+  // Afrekenen loopt (kassabon, betaling, voorraad en Shopify): knop geblokkeerd, zodat er nooit twee bonnen ontstaan.
+  const [paying, setPaying] = useState(false)
+  const doneRef = useRef<HTMLElement>(null)
   const [message, setMessage] = useState('')
   // Telt elke blokkade, zodat de melding ook bij dezelfde tekst opnieuw oplicht.
   const [blocked, setBlocked] = useState(0)
@@ -306,7 +309,7 @@ export function Pos() {
       setMessage(tx("Zoeken lukte niet: {0}", e instanceof Error ? e.message : String(e)))
     } finally { setBusy(false); refocus() }
   }
-  useScannerKeys((c) => { if (me) void lookup(c) })
+  useScannerKeys((c) => { if (me && !paying) void lookup(c) })
 
   const submitCode = (e: FormEvent) => {
     e.preventDefault()
@@ -326,9 +329,11 @@ export function Pos() {
     if (noDesc) return toast(tx("Vul bij het artikel {0} een omschrijving in.", DUMMY_SKU), true)
     if (missing.length) return toast(tx("Boven {0} zijn de gegevens van de klant verplicht: naam, adres, woonplaats en NIE of paspoortnummer.", eur(SIMPLIFIED_LIMIT)), true)
     if (method === 'contant' && received > 0 && received < totals.total) return toast(tx("Ontvangen is minder dan het totaal."), true)
+    if (paying) return
     let result: Awaited<ReturnType<typeof posCheckout>> | null = null
     let note = ''
     let shop = '', shopBad = false
+    setPaying(true)
     const ok = await run(async (d) => {
       result = await posCheckout(d, { salesperson_id: me.id, customer_id: customerId || null, date: todayISO(), lines, payment: { method, reference }, invoiceEmail: mailTo, issuer: hdb ? 'hdb' : 'bella' })
       const snap = await loadSnapshot(d)
@@ -343,9 +348,10 @@ export function Pos() {
         : sh.status === 'demo' ? tx("Testversie: niet naar Shopify gestuurd.")
         : tx("Nog niet in Shopify: {0} Opnieuw versturen kan onder Beheer > Kassa.", sh.error || tx("wacht op Shopify."))
       shopBad = !!sh && sh.status !== 'aangemaakt' && sh.status !== 'demo'
-    })
+    }).finally(() => setPaying(false))
     if (!ok || !result) return
     const r = result as Awaited<ReturnType<typeof posCheckout>>
+    setTimeout(() => doneRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 0)
     setDone({ issuer: issuer.name, orderNumber: r.orderNumber, invoiceId: r.invoiceId, invoiceNumber: r.invoiceNumber, change, note, shop, shopBad, corrected: r.corrections.filter((x) => !x.dummy).length })
     setLines([]); setCustomerId(''); setReference(''); setReceived(0); setMail(null); setMethod('contant'); setMessage(''); setHdb(true)
   }
@@ -406,7 +412,7 @@ export function Pos() {
           </section>
 
           {done && (
-            <section className="panel pos-done">
+            <section ref={doneRef} key={done.invoiceId} className="panel pos-done flash" role="status" aria-live="polite">
               <div className="pos-done-icon"><CheckIcon size={28} /></div>
               <div style={{ flex: 1 }}>
                 <h2 style={{ margin: 0 }}>{tx("Afgerekend: factura simplificada {0}", done.invoiceNumber)}</h2>
@@ -501,8 +507,12 @@ export function Pos() {
               ? <TextField label={tx("Factuur mailen naar")} type="email" value={mail ?? customer?.email ?? ''} onChange={setMail} placeholder={tx("naam@voorbeeld.es")} hint={tx("Leeg laten: niet mailen.")} />
               : <p className="small muted" style={{ margin: 0 }}>{tx("Mailen van de eenvoudige factuur staat uit onder Instellingen.")}</p>}
           </section>
-          <button className="btn primary pos-go" disabled={!lines.length} onClick={checkout}>{tx("Afrekenen {0}", eur(totals.total))}</button>
-          <p className="small muted" style={{ margin: 0 }}>{tx("Maakt de verkooporder, de factura simplificada van vandaag en de betaling, in één keer.")}</p>
+          <button className="btn primary pos-go" disabled={!lines.length || paying} aria-busy={paying} onClick={checkout}>
+            {paying ? <><Loader size={22} className="spin" aria-hidden />{tx("Bezig met afrekenen…")}</> : tx("Afrekenen {0}", eur(totals.total))}
+          </button>
+          {paying
+            ? <p className="note pos-paying" role="status" aria-live="polite">{tx("Kassabon, betaling en voorraad worden vastgelegd. Niet opnieuw klikken.")}</p>
+            : <p className="small muted" style={{ margin: 0 }}>{tx("Maakt de factura simplificada van vandaag, de betaling en de voorraadmutatie, in één keer.")}</p>}
           <button className="linklike small" style={{ alignSelf: 'flex-start' }} onClick={() => go('orders-nieuw')}>{tx("Bezorgen of bestellen? Maak een gewone verkooporder.")}</button>
           <button className="btn sm pos-test" type="button" disabled={testing} onClick={() => setTesting(true)} title={tx("Drukt een voorbeeldbon af om de bonprinter te controleren. Er wordt geen factuur gemaakt en geen nummer gebruikt.")}><Printer size={14} />{tx("Testbon printen")}</button>
         </div>

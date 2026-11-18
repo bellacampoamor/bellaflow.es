@@ -631,7 +631,8 @@ export async function posCheckout(db: Driver, input: PosInput) {
     note: `Kassa: voorraad gelijk aan HomeDecoBali (${x.free} vrij, HDB ${x.hdb})`,
   }))
   if (alignMoves.length) await db.insert('stock_movements', alignMoves)
-  const sAligned = alignMoves.length ? await loadSnapshot(db) : s
+  // Zonder opnieuw laden: de correcties zijn bekend (scheelt een volledige laadronde bij het afrekenen).
+  const sAligned: Snapshot = alignMoves.length ? { ...s, stock_movements: [...s.stock_movements, ...alignMoves] } : s
 
   // Voorraadverschil: wat de klant meeneemt maar niet vrij in de winkel staat, eerst bijboeken.
   const shortfalls = posShortfalls(sAligned, resolved, shop.id)

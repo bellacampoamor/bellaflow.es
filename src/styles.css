@@ -798,6 +798,12 @@ tr.focus-flash td { animation: focus-flash-cell 2.6s ease-out; }
 .pos-change { font: 700 1.2rem var(--display); color: var(--heading); }
 .pos-test { align-self: flex-start; margin-top: 6px; }
 .pos-go { width: 100%; justify-content: center; padding: 18px; font-size: 1.25rem; }
+.spin { animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.pos-paying { margin: 0; font-weight: 600; }
+.pos-done.flash { animation: pos-done-flash 2.4s ease-out 1; }
+@keyframes pos-done-flash { 0%, 50% { box-shadow: 0 0 0 4px var(--good); } 100% { box-shadow: 0 0 0 0 transparent; } }
+@media (prefers-reduced-motion: reduce) { .spin, .pos-done.flash { animation: none; } }
 .pos-done { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; border-left: 4px solid var(--good); }
 .pos-done-icon { width: 48px; height: 48px; border-radius: 50%; display: grid; place-items: center; background: var(--good-bg); color: var(--good); flex: 0 0 auto; }
 @media (max-width: 1000px) {
