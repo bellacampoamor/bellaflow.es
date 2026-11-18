@@ -4,7 +4,7 @@ import { inboundWarehouse, round2, todayISO, vatBreakdown, lineTotal } from '../
 import { canCredit, creditableAmount, creditableLines, creditSettlement, isCredit, originalMethod, refundMethodFixed } from '../domain/credit'
 import { posWarehouse } from '../domain/pos'
 import { createCreditInvoice } from '../domain/services'
-import { goesToShopify, shopifySendingOn } from '../domain/shopify'
+import { goesToShopify, paidCashOnly, shopifyOrderOf, shopifySendingOn } from '../domain/shopify'
 import { go, useApp } from '../ui/app-context'
 import { Empty, eur, fmtDate, Head, NumInput, Pill, pickRow, PickMark, SelectField, TextField, Sku } from '../ui/kit'
 import { tx } from '../i18n'
@@ -28,7 +28,10 @@ export function CreditForm({ invoiceId }: { invoiceId: string }) {
     const from = s.delivery_lines.find((d) => d.id === deliveryLineId)?.warehouse_id
     return (from && warehouses.some((w) => w.id === from) ? from : inboundWarehouse(warehouses)?.id ?? warehouses[0]?.id) ?? ''
   }
-  const [rows, setRows] = useState<Record<string, Row>>({})
+  // Kassabon: alle regels staan al geselecteerd, met retour in de winkel (aantal en locatie blijven te wijzigen; klik om weg te halen).
+  const [rows, setRows] = useState<Record<string, Row>>(() => inv?.simplified
+    ? Object.fromEntries(lines.filter((l) => l.remaining > 0).map((l) => [l.line.id, { qty: l.remaining, warehouse: l.stockable ? defaultWarehouse(l.line.delivery_line_id) : '' }]))
+    : {})
   const last = s.invoices.reduce((m, i) => (i.invoice_date > m ? i.invoice_date : m), '')
   const [date, setDate] = useState(todayISO() > last ? todayISO() : last)
   const [reason, setReason] = useState('')
@@ -149,7 +152,10 @@ export function CreditForm({ invoiceId }: { invoiceId: string }) {
             ]} />
             {method !== 'later' && <TextField label={tx("Referentie")} value={reference} onChange={setReference} />}
           </div>}
-          {goesToShopify(inv) && <p className="small muted">{shopifySendingOn(s.settings[0]) ? tx("Gaat ook naar Shopify: terugbetaling op de bestelling van {0}, met de artikelen terug in voorraad.", inv.number) : tx("Versturen naar Shopify staat uit: deze retour gaat niet naar Shopify.")}</p>}
+          {goesToShopify(inv) && <p className="small muted">{!shopifySendingOn(s.settings[0]) ? tx("Versturen naar Shopify staat uit: deze retour gaat niet naar Shopify.")
+            : (shopifyOrderOf(s, inv.id)?.kind === 'voorraad' || (!shopifyOrderOf(s, inv.id) && paidCashOnly(s.payments, inv.id)))
+              ? tx("Contant betaald: in Shopify gaan alleen de artikelen die retour in voorraad komen terug in de voorraad (Centraal magazijn). Geen bestelling en geen terugbetaling in Shopify.")
+              : tx("Gaat ook naar Shopify: terugbetaling op de bestelling van {0}, met de artikelen terug in voorraad.", inv.number)}</p>}
           <p className="small muted">{returned > 0 ? tx("{0} stuks komen terug in voorraad (mutatie Retour).", returned) : tx("Er komt niets terug in voorraad.")} {tx("Na het maken staat de creditfactuur vast, net als een factuur.")}</p>
           <div className="btn-row"><button className="btn primary" disabled={amount <= 0 || !reason.trim()} onClick={submit}>{tx("Creditfactuur maken")}</button></div>
         </section>

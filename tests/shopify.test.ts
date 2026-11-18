@@ -233,9 +233,9 @@ describe('Shopify: retour als terugbetaling (refund)', () => {
     expect((input.transactions as { amount: string }[])[0].amount).toBe('300.00')
   })
 
-  it('retour naar de locatie in Campoamor', () => {
-    expect(returnLocation([{ id: 'A', name: 'Centraal magazijn', isActive: true }, { id: 'B', name: 'Bella Outdoor & Furniture - Campoamor', isActive: true }])).toBe('B')
-    expect(returnLocation([{ id: 'A', name: 'Centraal magazijn', isActive: true }])).toBe('A')
+  it('voorraad en retour altijd op Centraal magazijn, niet op de locatie Campoamor (besluit Rick 18 november 2026)', () => {
+    expect(returnLocation([{ id: 'B', name: 'Bella Outdoor & Furniture - Campoamor', isActive: true }, { id: 'A', name: 'Centraal magazijn', isActive: true }])).toBe('A')
+    expect(returnLocation([{ id: 'A', name: 'Centraal magazijn', isActive: false }, { id: 'B', name: 'Bella Outdoor & Furniture - Campoamor', isActive: true }])).toBe('B')
     expect(returnLocation([])).toBeNull()
   })
 

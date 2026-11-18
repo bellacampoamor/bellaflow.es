@@ -101,11 +101,18 @@ export const ORDER_FOR_REFUND = `query orderForRefund($id: ID!) {
   locations(first: 10) { nodes { id name isActive } }
 }`
 
-/** Locatie voor de retour in Shopify: de winkel in Campoamor (daar verkoopt en neemt de kassa terug), anders de eerste actieve. */
-export function returnLocation(nodes: { id: string; name: string; isActive?: boolean }[]) {
+/**
+ * Locatie in Shopify voor elke voorraadmutatie van de kassa (afboeken, terugboeken, retour). Besluit Rick 18 november 2026:
+ * de voorraad van HDB is één voorraad, fysiek bij Bella, en dat is in Shopify de locatie **Centraal magazijn** (daaruit komt
+ * ook de beschikbare voorraad in Bella Flow). Niet de locatie "Bella Outdoor & Furniture - Campoamor". Zonder Centraal
+ * magazijn: de eerste actieve locatie.
+ */
+export function stockLocation(nodes: { id: string; name: string; isActive?: boolean }[]) {
   const active = nodes.filter((l) => l.isActive !== false)
-  return (active.find((l) => /campoamor/i.test(l.name)) ?? active[0])?.id ?? null
+  return (active.find((l) => /centraal/i.test(l.name)) ?? active[0])?.id ?? null
 }
+/** Retour: dezelfde locatie als afboeken. */
+export const returnLocation = stockLocation
 
 /** Sinds API 2026-04 verplicht met een idempotency key (het nummer van de creditfactuur): nooit dubbel terugbetalen. */
 export const REFUND_CREATE = `mutation refundCreate($input: RefundInput!, $key: String!) {

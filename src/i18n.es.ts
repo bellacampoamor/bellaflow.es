@@ -1814,6 +1814,7 @@ export const es: Record<string, string> = {
   "Tip:": "Consejo:",
   "Een retour aan de kassa wordt terugbetaald zoals er betaald is: {0}.": "Una devolución en caja se reembolsa igual que se pagó: {0}.",
   "Terug aan de klant met {0}, zoals er betaald is.": "Se devuelve al cliente con {0}, igual que se pagó.",
+  "Contant betaald: in Shopify gaan alleen de artikelen die retour in voorraad komen terug in de voorraad (Centraal magazijn). Geen bestelling en geen terugbetaling in Shopify.": "Pagado en efectivo: en Shopify solo vuelven al stock los artículos devueltos (Centraal magazijn). Sin pedido ni reembolso en Shopify.",
   "Gaat ook naar Shopify: terugbetaling op de bestelling van {0}, met de artikelen terug in voorraad.": "También va a Shopify: reembolso en el pedido de {0}, con los artículos de vuelta en stock.",
   "Versturen naar Shopify staat uit: deze retour gaat niet naar Shopify.": "El envío a Shopify está desactivado: esta devolución no irá a Shopify.",
   "Shopify terugbetaald op": "Shopify reembolsado en",

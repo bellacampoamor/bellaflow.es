@@ -10,7 +10,7 @@
 // Voor contante kassaverkopen ook read_inventory en write_inventory.
 //
 // Contant (besluit Rick 18 november 2026): een kassabon die volledig contant is betaald (rij met kind 'voorraad') wordt geen
-// bestelling en geeft geen betaling door; alleen de voorraad op de locatie Campoamor gaat omlaag. Een retour daarop (kind
+// bestelling en geeft geen betaling door; alleen de voorraad op de locatie Centraal magazijn (besluit Rick 18 november 2026) gaat omlaag. Een retour daarop (kind
 // 'voorraad_retour') boekt de artikelen die in Bella Flow retour in voorraad kwamen weer bij.
 //
 // Retour: een creditfactuur op een kassabon van HDB (rij met kind 'retour') wordt een refund op de bestelling van die
