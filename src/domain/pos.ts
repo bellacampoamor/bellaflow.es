@@ -37,6 +37,8 @@ export interface PosLine {
   unit_price: number
   discount_pct: number
   vat_rate: number
+  /** HDB-artikel: de voorraad van HomeDecoBali (= beschikbaar in de winkel) toen het op de bon kwam. */
+  stock?: number | null
 }
 
 /** Hetzelfde artikel nog eens scannen telt op bij de bestaande regel. Dummy-regels worden nooit samengevoegd. */
@@ -74,6 +76,32 @@ export function posShortfalls(s: Snapshot, lines: { product_id: string; qty: num
   }
   return out
 }
+
+/**
+ * Voorraad van HomeDecoBali (besluit Rick 18 november 2026): de hele voorraad van HDB ligt in het magazijn van Bella.
+ * Voor een HDB-artikel is de beschikbare voorraad aan de kassa daarom de voorraad uit de catalogus van HomeDecoBali,
+ * niet de som van de mutaties in Bella Flow. Bij afrekenen zet een correctie op de winkel de vrije voorraad in Bella Flow
+ * eerst gelijk aan die van HDB (kan ook omlaag); daarna gaat de verkoop eraf, zodat beide na de verkoop gelijk zijn.
+ * Verkoopt de kassa meer dan HDB opgeeft, dan wordt tot het aantal op de bon bijgeboekt (zoals bij een voorraadverschil),
+ * zodat de voorraad in Bella Flow nooit negatief wordt.
+ * stock: per product de voorraad van HDB; producten zonder bekende voorraad worden overgeslagen.
+ */
+export function hdbStockAlignment(s: Snapshot, lines: { product_id: string; qty: number }[], warehouseId: string, stock: Map<string, number>) {
+  const need = new Map<string, number>()
+  for (const l of lines) if (stock.has(l.product_id)) need.set(l.product_id, (need.get(l.product_id) ?? 0) + l.qty)
+  const out: { product_id: string; qty: number; free: number; hdb: number }[] = []
+  for (const [pid, qty] of need) {
+    const hdb = Math.max(0, stock.get(pid)!)
+    const free = freeAt(s, pid, warehouseId)
+    const target = Math.max(hdb, qty)
+    if (target !== free) out.push({ product_id: pid, qty: target - free, free, hdb })
+  }
+  return out
+}
+
+/** Is dit catalogusartikel van HomeDecoBali? */
+export const isHdbArticle = (a: Pick<CatalogArticle, 'source' | 'supplier_id'>, suppliers: Pick<Supplier, 'id' | 'code' | 'name'>[]) =>
+  a.source === 'hdb' || isHdbSupplier(suppliers.find((x) => x.id === a.supplier_id))
 
 /**
  * Voorraadverschil op een verkooporder (besluit Rick 11 november 2026): wat de klant meeneemt maar volgens het

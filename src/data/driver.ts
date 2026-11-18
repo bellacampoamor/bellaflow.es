@@ -48,6 +48,11 @@ export interface Driver {
   articleIndex(): Promise<{ articles: CatalogArticle[]; links: CatalogArticleElement[] }>
   /** Voegt toe of werkt bij op id. Een toegekend artikelnummer wijzigt nooit. Koppelingen worden alleen toegevoegd. */
   saveArticles(articles: CatalogArticle[], links: CatalogArticleElement[]): Promise<void>
+  /**
+   * Past de voorraad van de leverancier aan (alleen HomeDecoBali): na een kassaverkoop omlaag, na een retour omhoog, zodat
+   * zoeken en kassa direct kloppen. De volgende sync van HDB zet de voorraad weer gelijk aan die van HomeDecoBali.
+   */
+  adjustSupplierStock(changes: { article_number: string; delta: number }[]): Promise<void>
   /** Reserveert een blok volgnummers en geeft het eerste. */
   reserveArticleNumbers(count: number): Promise<number>
   /**

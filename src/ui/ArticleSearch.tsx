@@ -3,13 +3,15 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Check, Plus } from 'lucide-react'
 import type { ArticleHit, CatalogArticle, CatalogListItem, Product } from '../data/types'
 import { categoryName, priceWithSurcharge } from '../domain/articles'
+import { isHdbArticle } from '../domain/pos'
 import { onHandMap, reservedMap, stockKey } from '../domain/calc'
 import { catalogArticleCounts, catalogArticleElements, catalogArticlesBySku, catalogArticleVariants, searchCatalogArticles } from '../domain/services'
 import { useApp } from './app-context'
 import { CatalogPhoto, Empty, eur, Modal, Pill } from './kit'
 import { tx } from '../i18n'
 
-export type ArticlePick = { kind: 'product'; product: Product } | { kind: 'article'; article: CatalogArticle }
+/** Bij een product ook het catalogusartikel waar het uit komt (met de voorraad van de leverancier), als dat bekend is. */
+export type ArticlePick = { kind: 'product'; product: Product; article?: CatalogArticle } | { kind: 'article'; article: CatalogArticle }
 
 /** In welke catalogi gezocht wordt: standaard alle; de keuze blijft bewaard in deze browser. */
 export interface SearchSources { off: string[] }
@@ -55,6 +57,11 @@ export function SearchSourceChips({ value, onChange }: { value: SearchSources; o
       })())}
     </div>
   )
+}
+
+/** Voorraad van HomeDecoBali (ligt in het magazijn van Bella): de beschikbare voorraad aan de kassa (besluit Rick 18 november 2026). */
+function StockPill({ n }: { n: number }) {
+  return n > 0 ? <Pill tone="good">{tx("{0} op voorraad", n)}</Pill> : <Pill tone="warn">{tx("Niet op voorraad")}</Pill>
 }
 
 const money = (n: number | null, currency: string) => (n === null ? '–' : currency === 'EUR' ? eur(n) : `${n.toFixed(2)} ${currency}`)
@@ -106,7 +113,7 @@ export function ArticleSearch({ id, label, sources, onPick }: { id?: string; lab
   const rows: Row[] = [
     ...hits.map((a) => {
       const p = byNumber.get(a.article_number)
-      return { key: `a${a.id}`, pick: (p ? { kind: 'product', product: p } : { kind: 'article', article: a }) as ArticlePick, hit: a, product: p }
+      return { key: `a${a.id}`, pick: (p ? { kind: 'product', product: p, article: a } : { kind: 'article', article: a }) as ArticlePick, hit: a, product: p }
     }),
   ]
 
@@ -129,7 +136,7 @@ export function ArticleSearch({ id, label, sources, onPick }: { id?: string; lab
   }
   const pickVariant = (a: CatalogArticle) => {
     const p = byNumber.get(a.article_number)
-    onPick(p ? { kind: 'product', product: p } : { kind: 'article', article: a }); setChoose(null); setQ('')
+    onPick(p ? { kind: 'product', product: p, article: a } : { kind: 'article', article: a }); setChoose(null); setQ('')
   }
   const supplierName = (id: string) => s.suppliers.find((x) => x.id === id)?.name ?? ''
 
@@ -163,7 +170,9 @@ export function ArticleSearch({ id, label, sources, onPick }: { id?: string; lab
                   </span>
                   <span className="article-side">
                     <span className="strong">{p ? eur(p.sale_price) : money(priceWithSurcharge(a?.price ?? null, s.suppliers.find((x) => x.id === a?.supplier_id)), a?.currency ?? 'EUR')}</span>
-                    {p && <small>{tx("{0} vrij", free(p.id))}</small>}
+                    {a && isHdbArticle(a, s.suppliers) && a.supplier_stock !== null && a.supplier_stock !== undefined
+                      ? <StockPill n={a.supplier_stock} />
+                      : p ? <small>{tx("{0} vrij", free(p.id))}</small> : null}
                     {a && a.element_count > 0 && <small>{tx("+{0} elementen", a.element_count)}</small>}
                     {a && (a.variant_count ?? 0) > 0 && <Pill tone="info">{tx("{0} varianten", a.variant_count)}</Pill>}
                     {p && a && <Pill tone="info">{tx("In assortiment")}</Pill>}

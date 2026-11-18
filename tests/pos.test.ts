@@ -4,8 +4,8 @@ import { LocalDriver } from '../src/data/localDriver'
 import type { CatalogArticle } from '../src/data/types'
 import { freeAt, onHandMap, stockKey } from '../src/domain/calc'
 import { seedDemo } from '../src/domain/demo'
-import { addPosLine, DUMMY_SKU, posLineCompany, wrongCompanyLine, isDummyCode, missingCustomerData, POS_CUSTOMER_NOTE, posTotals, SIMPLIFIED_LIMIT, type PosLine } from '../src/domain/pos'
-import { importShowroom, posCheckout, saveSettings, productForArticle, saveRecord, syncCatalogArticles } from '../src/domain/services'
+import { addPosLine, DUMMY_SKU, hdbStockAlignment, posLineCompany, wrongCompanyLine, isDummyCode, missingCustomerData, POS_CUSTOMER_NOTE, posTotals, SIMPLIFIED_LIMIT, type PosLine } from '../src/domain/pos'
+import { createCreditInvoice, importShowroom, posCheckout, saveSettings, productForArticle, saveRecord, syncCatalogArticles } from '../src/domain/services'
 import { invoiceReport } from '../src/domain/calc'
 import { HDB_DEFAULTS, issuerInfo, legalLine, settingsUpgrade } from '../src/domain/issuers'
 import { overview } from '../src/domain/overview'
@@ -269,5 +269,68 @@ describe('Kassa: HDB-artikelen alleen op een bon van HDB (besluit Rick 16 novemb
   it('DIVERSEN mag op beide bonnen', async () => {
     await expect(checkout([dummy(20)], { issuer: 'hdb' })).resolves.toBeTruthy()
     await expect(checkout([dummy(20)])).resolves.toBeTruthy()
+  })
+})
+
+describe('Kassa: voorraad van HomeDecoBali is de beschikbare voorraad (besluit Rick 18 november 2026)', () => {
+  const hdb = async (stock: number | null) => {
+    const a: CatalogArticle = { ...table, id: newId(), article_number: 'HDB-ACC-0000000001', supplier_sku: 'OP-TEST-1', source: 'hdb', name: 'Gong test', supplier_stock: stock }
+    await db.saveArticles([a], [])
+    return (await db.findArticles({ numbers: [a.article_number] }))[0]
+  }
+  const sell = (a: CatalogArticle, qty: number) => checkout([line({ article: a, code: a.article_number, qty, stock: a.supplier_stock })], { issuer: 'hdb', payment: { method: 'contant', reference: '' } })
+  const pidOf = (a: CatalogArticle) => db.data.products.find((p) => p.catalog_article_number === a.article_number)!.id
+  const stockOf = async (a: CatalogArticle) => (await db.findArticles({ numbers: [a.article_number] }))[0].supplier_stock
+
+  it('zet de voorraad in Bella Flow gelijk aan HDB en boekt de verkoop af; daarna zijn beide gelijk', async () => {
+    const a = await hdb(5)
+    const r = await sell(a, 2)
+    expect(r.corrections).toHaveLength(0)
+    const pid = pidOf(a)
+    const corr = db.data.stock_movements.filter((m) => m.product_id === pid && m.kind === 'correctie')
+    expect(corr.map((m) => m.qty)).toEqual([5])
+    expect(corr[0].ref_id).toBe(r.invoiceNumber)
+    expect(freeAt(db.data, pid, shopId)).toBe(3)
+    expect(await stockOf(a)).toBe(3)
+  })
+
+  it('volgt een gewijzigde voorraad van HDB (sync), ook omlaag', async () => {
+    const a = await hdb(5)
+    await sell(a, 1)
+    await db.saveArticles([{ ...(await db.findArticles({ numbers: [a.article_number] }))[0], supplier_stock: 2 }], [])
+    await sell({ ...a, supplier_stock: 2 }, 1)
+    const pid = pidOf(a)
+    expect(freeAt(db.data, pid, shopId)).toBe(1)
+    expect(await stockOf(a)).toBe(1)
+  })
+
+  it('meer verkocht dan HDB opgeeft: bijgeboekt tot 0, gemeld als voorraadverschil, nooit negatief', async () => {
+    const a = await hdb(1)
+    const r = await sell(a, 3)
+    expect(r.corrections.map((c) => c.qty)).toEqual([2])
+    expect(freeAt(db.data, pidOf(a), shopId)).toBe(0)
+    expect(await stockOf(a)).toBe(0)
+  })
+
+  it('onbekende voorraad van HDB: de gewone regel voor een voorraadverschil', async () => {
+    const a = await hdb(null)
+    const r = await sell(a, 1)
+    expect(r.corrections).toHaveLength(1)
+    expect(await stockOf(a)).toBeNull()
+  })
+
+  it('retour in voorraad gaat ook weer bij de voorraad van HDB', async () => {
+    const a = await hdb(4)
+    const r = await sell(a, 2)
+    const ln = db.data.invoice_lines.find((l) => l.invoice_id === r.invoiceId)!
+    await createCreditInvoice(db, { invoice_id: r.invoiceId, date: TODAY, reason: 'Retour', lines: [{ invoice_line_id: ln.id, qty: 1, return_warehouse_id: shopId }], refund: { method: 'contant', reference: '' } })
+    expect(freeAt(db.data, pidOf(a), shopId)).toBe(3)
+    expect(await stockOf(a)).toBe(3)
+  })
+
+  it('rekenregel: gelijkzetten kan omhoog en omlaag, alleen voor producten met bekende voorraad', () => {
+    const pid = newId()
+    expect(hdbStockAlignment(db.data, [{ product_id: pid, qty: 1 }], shopId, new Map([[pid, 4]]))).toEqual([{ product_id: pid, qty: 4, free: 0, hdb: 4 }])
+    expect(hdbStockAlignment(db.data, [{ product_id: pid, qty: 1 }], shopId, new Map())).toEqual([])
   })
 })

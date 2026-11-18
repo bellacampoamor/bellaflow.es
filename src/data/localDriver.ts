@@ -60,6 +60,7 @@ export class LocalDriver implements Driver {
   async articleIndex() { return { articles: structuredClone(this.articles.articles), links: structuredClone(this.articles.links) } }
   async saveArticles(articles: CatalogArticle[], links: CatalogArticleElement[]) { this.articles.save(articles, links) }
   async reserveArticleNumbers(count: number) { return this.articles.reserve(count) }
+  async adjustSupplierStock(changes: { article_number: string; delta: number }[]) { this.articles.adjustStock(changes) }
   async wipeTestData(by: string, customers: boolean) {
     this.sync()
     if (this.data.settings.some((s) => s.live_since)) throw new Error(tx("Bella Flow is live: testgegevens wissen kan niet meer."))

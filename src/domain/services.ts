@@ -17,7 +17,7 @@ import { activeClosings, closeBlocker, lastNumbers, numberYear, openYear, rollba
 import { goesToShopify, shopifyBacklog, shopifyCompletes, shopifyKindOf, shopifyOrderOf, shopifySendingOn } from './shopify'
 import { creditableAmount, creditableLines, creditSeries, creditSettlement, isCredit, refundMethodFixed } from './credit'
 import { cashCount, closingOn, closingsOf, countedTotal, DENOMINATIONS, denomKey, kassaDay, openingFloat, type CashCounts } from './cashClosing'
-import { DUMMY_SKU, missingCustomerData, POS_CUSTOMER_NOTE, posShortfalls, posTotals, posWarehouse, SIMPLIFIED_LIMIT, takeNowShortfalls, wrongCompanyLine, type PosLine } from './pos'
+import { DUMMY_SKU, hdbStockAlignment, missingCustomerData, POS_CUSTOMER_NOTE, posLineCompany, posShortfalls, posTotals, posWarehouse, SIMPLIFIED_LIMIT, takeNowShortfalls, wrongCompanyLine, type PosLine } from './pos'
 import { isSendable, PURCHASE_MAIL, purchaseJsonFileName, purchaseOrdersJson, toBase64 } from './purchaseExport'
 import { articleSources, categoryName, priceWithSurcharge, finishArticleSync, missingSupplierCodes, planArticleSync } from './articles'
 import { DETAIL_COLUMNS, SHOWROOM_COLUMNS, showroomDetailFromCsv, showroomItemFromCsv } from './showroom'
@@ -556,6 +556,35 @@ export async function ensurePosCustomer(db: Driver) {
 }
 
 /** Afrekenen aan de kassa: kassabon (eenvoudige factuur) van vandaag, direct afgeleverd en betaald. Geen verkooporder. */
+/**
+ * Voorraad van HomeDecoBali per product, voor de HDB-artikelen op de bon (catalogus, kolom supplier_stock). Producten
+ * zonder bekende voorraad of van een andere leverancier ontbreken.
+ */
+async function hdbStockOf(db: Driver, s: Snapshot, lines: { line: PosLine; product_id: string }[]) {
+  const out = new Map<string, number>()
+  const hdb = lines.filter((x) => !x.line.dummy && posLineCompany(x.line, s) === 'hdb')
+  const numberOf = (x: { line: PosLine; product_id: string }) => x.line.article?.article_number ?? s.products.find((p) => p.id === x.product_id)?.catalog_article_number ?? ''
+  const numbers = [...new Set(hdb.map(numberOf).filter(Boolean))]
+  if (!numbers.length) return out
+  const arts = await db.findArticles({ numbers })
+  for (const x of hdb) {
+    const a = arts.find((y) => y.article_number === numberOf(x))
+    if (a && a.supplier_stock !== null && a.supplier_stock !== undefined) out.set(x.product_id, a.supplier_stock)
+  }
+  return out
+}
+
+/** Voorraad van HDB in de catalogus bijwerken na een kassaverkoop of retour. Lukt dat niet, dan zet de volgende sync het recht. */
+async function adjustHdbStock(db: Driver, s: Snapshot, changes: { product_id: string; delta: number }[]) {
+  const per = new Map<string, number>()
+  for (const c of changes) {
+    const p = s.products.find((x) => x.id === c.product_id)
+    if (p?.catalog_article_number && p.sku !== DUMMY_SKU) per.set(p.catalog_article_number, (per.get(p.catalog_article_number) ?? 0) + c.delta)
+  }
+  const list = [...per].map(([article_number, delta]) => ({ article_number, delta })).filter((x) => x.delta !== 0)
+  if (list.length) await db.adjustSupplierStock(list).catch(() => undefined)
+}
+
 export async function posCheckout(db: Driver, input: PosInput) {
   if (!input.salesperson_id) fail(tx("Kies eerst de medewerker."))
   if (!input.lines.length) fail(tx("Scan of voeg minimaal één artikel toe."))
@@ -593,13 +622,24 @@ export async function posCheckout(db: Driver, input: PosInput) {
   const s = await loadSnapshot(db)
   const customer = s.customers.find((c) => c.id === customer_id)!
 
+  // HDB (besluit Rick 18 november 2026): de voorraad van HomeDecoBali ligt in het magazijn van Bella en is de beschikbare
+  // voorraad. Eerst de vrije voorraad in Bella Flow gelijkzetten met die van HDB, daarna de verkoop.
+  const hdbStock = await hdbStockOf(db, s, input.lines.map((l, n) => ({ line: l, product_id: resolved[n].product_id })))
+  const aligned = hdbStockAlignment(s, resolved.filter((l) => !l.dummy), shop.id, hdbStock)
+  const alignMoves = aligned.map((x) => ({
+    id: newId(), product_id: x.product_id, warehouse_id: shop.id, qty: x.qty, kind: 'correctie' as const, ref_id: '', moved_at: input.date,
+    note: `Kassa: voorraad gelijk aan HomeDecoBali (${x.free} vrij, HDB ${x.hdb})`,
+  }))
+  if (alignMoves.length) await db.insert('stock_movements', alignMoves)
+  const sAligned = alignMoves.length ? await loadSnapshot(db) : s
+
   // Voorraadverschil: wat de klant meeneemt maar niet vrij in de winkel staat, eerst bijboeken.
-  const shortfalls = posShortfalls(s, resolved, shop.id)
-  const corrections = shortfalls.map((x) => ({
+  const shortfalls = posShortfalls(sAligned, resolved, shop.id)
+  const corrections = [...alignMoves, ...shortfalls.map((x) => ({
     id: newId(), product_id: x.product_id, warehouse_id: shop.id, qty: x.qty, kind: 'correctie' as const, ref_id: '', moved_at: input.date,
     note: x.dummy ? 'Kassa: diversen, geen voorraad' : `Kassa: voorraadverschil, ${x.free} vrij, ${x.free + x.qty} verkocht`,
-  }))
-  if (corrections.length) await db.insert('stock_movements', corrections)
+  }))]
+  if (corrections.length > alignMoves.length) await db.insert('stock_movements', corrections.slice(alignMoves.length))
 
   const header: OrderHeader = {
     customer_id, order_date: input.date, channel: 'winkel', salesperson_id: input.salesperson_id, customer_reference: '', order_type: 'direct', fulfilment: 'meenemen',
@@ -624,13 +664,17 @@ export async function posCheckout(db: Driver, input: PosInput) {
   }
   const open = round2(invoice.total - invoice.deposit_settled)
   if (open > 0) await payInvoice(db, { invoice_id: invoice.id, amount: open, method: input.payment.method, paid_at: input.date, reference: input.payment.reference })
+  // De voorraad van HDB in de catalogus gaat meteen omlaag; de volgende sync zet hem weer gelijk aan HomeDecoBali.
+  await adjustHdbStock(db, s2, resolved.filter((l) => hdbStock.has(l.product_id)).map((l) => ({ product_id: l.product_id, delta: -l.qty })))
   // HDB: de verkoop gaat als conceptorder naar de Shopify van HomeDecoBali. Lukt dat niet, dan blijft de verkoop staan
   // en staat hij onder Beheer > Kassa klaar om opnieuw te versturen.
   // Staat versturen uit (Instellingen > Kassa: HDB), dan gaat er niets naar Shopify; later kan het per factuur alsnog.
   const shopify = !goesToShopify(invoice) ? null
     : !shopifySendingOn((await db.list('settings'))[0]) ? 'uit' as const
     : await sendSaleToShopify(db, invoice.id).catch(() => 'mislukt' as const)
-  return { orderId, orderNumber: order.number, invoiceId: invoice.id, invoiceNumber: invoice.number, corrections: shortfalls, shopify }
+  // Meer verkocht dan HDB opgeeft: telt als voorraadverschil voor de melding op de kassa.
+  const over = aligned.filter((x) => x.hdb < x.free + x.qty).map((x) => ({ product_id: x.product_id, qty: x.free + x.qty - x.hdb, dummy: false, free: x.hdb }))
+  return { orderId, orderNumber: order.number, invoiceId: invoice.id, invoiceNumber: invoice.number, corrections: [...shortfalls, ...over], shopify }
 }
 
 // Shopify van HDB ----------------------------------------------------------------
@@ -1293,6 +1337,8 @@ export async function createCreditInvoice(db: Driver, input: CreditInput) {
     { table: 'order_events', rows: original.sales_order_id ? [event(original.sales_order_id, 'factuur', `Creditfactuur ${number} gemaakt op factuur ${original.number}${back}. Reden: ${reason}`)] : [] },
     { table: 'hdb_shopify_orders', rows: queue },
   ])
+  // HDB: wat retour in voorraad komt, komt ook weer bij de voorraad van HDB in de catalogus.
+  if (invoice.issuer === 'hdb') await adjustHdbStock(db, s, moves.map((m) => ({ product_id: m.product_id, delta: m.qty })))
   // Shopify na het vastleggen: lukt dat niet, dan blijft de retour in Bella Flow staan en staat hij klaar om opnieuw te versturen.
   if (queue.length) await pushToShopify(db, [queue[0].id]).catch(() => 'mislukt' as const)
   return id

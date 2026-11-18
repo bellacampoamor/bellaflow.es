@@ -3,7 +3,7 @@ import { AlertTriangle, Banknote, Check as CheckIcon, CreditCard, Minus, PenLine
 import type { Customer, Payment } from '../data/types'
 import { freeAt, lineTotal, todayISO } from '../domain/calc'
 import { labelBasePrice } from '../domain/labels'
-import { addPosLine, DUMMY_SKU, isDummyCode, missingCustomerData, POS_CUSTOMER_NOTE, posLineCompany, posTotals, posWarehouse, SIMPLIFIED_LIMIT, wrongCompanyLine, type PosLine } from '../domain/pos'
+import { addPosLine, DUMMY_SKU, isDummyCode, isHdbArticle, missingCustomerData, POS_CUSTOMER_NOTE, posLineCompany, posTotals, posWarehouse, SIMPLIFIED_LIMIT, wrongCompanyLine, type PosLine } from '../domain/pos'
 import { findArticleByCode, findInvoiceByNumber, posCheckout, saveRecord } from '../domain/services'
 import { canCredit, isCredit } from '../domain/credit'
 import { loadSnapshot } from '../data/driver'
@@ -221,9 +221,10 @@ export function Pos() {
   const refocus = () => setTimeout(() => scanRef.current?.focus(), 0)
   useEffect(() => { if (me && !done) refocus() }, [me, done])
 
-  // Vrij in de winkel per regel, rekening houdend met eerdere regels van hetzelfde product.
+  // Vrij in de winkel per regel. HDB-artikel: de voorraad van HomeDecoBali, die in het magazijn van Bella ligt (besluit Rick 18 november 2026).
   const freeInShop = (l: PosLine) => {
     if (l.dummy || !shop) return null
+    if (l.stock !== null && l.stock !== undefined && posLineCompany(l, s) === 'hdb') return Math.max(0, l.stock)
     const pid = l.product_id ?? s.products.find((p) => p.catalog_article_number === l.code)?.id
     return pid ? Math.max(0, freeAt(s, pid, shop.id)) : 0
   }
@@ -261,11 +262,13 @@ export function Pos() {
     if (p.kind === 'product') {
       const pr = p.product
       if (pr.sku === DUMMY_SKU) return addDummy()
-      line = { key: newKey(), product_id: pr.id, code: pr.catalog_article_number || pr.sku, description: pr.name, qty: 1, unit_price: pr.sale_price, discount_pct: 0, vat_rate: pr.vat_rate }
+      const stock = p.article && isHdbArticle(p.article, s.suppliers) ? p.article.supplier_stock : undefined
+      line = { key: newKey(), product_id: pr.id, code: pr.catalog_article_number || pr.sku, description: pr.name, qty: 1, unit_price: pr.sale_price, discount_pct: 0, vat_rate: pr.vat_rate, stock }
     } else {
       const a = p.article
       const pr = s.products.find((x) => x.catalog_article_number === a.article_number)
-      line = { key: newKey(), article: a, product_id: pr?.id, code: a.article_number, description: pr?.name ?? a.name, qty: 1, unit_price: labelBasePrice(a, s.products, s.suppliers) ?? 0, discount_pct: 0, vat_rate: pr?.vat_rate ?? 21 }
+      const stock = isHdbArticle(a, s.suppliers) ? a.supplier_stock : undefined
+      line = { key: newKey(), article: a, product_id: pr?.id, code: a.article_number, description: pr?.name ?? a.name, qty: 1, unit_price: labelBasePrice(a, s.products, s.suppliers) ?? 0, discount_pct: 0, vat_rate: pr?.vat_rate ?? 21, stock }
     }
     if (blockWrong(line)) return
     setLines((v) => addPosLine(v, line))
@@ -433,6 +436,7 @@ export function Pos() {
                         {l.dummy
                           ? <input id={`pos-desc-${l.key}`} className="pos-desc" value={l.description} placeholder={tx("Omschrijving (verplicht)")} aria-label={tx("Omschrijving")} onChange={(e) => patch(l.key, { description: e.target.value })} />
                           : <div className="strong">{l.description}</div>}
+                        {!short && free !== null && l.stock !== null && l.stock !== undefined && <div className="small muted">{tx("{0} op voorraad", free)}</div>}
                         {short && <div className="small warn-text"><AlertTriangle size={13} /> {tx("{0} vrij in de winkel; het verschil wordt bij afrekenen bijgeboekt.", free)}</div>}
                         {l.unit_price <= 0 && <div className="small bad-text">{tx("Vul een prijs in.")}</div>}
                       </div>

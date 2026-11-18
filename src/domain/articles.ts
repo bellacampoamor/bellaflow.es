@@ -213,6 +213,13 @@ export class ArticleStore {
   private parents = new Map<string, string[]>()
   counter = 0
 
+  /** Voorraad van de leverancier aanpassen (HDB na een kassaverkoop of retour); onbekende voorraad blijft onbekend, nooit onder 0. */
+  adjustStock(changes: { article_number: string; delta: number }[]) {
+    for (const c of changes) {
+      const a = this.articles.find((x) => x.article_number === c.article_number)
+      if (a && a.supplier_stock !== null && a.supplier_stock !== undefined) a.supplier_stock = Math.max(0, a.supplier_stock + c.delta)
+    }
+  }
   save(articles: CatalogArticle[], links: CatalogArticleElement[]) {
     for (const a of structuredClone(articles)) {
       const i = this.byId.get(a.id)

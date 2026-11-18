@@ -5,6 +5,8 @@ import type { ArticleHit, ArticleQuery, CatalogArticle, CatalogListItem, Catalog
 
 const PAGE = 1000
 const ARTICLE_COLUMNS = 'id, article_number, supplier_id, supplier_sku, ean, name, category_code, series, price, currency, image_url, source, active, created_at, variant_of'
+/** Met de voorraad van de leverancier (HDB: beschikbare voorraad aan de kassa). */
+const FIND_COLUMNS = `${ARTICLE_COLUMNS}, supplier_stock`
 
 export function createSupabase(url: string, key: string) {
   return createClient(url, key)
@@ -108,7 +110,7 @@ export class SupabaseDriver implements Driver {
     if (f.skuPrefix) {
       const pre = f.skuPrefix.trim()
       if (!pre) return []
-      let query = this.sb.from('catalog_articles').select(ARTICLE_COLUMNS).ilike('supplier_sku', `${pre.replace(/[\\%_]/g, '\\$&')}%`)
+      let query = this.sb.from('catalog_articles').select(FIND_COLUMNS).ilike('supplier_sku', `${pre.replace(/[\\%_]/g, '\\$&')}%`)
       if (f.supplierId) query = query.eq('supplier_id', f.supplierId)
       const { data, error } = await query.order('supplier_sku').limit(f.limit ?? 500)
       if (error) throw new Error(error.message)
@@ -117,13 +119,19 @@ export class SupabaseDriver implements Driver {
     const out: CatalogArticle[] = []
     const keys = f.ids ?? f.numbers ?? f.skus ?? []
     for (let i = 0; i < keys.length; i += 200) {
-      let query = this.sb.from('catalog_articles').select(ARTICLE_COLUMNS)
+      let query = this.sb.from('catalog_articles').select(FIND_COLUMNS)
       query = f.ids ? query.in('id', keys.slice(i, i + 200)) : f.numbers ? query.in('article_number', keys.slice(i, i + 200)) : query.eq('supplier_id', f.supplierId!).in('supplier_sku', keys.slice(i, i + 200))
       const { data, error } = await query
       if (error) throw new Error(error.message)
       out.push(...((data ?? []) as unknown as Record<string, unknown>[]).map(toNumbers) as unknown as CatalogArticle[])
     }
     return out
+  }
+  async adjustSupplierStock(changes: { article_number: string; delta: number }[]) {
+    const list = changes.filter((c) => c.delta !== 0)
+    if (!list.length) return
+    const { error } = await this.sb.rpc('adjust_supplier_stock', { p_changes: list })
+    if (error) throw new Error(error.message)
   }
   async articleVariants(parentId: string) {
     const { data, error } = await this.sb.from('catalog_articles').select(`${ARTICLE_COLUMNS}, supplier_stock, supplier_stock_at, images`)

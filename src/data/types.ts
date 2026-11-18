@@ -108,6 +108,11 @@ export interface CatalogArticle {
   images?: string[]
   /** Variant van een verzamelartikel (HA-CO: model uit de webwinkel), anders leeg. */
   variant_of?: string | null
+  /**
+   * Voorraad die de leverancier opgeeft. Bij HomeDecoBali is dat de voorraad in het magazijn van Bella, en daarmee de
+   * beschikbare voorraad aan de kassa (besluit Rick 18 november 2026). Leeg = onbekend.
+   */
+  supplier_stock?: number | null
 }
 /** Koppeling artikel en element (subartikel), op de eigen id's. */
 export interface CatalogArticleElement { parent_id: string; element_id: string; position: number }
